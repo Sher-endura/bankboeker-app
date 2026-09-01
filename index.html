@@ -1,0 +1,3350 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bankboeker — Endura Accounting &amp; Advisory</title>
+<style>
+  :root {
+    --blauw: #1c6fb8; --blauw-d: #145089; --grijs: #f4f6f8; --rand: #d9dee3;
+    --groen: #1e8a4c; --oranje: #c77700; --paars: #7b4fb8; --rood: #c0392b; --tekst: #1f2937;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: var(--tekst); background: var(--grijs); }
+  header { background: var(--blauw); color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header .sub { font-size: 12px; opacity: .85; }
+  nav { background: #fff; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
+  nav button { border: none; background: none; padding: 12px 16px; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; color: #555; }
+  nav button.actief { color: var(--blauw); border-bottom-color: var(--blauw); font-weight: 600; }
+  main { padding: 20px; max-width: 1280px; margin: 0 auto; }
+  .kaart { background: #fff; border: 1px solid var(--rand); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+  .kaart h2 { margin: 0 0 12px; font-size: 16px; }
+  .kaart h3 { margin: 18px 0 8px; font-size: 14px; }
+  label { display: block; font-size: 12px; color: #555; margin: 10px 0 3px; }
+  input[type=text], select, textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--rand); border-radius: 5px; font-size: 13px; font-family: inherit; background: #fff; }
+  input:disabled { background: #f0f2f4; }
+  .rij { display: flex; gap: 14px; flex-wrap: wrap; }
+  .rij > div { flex: 1; min-width: 160px; }
+  button.knop { background: var(--blauw); color: #fff; border: none; border-radius: 5px; padding: 9px 16px; font-size: 13px; cursor: pointer; }
+  button.knop:hover { background: var(--blauw-d); }
+  button.knop.stil { background: #fff; color: var(--blauw); border: 1px solid var(--blauw); }
+  button.knop.gevaar { background: var(--rood); }
+  button.knop:disabled { background: #b8c4ce; cursor: not-allowed; border: none; color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 9px; border-bottom: 1px solid var(--rand); text-align: left; vertical-align: middle; }
+  th { background: var(--grijs); font-weight: 600; font-size: 12px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; color: #fff; white-space: nowrap; }
+  .badge.regel { background: var(--groen); }
+  .badge.zwak { background: var(--oranje); }
+  .badge.suggestie { background: var(--paars); }
+  .badge.vraagpost { background: #8a97a3; }
+  .badge.verstuurd { background: #4a5a68; }
+  input.oms-bewerk { border: 1px solid transparent; background: transparent; width: 100%; min-width: 260px; padding: 4px 6px; }
+  input.oms-bewerk:hover, input.oms-bewerk:focus { border-color: var(--rand); background: #fff; }
+  input.oms-bewerk.verrijkt { border-left: 3px solid var(--groen); }
+  .stat { display: inline-block; margin-right: 22px; }
+  .stat b { font-size: 20px; display: block; }
+  .stat span { font-size: 12px; color: #666; }
+  .hint { font-size: 12px; color: #666; line-height: 1.5; }
+  .dropzone { border: 2px dashed var(--rand); border-radius: 8px; padding: 20px; text-align: center; color: #777; font-size: 13px; cursor: pointer; }
+  .dropzone.sleep { border-color: var(--blauw); background: #eef5fb; }
+  .dropzone.klein { padding: 12px; }
+  tr.overgeslagen { opacity: .45; text-decoration: line-through; }
+  select.gl-keuze { min-width: 220px; }
+  input.kpl-keuze { min-width: 190px; margin-top: 4px; border-color: var(--paars); }
+  .melding { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 10px 0; }
+  .melding.ok { background: #e5f5ec; color: var(--groen); }
+  .melding.fout { background: #fbeaea; color: var(--rood); }
+  footer { text-align: center; font-size: 11px; color: #999; padding: 18px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bankboeker</h1>
+  <span class="sub">vraagposten → grootboek · via DirectLink Data Link · v4.0-web</span>
+  <span style="flex:1"></span>
+  <span class="sub" id="kop-klant"></span>
+  <span class="sub" id="kop-gebruiker" style="display:none"></span>
+  <button class="knop stil" id="btn-uitloggen" style="display:none; padding:5px 10px; font-size:12px;">Uitloggen</button>
+</header>
+<nav>
+  <button data-tab="ronde">🔁 Ronde</button>
+  <button data-tab="inlezen" class="actief">1 · Inlezen</button>
+  <button data-tab="controleren">2 · Controleren</button>
+  <button data-tab="exporteren">3 · Doorvoeren</button>
+  <button data-tab="klanten">Klanten &amp; instellingen</button>
+  <button data-tab="regels">Boekingsregels</button>
+  <button data-tab="herhaal">📅 Herhaal</button>
+</nav>
+<main>
+
+<!-- ============ TAB: RONDE ============ -->
+<section id="tab-ronde" style="display:none">
+  <div class="kaart">
+    <h2>Ronde langs alle klanten</h2>
+    <p class="hint">Loopt elke administratie langs en vraagt de vraagposten-rekening op. Je ziet in één lijst welke klanten openstaande <b>conceptregels uit de bank</b> hebben — dus waar werk klaarligt. Historie, handmatige correcties en boekstukken die de Bankboeker al heeft weggeboekt blijven buiten de lijst.</p>
+    <p class="hint">Eén administratie per aanroep (zo werkt de Twinfield-koppeling), dus een volledige ronde duurt een aantal minuten. Doe er <b>één per dag</b>: Twinfield rekent dataverkeer af via de Fair Use Policy.</p>
+    <p class="hint" id="ronde-keuze"></p>
+    <p style="margin-top:10px">
+      <button class="knop" id="btn-ronde">🔁 Ronde starten</button>
+      <button class="knop stil" id="btn-verken">🔍 Verkennen: wie boekt er?</button>
+      <button class="knop stil" id="btn-ronde-stop" style="display:none">Stoppen</button>
+    </p>
+    <div id="melding-ronde"></div>
+    <div id="ronde-voortgang" class="hint" style="margin-top:8px"></div>
+    <div style="overflow-x:auto; margin-top:10px">
+      <table id="tabel-ronde">
+        <thead><tr><th>Administratie</th><th>Naam</th><th class="num">Open regels</th><th>Bankboekstukken</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="kaart" id="kaart-verkenning" style="display:none">
+    <h2>Wie boekt welke administratie?</h2>
+    <p class="hint">Twinfield zet op elk boekstuk de naam van degene die het maakte. Staat daar een collega van ons, dan is de klant voor ons; staat er iemand van de klant zelf, dan boeken zij <b>in house</b> en zet de app die administratie uit de ronde. Geel = het voorstel wijkt af van wat er nu staat. Niets wordt gewijzigd tot je op <b>Voorstel overnemen</b> klikt.</p>
+    <p class="hint">Onze eigen boekers (komma's ertussen; pas aan als er iemand bijkomt):
+      <input type="text" id="ronde-boekers" style="width:100%; max-width:560px; margin-top:4px"></p>
+    <p><button class="knop" id="btn-verken-overnemen" style="display:none">Voorstel overnemen</button></p>
+    <div style="overflow-x:auto; margin-top:10px">
+      <table id="tabel-verkenning">
+        <thead><tr><th>Administratie</th><th>Naam</th><th>Boekt</th><th>Beoordeling</th><th>Nu</th><th>Voorstel</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TAB: INLEZEN ============ -->
+<section id="tab-inlezen">
+  <div class="kaart">
+    <h2>Klant</h2>
+    <div class="rij">
+      <div>
+        <label>Administratie</label>
+        <select id="klant-select"></select>
+      </div>
+      <div>
+        <label>Vraagposten-rekening</label>
+        <input type="text" id="info-vraagposten" disabled>
+      </div>
+      <div>
+        <label>Kennis</label>
+        <input type="text" id="info-regels" disabled>
+      </div>
+    </div>
+  </div>
+  <div class="kaart">
+    <h2>Vraagposten inlezen</h2>
+    <p class="hint">Exporteer in Twinfield de <b>grootboekkaart</b> van de vraagposten-rekening (of de volledige grootboekkaart — regels op andere rekeningen worden genegeerd) en sleep het bestand hieronder. Zowel de <b>CSV-</b> als de <b>Excel-export (XLSX)</b> van Twinfield werkt direct.</p>
+    <div class="dropzone" id="drop-vraagposten">Sleep hier het vraagposten-bestand (CSV of Excel), of klik om te bladeren</div>
+    <input type="file" id="file-vraagposten" accept=".csv,.txt,.xlsx" style="display:none">
+    <p style="margin-top:10px"><button class="knop" id="btn-live-vraagposten">🔗 Live ophalen uit Twinfield (via DirectLink)</button></p>
+    <p class="hint">Haalt de openstaande vraagposten van de <b>actieve klant</b> rechtstreeks uit Twinfield via DirectLink (2 seconden). Je hoeft hier niets voor in te vullen — het verkeer loopt beveiligd via het doorgeefluik, met jouw inlog. De app neemt alleen de <b>conceptregels uit de bank</b> mee: definitieve historie en boekstukken die al met een Bankboeker-memoriaal zijn weggeboekt worden overgeslagen.</p>
+    <div id="melding-inlezen"></div>
+  </div>
+  <div class="kaart">
+    <h2>Bankafschriften koppelen (optioneel)</h2>
+    <p class="hint">Twinfield kapt omschrijvingen af op 40 tekens. Sleep hier de bankafschriften van dezelfde periode (CSV, Excel of PDF); de app zoekt per regel de <b>volledige omschrijving</b> erbij — herkenbaar aan de groene rand in stap 2, waar je de tekst ook nog kunt aanpassen. Volgorde: eerst de vraagposten inlezen, dan de afschriften. PDF-ondersteuning is bèta en vereist internet.</p>
+    <div class="dropzone klein" id="drop-afschrift">Sleep hier bankafschrift(en) (CSV, Excel of PDF)</div>
+    <input type="file" id="file-afschrift" accept=".csv,.txt,.xlsx,.pdf" style="display:none">
+    <div id="melding-afschrift"></div>
+  </div>
+</section>
+
+<!-- ============ TAB: CONTROLEREN ============ -->
+<section id="tab-controleren" style="display:none">
+  <div class="kaart">
+    <div class="stat"><b id="st-totaal">0</b><span>regels ingelezen</span></div>
+    <div class="stat"><b id="st-herkend" style="color:var(--groen)">0</b><span>herkend via regel</span></div>
+    <div class="stat"><b id="st-suggestie" style="color:var(--paars)">0</b><span>suggestie (controleren)</span></div>
+    <div class="stat"><b id="st-vraagpost" style="color:#8a97a3">0</b><span>blijft op vraagposten</span></div>
+    <div class="stat"><b id="st-skip">0</b><span>overgeslagen</span></div>
+  </div>
+  <div class="kaart">
+    <h2>Controleer de voorstellen</h2>
+    <p style="margin-bottom:10px">
+      <button class="knop stil" id="btn-zoek-onbekend">🔍 Onbekende omschrijvingen online opzoeken</button>
+      <button class="knop gevaar" id="btn-sessie-wissen">✕ Ingelezen bestand wissen</button>
+    </p>
+    <p class="hint">Onherkende regels blijven standaard op de vraagposten-rekening staan — die kun je later alsnog alloceren of naar de klant mailen (stap 3).
+    Kies je de <b>debiteuren</b>-rekening, dan verschijnt een extra veld voor het klantnummer (gaat mee als KPL/dim2).
+    Elke aanpassing wordt een boekingsregel voor de volgende keer. Klik op een rijnummer om een regel over te slaan.</p>
+    <div id="melding-schema-leeg"></div>
+    <div style="overflow-x:auto">
+      <table id="tabel-review">
+        <thead><tr>
+          <th>#</th><th>Datum</th><th>Omschrijving</th><th class="num">Debet</th><th class="num">Credit</th>
+          <th>Grootboekrekening</th><th>Herkenning</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TAB: EXPORTEREN ============ -->
+<section id="tab-exporteren" style="display:none">
+  <div class="kaart">
+    <h2>A · Boekingen — rechtstreeks doorvoeren of als bestand</h2>
+    <p class="hint">
+      Alle gealloceerde regels (niet op vraagposten, niet overgeslagen) worden memoriaal-boekingen van twee regels: de gekozen rekening en de tegenboeking op de vraagposten-rekening.
+      Kolomnamen sluiten aan op de Data Link-mapping (customer_code → office, txn_type → code, account_number → dim1, KPL → dim2, side, amount, description).
+      Bij debiteuren-regels bevat de KPL-kolom het klantnummer.
+    </p>
+    <div class="rij">
+      <div><label>Dagboekcode memoriaal (txn_type)</label><input type="text" id="exp-dagboek"></div>
+      <div><label>Valuta</label><input type="text" id="exp-valuta"></div>
+      <div><label>Standaard KPL (leeg = geen)</label><input type="text" id="exp-kpl"></div>
+    </div>
+    <p style="margin-top:14px">
+      <button class="knop" id="btn-export">Download memoriaal-CSV</button>
+      <button class="knop stil" id="btn-export-xlsx">Download als Excel (controle)</button>
+      <button class="knop stil" id="btn-leer">Correcties opslaan als boekingsregels</button>
+    </p>
+    <p class="hint">De DirectLink Data Link verwerkt het CSV-bestand; de Excel-versie is voor eigen controle of archief.</p>
+    <div id="melding-export"></div>
+
+    <h3>Journaal — zo komen de boekingen in Twinfield</h3>
+    <div style="overflow-x:auto"><table id="tabel-journaal"><thead><tr><th>Boeking</th><th>Rekening</th><th>Naam</th><th>KPL</th><th class="num">Debet</th><th class="num">Credit</th></tr></thead><tbody></tbody></table></div>
+
+    <h3>Direct doorvoeren in Twinfield (via DirectLink)</h3>
+    <p class="hint">Werkt de <b>bestaande conceptboekingen</b> in Twinfield bij: per regel wordt in het oorspronkelijke boekstuk de vraagposten-rekening vervangen door de gekozen rekening. Er komt dus géén memoriaal naast te staan — de bankboeking zelf krijgt de juiste rekening en blijft <b>concept</b>; definitief verwerken doe je in Twinfield. Vóór elke wijziging bewaart de app een reservekopie van het originele boekstuk. Regels zonder boekstuknummer gaan als vanouds via een memoriaal. In cloud-modus loopt het verkeer via het beveiligde doorgeefluik en zijn endpoint en token hieronder <b>niet nodig</b>.</p>
+    <div class="rij">
+      <div style="flex:2"><label>Endpoint (alleen zonder cloud-modus)</label><input type="text" id="dl-endpoint"></div>
+      <div style="flex:2"><label>Bearer token (alleen zonder cloud-modus)</label><input type="password" id="dl-token" placeholder="niet nodig in cloud-modus"></div>
+      <div style="flex:1; display:flex; align-items:flex-end"><button class="knop" id="btn-upload">Doorvoeren in Twinfield</button></div>
+    </div>
+    <div id="melding-upload"></div>
+
+    <h3>Technisch voorbeeld (CSV-kolommen)</h3>
+    <div style="overflow-x:auto"><table id="tabel-preview"><thead></thead><tbody></tbody></table></div>
+  </div>
+  <div class="kaart">
+    <h2>B · Invullijst — zelf invullen in het Twinfield-scherm</h2>
+    <p class="hint">Twinfield staat niet toe dat een bankboeking via de koppeling wordt gewijzigd
+      (bevestigd door Twinfield NL, 5 augustus 2026: alleen boekingen met oorsprong "import" zijn via
+      de API aan te passen, en alles wat via de bankmodule binnenkomt heeft oorsprong "bank").
+      Wil je de bankboeking zélf schoon houden — dus zonder memoriaal ernaast — dan vul je de
+      rekeningen in het invoerscherm van Twinfield in. Deze lijst staat in dezelfde volgorde als dat
+      scherm, zodat je alleen hoeft over te nemen. Open het boekstuk in Twinfield met
+      <i>Kas &amp; Banken → het afschrift</i>, of rechtstreeks via
+      <code>accounting.twinfield.com/input/default.aspx?code=BNK&amp;number=…&amp;mode=explode</code>.</p>
+    <p>
+      <button class="knop" id="btn-invullijst">Invullijst tonen</button>
+      <button class="knop stil" id="btn-invullijst-kopie" style="display:none">Kopiëren (om te plakken in Excel)</button>
+      <button class="knop stil" id="btn-invullijst-klaar" style="display:none">Ingevuld in Twinfield — markeer als verwerkt</button>
+    </p>
+    <div id="melding-invullijst"></div>
+    <div id="invullijst-inhoud" style="margin-top:10px"></div>
+  </div>
+  <div class="kaart">
+    <h2>C · Vragenlijst voor de klant</h2>
+    <p class="hint">Alle regels die op de vraagposten-rekening blijven staan, als lijst om naar de klant te mailen. De klant vult de laatste kolom in; "Endura notes" is voor intern gebruik. Download als Excel-bestand (handig om te mailen) of als puntkomma-gescheiden CSV.</p>
+    <p>
+      <button class="knop" id="btn-vragen-xlsx">Download vragenlijst (Excel)</button>
+      <button class="knop stil" id="btn-vragen">Download vragenlijst (CSV)</button>
+    </p>
+    <div id="melding-vragen"></div>
+    <h3>Voorbeeld</h3>
+    <div style="overflow-x:auto"><table id="tabel-vragen-preview"><thead></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<!-- ============ TAB: KLANTEN & INSTELLINGEN ============ -->
+<section id="tab-klanten" style="display:none">
+  <div class="kaart">
+    <h2>Klantprofielen</h2>
+    <div style="overflow-x:auto">
+      <table id="tabel-klanten">
+        <thead><tr><th>In ronde</th><th>Code (office)</th><th>Naam</th><th>Boekt</th><th>Vraagposten</th><th>Deb.-rek.</th><th>Cred.-rek.</th><th>Regels</th><th>Schema</th><th>Relaties</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px">
+      <button class="knop" id="btn-klant-nieuw">+ Nieuwe klant</button>
+      <button class="knop stil" id="btn-profiel-export">Profielen exporteren (JSON)</button>
+      <button class="knop stil" id="btn-profiel-import">Profielen importeren</button>
+      <input type="file" id="file-profielen" accept=".json" style="display:none">
+    </p>
+    <p class="hint">Kantoorbreed delen: exporteer de profielen naar een JSON-bestand op de gedeelde schijf; collega's importeren datzelfde bestand en hebben dan dezelfde klanten, schema's en geleerde regels. (In de gedeelde database-modus is dit alleen nog nodig voor back-ups.)</p>
+    <h3>Klantenlijst importeren</h3>
+    <p class="hint">CSV of Excel met kolommen klantnaam en klantcode (in willekeurige volgorde). Voor elke nieuwe code wordt een profiel aangemaakt met vraagposten-rekening 2999 als standaard — controleer die per klant in de instellingen. Bestaande profielen blijven ongemoeid.</p>
+    <div class="dropzone klein" id="drop-klantenlijst">Sleep hier de klantenlijst (CSV of Excel)</div>
+    <input type="file" id="file-klantenlijst" accept=".csv,.txt,.xlsx" style="display:none">
+    <p style="margin-top:10px"><button class="knop stil" id="btn-live-administraties">🔗 Administraties live ophalen uit Twinfield</button></p>
+    <div id="melding-klantenlijst"></div>
+    <div id="blok-negeerlijst" style="display:none; margin-top:14px">
+      <h3>Verwijderde administraties</h3>
+      <p class="hint">Deze blijven bij "Administraties live ophalen" buiten de lijst — ook bij collega's. Klik op een code om hem weer toe te laten.</p>
+      <p id="negeerlijst-codes"></p>
+    </div>
+  </div>
+
+  <div class="kaart">
+    <h2>Online opzoeken van onbekende omschrijvingen (Google, gratis)</h2>
+    <p class="hint">De app kan onbekende tegenpartijen automatisch opzoeken via Google (officiële API, <b>100 gratis zoekopdrachten per dag</b>, geen betaalgegevens nodig). Resultaten worden per klant gecachet — elke leverancier wordt maar één keer ooit opgezocht. Voorstellen verschijnen als suggestie in stap 2 en worden na jouw goedkeuring een vaste boekingsregel. Instellen: (1) maak op <b>programmablesearchengine.google.com</b> een zoekmachine aan met "hele web doorzoeken" en kopieer de <b>Zoekmachine-ID</b>; (2) zet in <b>console.cloud.google.com</b> de "Custom Search API" aan en maak een <b>API-sleutel</b>.</p>
+    <div class="rij">
+      <div><label>Google API-sleutel</label><input type="password" id="zk-key" placeholder="AIza…"></div>
+      <div><label>Zoekmachine-ID (cx)</label><input type="text" id="zk-cx" placeholder="a1b2c3…"></div>
+      <div><label>Zoekcontext (locatie)</label><input type="text" id="zk-suffix" value="Aruba"></div>
+    </div>
+    <p style="margin-top:10px"><label style="display:inline"><input type="checkbox" id="zk-auto" checked> Automatisch opzoeken bij het inlezen van vraagposten</label></p>
+    <div id="melding-zoeken"></div>
+  </div>
+
+  <div class="kaart" id="kaart-instellingen" style="display:none">
+    <h2 id="klant-form-titel">Instellingen</h2>
+    <div class="rij">
+      <div><label>Administratiecode (customer_code / office) *</label><input type="text" id="kf-code"></div>
+      <div><label>Naam *</label><input type="text" id="kf-naam"></div>
+    </div>
+    <div class="rij">
+      <div><label>Vraagposten-rekening *</label><input type="text" id="kf-vraagposten" placeholder="bijv. 2999"></div>
+      <div><label>Debiteuren-rekening (voor klantnummer/KPL)</label><input type="text" id="kf-debiteurengl" placeholder="bijv. 0300"></div>
+      <div><label>Crediteuren-rekening (voor leveranciersnummer/KPL)</label><input type="text" id="kf-crediteurengl" placeholder="bijv. 1600"></div>
+      <div><label>Dagboekcode memoriaal</label><input type="text" id="kf-memo" placeholder="bijv. MEMO"></div>
+    </div>
+    <div class="rij">
+      <div><label>Valuta</label><input type="text" id="kf-valuta" placeholder="AWG"></div>
+      <div><label>Banken / dagboeken (notitie)</label><input type="text" id="kf-dagboeken" placeholder="bijv. BNK, BNK1 (CMB Bank)"></div>
+    </div>
+    <p style="margin-top:12px">
+      <button class="knop" id="btn-klant-opslaan">Opslaan</button>
+      <button class="knop stil" id="btn-klant-sluiten">Sluiten</button>
+    </p>
+    <div id="melding-klant"></div>
+
+    <div id="kaart-uploads">
+      <h3>Grootboekrekeningschema <span class="hint" id="schema-status"></span></h3>
+      <p class="hint">CSV of Excel met per regel <code>code;naam</code> (of een Twinfield-export met kolommen Code en Naam). Vervangt het huidige schema niet, maar vult het aan.</p>
+      <div class="dropzone klein" id="drop-schema">Sleep hier het rekeningschema (CSV of Excel)</div>
+      <input type="file" id="file-schema" accept=".csv,.txt,.xlsx" style="display:none">
+      <p style="margin-top:8px"><button class="knop stil" id="btn-live-schema">🔗 Live ophalen uit Twinfield</button></p>
+      <div id="melding-schema"></div>
+
+      <h3>Debiteurenlijst (klantnummers) <span class="hint" id="deb-status"></span></h3>
+      <p class="hint">CSV of Excel met per regel <code>klantnummer;klantnaam</code> (Twinfield debiteuren-export). Wordt gebruikt voor het KPL-veld bij debiteuren-boekingen.</p>
+      <div class="dropzone klein" id="drop-debiteuren">Sleep hier de debiteurenlijst (CSV of Excel)</div>
+      <input type="file" id="file-debiteuren" accept=".csv,.txt,.xlsx" style="display:none">
+      <p style="margin-top:8px"><button class="knop stil" id="btn-live-debiteuren">🔗 Live ophalen uit Twinfield</button></p>
+      <div id="melding-debiteuren"></div>
+
+      <h3>Crediteurenlijst (leveranciersnummers) <span class="hint" id="cred-status"></span></h3>
+      <p class="hint">CSV of Excel met per regel <code>leveranciersnummer;naam</code> (Twinfield crediteuren-export). Nodig om betalingen aan leveranciers op de crediteur af te letteren — dan zet de app het leveranciersnummer in het KPL-veld.</p>
+      <div class="dropzone klein" id="drop-crediteuren">Sleep hier de crediteurenlijst (CSV of Excel)</div>
+      <input type="file" id="file-crediteuren" accept=".csv,.txt,.xlsx" style="display:none">
+      <p style="margin-top:8px"><button class="knop stil" id="btn-live-crediteuren">🔗 Live ophalen uit Twinfield</button></p>
+      <div id="melding-crediteuren"></div>
+
+      <h3>Leren uit historie <span class="hint" id="regels-status"></span></h3>
+      <p class="hint">Sleep een grootboekkaart-export met <b>reeds geboekte</b> banktransacties (alle rekeningen). Mag zo vaak als je wilt — bestaande regels worden bijgewerkt, nieuwe toegevoegd. Ook het rekeningschema wordt hieruit aangevuld.</p>
+      <div class="dropzone klein" id="drop-historie">Sleep hier een historie-export (CSV of Excel)</div>
+      <input type="file" id="file-historie" accept=".csv,.txt,.xlsx" style="display:none">
+      <p style="margin-top:8px">
+        <button class="knop stil" id="btn-live-leren">🔗 Leren uit de laatste bankboekstukken in Twinfield</button>
+        <input type="number" id="leren-aantal" value="30" min="1" max="60" style="width:70px" title="Hoeveel bankboekstukken teruglezen">
+      </p>
+      <p class="hint">Leest de laatste bankboekstukken van deze klant en leert van elke regel die al een grootboekrekening heeft — mét de volledige bankomschrijving, dus ook wat in de vraagpostenlijst afgekapt wordt. De recentste boeking wint.
+        <b>Neem er minstens 30</b>: dingen die maandelijks terugkomen (zoals salaris) zitten anders buiten bereik, en juist daar zit het onderscheid tussen bijvoorbeeld vaste lonen en losse krachten.</p>
+      <div id="melding-historie"></div>
+
+      <h3>Opschonen</h3>
+      <p class="hint">Voor als er per ongeluk een bestand bij de verkeerde klant is ingelezen, geleerd of geëxporteerd. Wissen kan niet ongedaan worden gemaakt — controleer dat de juiste klant bovenaan dit formulier staat.</p>
+      <p>
+        <button class="knop gevaar" id="btn-wis-regels">Boekingsregels wissen</button>
+        <button class="knop gevaar" id="btn-wis-verstuurd">Verwerkt-markeringen wissen</button>
+        <button class="knop gevaar" id="btn-wis-schema">Rekeningschema wissen</button>
+        <button class="knop gevaar" id="btn-wis-debiteuren">Debiteurenlijst wissen</button>
+        <button class="knop gevaar" id="btn-wis-zoekcache">Zoek-cache wissen</button>
+      </p>
+      <div id="melding-opschonen"></div>
+    </div>
+  </div>
+
+  <div class="kaart" id="kaart-gebruikers" style="display:none">
+    <h2>Gebruikers (medewerkers)</h2>
+    <p class="hint">Nieuwe accounts krijgen het standaardwachtwoord <b>enter123</b> en moeten bij de eerste inlog verplicht een eigen wachtwoord kiezen. Resetten zet het wachtwoord terug naar enter123, opnieuw met verplichte wijziging. Alleen @endura-aruba.com-adressen.</p>
+    <div class="rij">
+      <div style="flex:2"><label>E-mailadres nieuwe medewerker</label><input type="email" id="gb-email" placeholder="naam@endura-aruba.com"></div>
+      <div style="flex:1; display:flex; align-items:flex-end"><button class="knop" id="btn-gb-aanmaken">+ Account aanmaken</button></div>
+    </div>
+    <div id="melding-gebruikers"></div>
+    <div style="overflow-x:auto; margin-top:10px">
+      <table id="tabel-gebruikers">
+        <thead><tr><th>E-mailadres</th><th>Aangemaakt</th><th>Laatste inlog</th><th>Wachtwoord</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TAB: REGELS ============ -->
+<section id="tab-regels" style="display:none">
+  <div class="kaart">
+    <h2>Boekingsregels van <span id="regels-klantnaam"></span></h2>
+    <p class="hint">Patroon = de eerste woorden van de bankomschrijving, zonder cijfers en leestekens. Regels ontstaan uit historie-exports en uit jouw correcties in het controlescherm.</p>
+    <input type="text" id="regels-zoek" placeholder="Zoek in patronen…" style="max-width:320px; margin-bottom:10px">
+    <div style="overflow-x:auto">
+      <table id="tabel-regels">
+        <thead><tr><th>Patroon</th><th>Grootboek</th><th>Naam</th><th class="num">Keren gezien</th><th class="num">Consistentie</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TAB: HERHAAL ============ -->
+<section id="tab-herhaal" style="display:none">
+  <div class="kaart">
+    <h2>Herhaalboekingen</h2>
+    <p class="hint">Vaste boekingen (huur, lease, afschrijvingen …) die <b>vanzelf</b> op de ingestelde dag naar Twinfield gaan — als <b>concept</b>-memoriaal via DirectLink, dus definitief boeken blijft handwerk in Twinfield. De klok draait elke ochtend om 07:00 (Arubaanse tijd), ook als niemand de app open heeft. Deze lijst is gedeeld met alle collega's.</p>
+    <p style="margin-bottom:10px">
+      <button class="knop" id="btn-hh-nieuw">+ Nieuwe herhaalboeking</button>
+      <button class="knop stil" id="btn-hh-ronde" title="Voert direct uit wat vandaag (of eerder) aan de beurt is — hetzelfde als wat de klok 's ochtends doet.">▶ Ronde nu draaien</button>
+    </p>
+    <div id="melding-herhaal"></div>
+    <div style="overflow-x:auto">
+      <table id="tabel-herhaal">
+        <thead><tr><th>Klant</th><th>Naam</th><th>Ritme</th><th>Volgende keer</th><th class="num">Bedrag</th><th>Laatste uitslag</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="kaart" id="kaart-hh-form" style="display:none">
+    <h2 id="hh-form-titel">Nieuwe herhaalboeking</h2>
+    <div class="rij">
+      <div><label>Administratie *</label><select id="hh-klant"></select></div>
+      <div><label>Naam (voor jezelf, bv. "Huur kantoor") *</label><input type="text" id="hh-naam"></div>
+      <div><label>Dagboek (memoriaal)</label><input type="text" id="hh-dagboek" placeholder="MEMO"></div>
+    </div>
+    <div class="rij">
+      <div><label>Ritme *</label><select id="hh-ritme">
+        <option value="maandelijks">Maandelijks</option>
+        <option value="kwartaal">Per kwartaal</option>
+        <option value="jaarlijks">Jaarlijks</option>
+      </select></div>
+      <div><label>Eerste boekdatum * (bepaalt ook de vaste dag; dag 31 = laatste dag van de maand)</label><input type="date" id="hh-datum"></div>
+      <div><label style="margin-bottom:8px">Aan/uit</label><label style="display:inline; font-size:13px; color:var(--tekst)"><input type="checkbox" id="hh-actief" checked> Actief (meedoen in de dagelijkse ronde)</label></div>
+    </div>
+    <h3>Journaalregels</h3>
+    <p class="hint">Vast bedrag per regel; debet en credit moeten in evenwicht zijn. In de omschrijving mag <code>{maand}</code>, <code>{jaar}</code> of <code>{kwartaal}</code> — dat wordt bij het versturen ingevuld (bv. "Huur {maand} {jaar}" → "Huur september 2026"). KPL is voor een klant- of leveranciersnummer (mag leeg).</p>
+    <div style="overflow-x:auto">
+      <table id="tabel-hh-regels">
+        <thead><tr><th>Grootboekrekening</th><th>KPL</th><th>Omschrijving</th><th class="num">Bedrag</th><th>Debet/credit</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p style="margin-top:8px">
+      <button class="knop stil" id="btn-hh-regel">+ Regel toevoegen</button>
+      <span id="hh-balans" class="hint" style="margin-left:14px"></span>
+    </p>
+    <p style="margin-top:14px">
+      <button class="knop" id="btn-hh-opslaan">Opslaan</button>
+      <button class="knop stil" id="btn-hh-sluiten">Sluiten</button>
+    </p>
+    <div id="melding-hh-form"></div>
+  </div>
+
+  <div class="kaart">
+    <h2>Logboek</h2>
+    <p class="hint">Elke poging van de ronde, nieuwste bovenaan. Een fout wordt <b>niet</b> vanzelf opnieuw geprobeerd (een time-out kan tóch verwerkt zijn — eerst in Twinfield kijken, dan hier met "Verstuur nu" opnieuw).</p>
+    <div style="overflow-x:auto">
+      <table id="tabel-herhaal-log">
+        <thead><tr><th>Wanneer</th><th>Klant</th><th>Naam</th><th>Boekdatum</th><th>Uitslag</th><th>Door</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>Bankboeker <b>v4.0-web</b> (31-08-2026) · <span id="voet-modus">lokale modus</span> · Endura Accounting &amp; Advisory</footer>
+
+<!-- ============ LOGIN-OVERLAY (alleen in cloud-modus) ============ -->
+<div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--grijs); z-index:100; align-items:center; justify-content:center;">
+  <div class="kaart" style="max-width:380px; text-align:left; padding:32px;">
+    <h2 style="margin-bottom:6px; text-align:center">Bankboeker</h2>
+    <p class="hint" style="margin-bottom:22px; text-align:center">Endura Accounting &amp; Advisory — log in met je werkaccount.</p>
+    <form id="login-form">
+      <label>E-mailadres</label>
+      <input type="email" id="login-email" autocomplete="username" placeholder="naam@endura-aruba.com" style="width:100%; margin-bottom:10px" required>
+      <label>Wachtwoord</label>
+      <input type="password" id="login-wachtwoord" autocomplete="current-password" style="width:100%; margin-bottom:16px" required>
+      <button class="knop" id="btn-login" type="submit" style="width:100%; padding:12px;">Inloggen</button>
+    </form>
+    <div id="melding-login"></div>
+  </div>
+</div>
+
+<!-- ============ WACHTWOORD-WIJZIGEN-OVERLAY (verplicht na enter123) ============ -->
+<div id="wachtwoord-overlay" style="display:none; position:fixed; inset:0; background:var(--grijs); z-index:100; align-items:center; justify-content:center;">
+  <div class="kaart" style="max-width:380px; text-align:left; padding:32px;">
+    <h2 style="margin-bottom:6px; text-align:center">Kies je eigen wachtwoord</h2>
+    <p class="hint" style="margin-bottom:22px; text-align:center">Je bent ingelogd met het standaardwachtwoord. Kies eerst een eigen wachtwoord (minimaal 8 tekens), daarna gaat de app open.</p>
+    <form id="wachtwoord-form">
+      <label>Nieuw wachtwoord</label>
+      <input type="password" id="ww-nieuw" autocomplete="new-password" style="width:100%; margin-bottom:10px" required>
+      <label>Nog een keer</label>
+      <input type="password" id="ww-nogeens" autocomplete="new-password" style="width:100%; margin-bottom:16px" required>
+      <button class="knop" id="btn-wachtwoord" type="submit" style="width:100%; padding:12px;">Opslaan en doorgaan</button>
+    </form>
+    <div id="melding-wachtwoord"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="seed_t2pan.js"></script>
+<script>
+"use strict";
+/* ================= Opslag & staat ================= */
+const OPSLAG = "bankboeker.profielen.v1";
+let profielen = [];
+let huidig = null;                    // actief klantprofiel
+let regelsSessie = [];                // ingelezen vraagposten-regels
+let bewerkIndex = -1;                 // klantinstellingen
+
+/* ---- Cloud (Supabase): actief zodra config.js is ingevuld; anders lokale modus ---- */
+const CFG = window.BANKBOEKER_CONFIG || {};
+const CLOUD = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase);
+let sb = null, gebruiker = null;
+
+async function initAuth() {
+  if (!CLOUD) return true;
+  sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+  sb.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_IN" && document.getElementById("login-overlay").style.display !== "none") location.reload();
+    if (event === "SIGNED_OUT") location.reload();
+  });
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { toonLogin(); return false; }
+  gebruiker = session.user;
+  const domein = (CFG.TOEGESTAAN_DOMEIN || "").toLowerCase();
+  if (domein && !(gebruiker.email || "").toLowerCase().endsWith("@" + domein)) {
+    toonLogin();
+    toonMelding("melding-login", "fout", `Alleen ${domein}-accounts hebben toegang. Ingelogd als ${escapeHtml(gebruiker.email || "?")}.`);
+    await sb.auth.signOut();
+    return false;
+  }
+  // Standaardwachtwoord (enter123)? Dan eerst een eigen wachtwoord kiezen.
+  if (gebruiker.user_metadata && gebruiker.user_metadata.moet_wachtwoord_wijzigen === true) {
+    document.getElementById("wachtwoord-overlay").style.display = "flex";
+    return false;
+  }
+  document.getElementById("kop-gebruiker").textContent = gebruiker.email;
+  document.getElementById("kop-gebruiker").style.display = "";
+  document.getElementById("btn-uitloggen").style.display = "";
+  return true;
+}
+function toonLogin() {
+  document.getElementById("login-overlay").style.display = "flex";
+}
+async function laadProfielen() {
+  if (CLOUD) {
+    const { data, error } = await sb.from("klanten").select("code,data").order("code");
+    if (error) { alert("Kan klanten niet laden: " + error.message); return []; }
+    const spec = data.find(r => r.code === NEGEER_CODE);
+    negeerlijst = (spec && spec.data && Array.isArray(spec.data.codes)) ? spec.data.codes : [];
+    const lijst = data.filter(r => r.code !== NEGEER_CODE).map(r => r.data);
+    for (const p of lijst) { p.rules = regelsNaarMap(p.rules); migreer(p); }
+    return lijst;
+  }
+  let lijst = null;
+  try { negeerlijst = JSON.parse(localStorage.getItem(NEGEER_OPSLAG)) || []; } catch (e) {}
+  try {
+    const opgeslagen = JSON.parse(localStorage.getItem(OPSLAG));
+    if (Array.isArray(opgeslagen) && opgeslagen.length) lijst = opgeslagen;
+  } catch (e) {}
+  if (!lijst) {
+    lijst = (window.SEED_PROFILES || []).map(p => ({ ...p, rules: regelsNaarMap(p.rules) }));
+  }
+  for (const p of lijst) migreer(p);
+  return lijst;
+}
+/* Cloud-schrijfacties: opslaan gebundeld (debounce), verwijderen direct */
+let bewaarTimer = null;
+function bewaarCloud() {
+  clearTimeout(bewaarTimer);
+  bewaarTimer = setTimeout(async () => {
+    const rijen = profielen.map(p => ({ code: p.code, data: p, updated_by: gebruiker ? gebruiker.email : null }));
+    const { error } = await sb.from("klanten").upsert(rijen, { onConflict: "code" });
+    if (error) alert("Opslaan in de database mislukt: " + error.message);
+  }, 800);
+}
+async function verwijderCloud(code) {
+  if (!CLOUD) return;
+  const { error } = await sb.from("klanten").delete().eq("code", code);
+  if (error) alert("Verwijderen in de database mislukt: " + error.message);
+}
+/* Verwijderde administraties onthouden — gedeeld met collega's. Zonder dit zet
+   "Administraties live ophalen" een weggegooide administratie er de volgende
+   keer gewoon weer in (die bestaat immers nog in Twinfield). Opgeslagen als
+   aparte rij in de klanten-tabel (code "_verwijderd"), zodat er geen
+   databasewijziging nodig is; in lokale modus in localStorage. */
+const NEGEER_CODE = "_verwijderd";
+const NEGEER_OPSLAG = "bankboeker.negeerlijst.v1";
+let negeerlijst = [];
+function bewaarNegeerlijst() {
+  if (CLOUD) {
+    sb.from("klanten").upsert({ code: NEGEER_CODE, data: { codes: negeerlijst }, updated_by: gebruiker ? gebruiker.email : null }, { onConflict: "code" })
+      .then(({ error }) => { if (error) alert("De lijst met verwijderde administraties kon niet worden opgeslagen: " + error.message); });
+  } else {
+    localStorage.setItem(NEGEER_OPSLAG, JSON.stringify(negeerlijst));
+  }
+}
+function negeer(code) {
+  code = (code || "").toUpperCase();
+  if (code && !negeerlijst.includes(code)) { negeerlijst.push(code); bewaarNegeerlijst(); }
+}
+/* Wie een code bewust opnieuw toevoegt (nieuwe klant, import), wil hem terug. */
+function ontNegeer(code) {
+  const i = negeerlijst.indexOf((code || "").toUpperCase());
+  if (i >= 0) { negeerlijst.splice(i, 1); bewaarNegeerlijst(); }
+}
+function vernieuwNegeerlijst() {
+  const blok = document.getElementById("blok-negeerlijst");
+  if (!blok) return;
+  blok.style.display = negeerlijst.length ? "" : "none";
+  const houder = document.getElementById("negeerlijst-codes");
+  houder.innerHTML = "";
+  for (const code of [...negeerlijst].sort()) {
+    const b = document.createElement("button");
+    b.className = "knop stil"; b.style.margin = "0 6px 6px 0";
+    b.textContent = code + " ✕";
+    b.title = "Weer toelaten — komt terug bij de volgende 'Administraties live ophalen'";
+    b.addEventListener("click", () => {
+      ontNegeer(code); vernieuwNegeerlijst();
+      audit("klant weer toegelaten", code, "");
+      toonMelding("melding-klantenlijst", "ok", `${escapeHtml(code)} wordt weer toegelaten en komt terug bij de volgende "Administraties live ophalen".`);
+    });
+    houder.appendChild(b);
+  }
+}
+async function audit(actie, klantCode, details) {
+  if (!CLOUD) return;
+  await sb.from("audit_log").insert({ email: gebruiker ? gebruiker.email : null, actie, klant: klantCode, details });
+}
+function migreer(p) {
+  p.rules = p.rules || {};
+  p.schema = p.schema || [];
+  p.debiteuren = p.debiteuren || [];
+  p.crediteuren = p.crediteuren || [];
+  p.verstuurd = p.verstuurd || {};   // vingerafdruk → datum van verwerking (tegen dubbel boeken)
+  p.zoekCache = p.zoekCache || {};   // zoeksleutel → gevonden webtekst (elke leverancier maar één keer opzoeken)
+  if (p.meedoen === undefined) p.meedoen = true;   // doet deze klant mee in de ronde? (klanten die zelf boeken: uit)
+  p.boeker = p.boeker || "";         // wie de bankregels in Twinfield boekt (uit fin.trs.head.username)
+  // Eerste keuze: een rekening die exact "Debiteuren" of "Crediteuren" heet —
+  // schema's bevatten vaak ook varianten als "Kruisposten Crediteuren" of
+  // "Voorz dubieuze debiteuren", en die zijn hier niet bedoeld.
+  const kiesRekening = (p, patroonExact, patroonRuim) =>
+    (p.schema.find(s => patroonExact.test((s.naam || "").trim())) ||
+     p.schema.find(s => patroonRuim.test(s.naam || "")) || {}).gl || "";
+  if (!p.debiteurenGl) p.debiteurenGl = kiesRekening(p, /^debiteuren$/i, /debiteuren/i);
+  if (!p.crediteurenGl) p.crediteurenGl = kiesRekening(p, /^crediteuren$/i, /crediteuren/i);
+  // regels die naar de vraagposten-rekening zelf wijzen zijn nooit zinvol
+  for (const k in p.rules) if (p.rules[k].gl === p.vraagposten) delete p.rules[k];
+}
+/* Debiteuren én crediteuren krijgen een relatienummer mee in het KPL-veld
+   (dim2). Betalingen aan leveranciers horen op de crediteur afgeletterd te
+   worden, net zoals ontvangsten op de debiteur. */
+function relatieSoort(gl, profiel) {
+  const p = profiel || huidig;
+  if (!p || !gl) return null;
+  if (p.debiteurenGl && gl === p.debiteurenGl) return "deb";
+  if (p.crediteurenGl && gl === p.crediteurenGl) return "cred";
+  return null;
+}
+function relatieLijst(gl, profiel) {
+  const p = profiel || huidig;
+  const soort = relatieSoort(gl, p);
+  return soort === "deb" ? (p.debiteuren || []) : soort === "cred" ? (p.crediteuren || []) : [];
+}
+function regelsNaarMap(lijst) {
+  if (!Array.isArray(lijst)) return lijst || {};
+  const map = {};
+  for (const r of lijst) map[r.key] = { gl: r.gl, glName: r.glName, seen: r.seen, share: r.share };
+  return map;
+}
+function bewaar() {
+  if (CLOUD) bewaarCloud();
+  else localStorage.setItem(OPSLAG, JSON.stringify(profielen));
+}
+
+/* ================= Classificatie ================= */
+function normaliseer(omschrijving) {
+  let d = (omschrijving || "").toUpperCase();
+  d = d.replace(/[0-9]+/g, "").replace(/[^A-Z ]/g, " ").replace(/ +/g, " ").trim();
+  return d;
+}
+/* Soorten betaling die de bank in de omschrijving zet. Ze bepalen samen mét de
+   naam op welke rekening een regel hoort: dezelfde medewerker krijgt tips op
+   3000 en salaris op 1800 of 4050 (geleerd bij Herber, 5 aug 2026). Daarom
+   staat het soort ook in de leersleutel, en niet alleen de naam. */
+const SOORTEN = [
+  { her: /\bSALAR|\bNETTOLON|\bNETTO\s?LOON|\bLO(ON|NEN)\b|\bPAYROLL\b|\bWAGES?\b/, label: "SALARIS", mooi: "Salaris" },
+  { her: /\bTIPS?\b|\bTIPS\b/, label: "TIPS", mooi: "Tips" },
+  { her: /\bVAKANTIE|\bVACATION\b/, label: "VAKANTIEGELD", mooi: "Vakantiegeld" },
+  { her: /\bBONUS\b/, label: "BONUS", mooi: "Bonus" },
+  { her: /\bADVANCE\b|\bVOORSCHOT\b/, label: "VOORSCHOT", mooi: "Voorschot" }
+];
+/* Ruis die niets zegt over wie of wat: losse letters (uit I.F.O., V/D),
+   aanspreektitels en betaalwijze-afkortingen. */
+const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND", "VAN", "DEN", "DER", "WEEK"]);
+function soortVan(omschrijving) {
+  const b = (omschrijving || "").toUpperCase();
+  return SOORTEN.find(s => s.her.test(b)) || null;
+}
+function naamWoorden(omschrijving) {
+  let d = (omschrijving || "").toUpperCase();
+  d = d.replace(/\bI\.?\s*F\.?\s*O\.?/g, " ");            // "in favor of" = ten gunste van
+  const soort = soortVan(d);
+  if (soort) d = d.replace(soort.her, " ");
+  d = d.replace(/[0-9]+/g, " ").replace(/[^A-Z ]/g, " ").replace(/ +/g, " ").trim();
+  return d.split(" ").filter(w => w.length > 1 && !OMS_RUIS.has(w));
+}
+function sleutels(omschrijving) {
+  const naam = naamWoorden(omschrijving);
+  const soort = soortVan(omschrijving);
+  const uit = [];
+  if (soort) {
+    if (naam.length >= 2) uit.push(naam.slice(0, 2).join(" ") + " " + soort.label);
+    if (naam.length >= 1) uit.push(naam[0] + " " + soort.label);
+  }
+  if (naam.length >= 3) uit.push(naam.slice(0, 3).join(" "));
+  if (naam.length >= 2) uit.push(naam.slice(0, 2).join(" "));
+  if (naam.length >= 1) uit.push(naam[0]);
+  if (soort) uit.push(soort.label);                        // laatste redmiddel: alleen het soort
+  // Terugval op de oudere sleutelvorm, zodat eerder geleerde regels blijven werken.
+  const oud = normaliseer(omschrijving).split(" ").filter(Boolean);
+  if (oud.length >= 3) uit.push(oud.slice(0, 3).join(" "));
+  if (oud.length >= 2) uit.push(oud.slice(0, 2).join(" "));
+  if (oud.length >= 1) uit.push(oud[0]);
+  return [...new Set(uit)];
+}
+/* Een leesbare omschrijving voor de boeking: bankreferenties eruit, soort en
+   periode vooraan, naam in normale schrijfwijze. Het origineel blijft bewaard
+   (omsOrigineel) en is in de app als tooltip te zien. Max 40 tekens — dat is
+   wat Twinfield op een detailregel toestaat. */
+/* Afkortingen die in hoofdletters horen te blijven. */
+const OMS_KAPITALEN = new Set(["ACH", "MBA", "POS", "ATM", "FX", "AMEX", "BAZV", "AOV", "AZV", "LB", "SVB", "TIP", "TIPS", "NV", "VBA", "USD", "AWG", "EUR"]);
+/* rekeningNaam meegeven laat het soort ook uit het rekeningschema komen: een
+   batchbetaling die alleen "I.F.O. CESAR" heet, wordt op rekening "Te betalen
+   Tips" leesbaar als "Tips Cesar". */
+function netteOmschrijving(ruw, rekeningNaam) {
+  const boven = (ruw || "").toUpperCase();
+  const soort = soortVan(boven) || (rekeningNaam ? soortVan(rekeningNaam) : null);
+  const periode = boven.match(/\b(0?[1-9]|1[0-2])\/(20\d{2})\b/);
+  const week = boven.match(/\bWEEK\s*(\d{1,2})\b/);
+  const naam = naamWoorden(ruw);
+  const gezien = new Set(), uniek = [];
+  for (const w of naam) if (!gezien.has(w)) { gezien.add(w); uniek.push(w); }   // "ELIOMAR DANIA ELIOMAR DANIA"
+  const titel = uniek.map(w => OMS_KAPITALEN.has(w) ? w
+    : w.toLowerCase().replace(/(^|[\/\-])([a-zà-ſ])/g, (m, v, l) => v + l.toUpperCase())).join(" ");
+  const delen = [];
+  if (soort) delen.push(soort.mooi);
+  if (week) delen.push("week " + week[1]);
+  if (periode) delen.push(periode[0]);
+  if (titel) delen.push(titel);
+  const uit = delen.join(" ").replace(/\s{2,}/g, " ").trim();
+  return (uit || (ruw || "").trim()).slice(0, 40);
+}
+function classificeer(omschrijving, profiel) {
+  for (const k of sleutels(omschrijving)) {
+    const r = profiel.rules[k];
+    if (r && r.gl !== profiel.vraagposten) return { ...r, key: k };
+  }
+  return classificeerBenaderend(omschrijving, profiel);
+}
+/* Namen worden in bankomschrijvingen verschillend gespeld — bij Herber stond
+   dezelfde medewerker als "QUISHAWN DANIA" en als "QUISHANWN E DANIA", en dan
+   mist een exacte sleutel de geleerde regel (4050 Losse krachten). Daarom een
+   tweede ronde die één of twee tekens verschil toestaat. Voorwaarden houden het
+   veilig: hetzelfde soort betaling, lange sleutels, en één duidelijke winnaar. */
+function tekenAfstand(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let vorige = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const rij = [i];
+    let besteInRij = i;
+    for (let j = 1; j <= b.length; j++) {
+      rij[j] = Math.min(vorige[j] + 1, rij[j - 1] + 1, vorige[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (rij[j] < besteInRij) besteInRij = rij[j];
+    }
+    if (besteInRij > max) return max + 1;      // deze rij kan het al niet meer worden
+    vorige = rij;
+  }
+  return vorige[b.length];
+}
+function classificeerBenaderend(omschrijving, profiel) {
+  const eigen = sleutels(omschrijving)[0];
+  if (!eigen || eigen.length < 8) return null;
+  const soort = soortVan(omschrijving);
+  const achtervoegsel = soort ? " " + soort.label : "";
+  if (soort && !eigen.endsWith(achtervoegsel)) return null;
+  const treffers = [];
+  for (const k in profiel.rules) {
+    if (profiel.rules[k].gl === profiel.vraagposten) continue;
+    if (soort ? !k.endsWith(achtervoegsel) : !!SOORTEN.find(s => k.endsWith(" " + s.label))) continue;
+    if (tekenAfstand(eigen, k, 2) <= 2) treffers.push(k);
+  }
+  const rekeningen = new Set(treffers.map(k => profiel.rules[k].gl));
+  if (rekeningen.size !== 1) return null;       // niets of onbeslist: liever een mens
+  const k = treffers[0];
+  return { ...profiel.rules[k], key: k, benaderd: true };
+}
+
+/* ---- Slimme suggestie: redeneren over de omschrijving t.o.v. het rekeningschema ---- */
+const SYNONIEMEN = [
+  { her: /\b(SALARIS|SALARY|PAYROLL|LOON|WAGES?|PAYMENT SALARIS)\b/, zoek: ["lonen", "salaris"] },
+  { her: /\b(LOSSE|FREELANCE|CONTRACTOR)\b/, zoek: ["losse krachten"] },
+  { her: /\b(HUUR|RENT|LEASE PAND)\b/, zoek: ["huur"] },
+  { her: /\b(LEASE|LEASING)\b/, zoek: ["lease"] },
+  { her: /\b(SETAR|DIGICEL|TELEFOON|PHONE|TELECOM|MOBILE)\b/, zoek: ["telefoon"] },
+  { her: /\b(INTERNET|WIFI|WEBAFAX|HOSTING|DOMAIN)\b/, zoek: ["internet", "computer"] },
+  { her: /\b(ELMAR|ELECTRICIT|ELECTRA|UTILIT|WEB ARUBA|ENERGIEBEDRIJF)\b/, zoek: ["electriciteit", "water"] },
+  { her: /\b(VERZEKERING|INSURANCE|ASSURANT|ENNIA|GUARDIAN)\b/, zoek: ["verzekering"] },
+  { her: /\b(BENZINE|FUEL|GASOLINE|VALERO|TEXACO|TOTAL STATION|WASH)\b/, zoek: ["benzine", "onderhoud en benzine"] },
+  { her: /\b(MARKETING|ADVERT|SOCIAL|FACEBOOK|INSTAGRAM|PROMO|INFLUENCER)\b/, zoek: ["marketing"] },
+  { her: /\b(CLEANING|SCHOONMAAK|LAUNDRY|WASSERIJ)\b/, zoek: ["schoonmaak"] },
+  { her: /\b(SECURITY|BEVEILIG|ALARM)\b/, zoek: ["beveiliging"] },
+  { her: /\b(CURSUS|TRAINING|OPLEIDING|COURSE|WORKSHOP)\b/, zoek: ["bijscholing", "cursus"] },
+  { her: /\b(NOTARIS|LEGAL|ADVOCA|LAWYER|CONSULT|ADVIES)\b/, zoek: ["advieskosten", "advies"] },
+  { her: /\b(ACCOUNTING|ADMINISTRAT|BOEKHOUD)\b/, zoek: ["accounting", "advies"] },
+  { her: /\b(SVB|SOCIALE VERZEKERING)\b/, zoek: ["svb"] },
+  { her: /\b(BELASTING|TAX|BBO|IMPUESTO|DIMP|ONTVANGER)\b/, zoek: ["bbo", "belasting"] },
+  { her: /\b(AOV|AWW)\b/, zoek: ["aov"] },
+  { her: /\b(AZV)\b/, zoek: ["azv"] },
+  { her: /\b(LOONBELASTING)\b/, zoek: ["loonbelasting"] },
+  { her: /\b(FREIGHT|CARGO|SHIPPING|DOUANE|CUSTOMS|IMPORT DUT|VERZEND|COURIER|DHL|FEDEX|POST)\b/, zoek: ["verzend", "vracht"] },
+  { her: /\b(KANTOOR|OFFICE SUPPLIES|STATIONER)\b/, zoek: ["kantoorartikelen", "kantoor"] },
+  { her: /\b(ONDERHOUD|MAINTENANCE|REPAIR|REPARATIE|PLUMB|HANDYMAN)\b/, zoek: ["onderhoud"] },
+  { her: /\b(BANK ?KOSTEN|CHARGES|FEE|DEBIT NOTE|COMMISSION)\b/, zoek: ["bankkosten"] },
+  { her: /\b(FOOD|BAKERY|MEAT|COFFEE|KOFFIE|SUPERMARKET|SUPERMARKT|TRADING|GROCERY|PRODUCE|BEVERAGE)\b/, zoek: ["kostprijs food", "kostprijs omzet", "kostprijs"] },
+  { her: /\b(DRANK|LIQUOR|WINE|BEER|BEVERAGES)\b/, zoek: ["kostprijs drank"] },
+  { her: /\b(KEUKEN|KITCHEN|EQUIPMENT KEUKEN)\b/, zoek: ["keuken"] },
+  { her: /\b(HOTEL|RESORT|RESTAURANT|CAFE|HORECA)\b/, zoek: ["debiteuren"] },
+  { her: /\b(TERUGBOEKING|REFUND|STORNO|REVERSAL)\b/, zoek: ["debiteuren", "crediteuren"] },
+];
+function suggereer(omschrijving, profiel) {
+  const d = " " + normaliseer(omschrijving) + " ";
+  // 1) synoniemen: herken het concept, zoek de rekening op naam in het schema van déze klant
+  for (const s of SYNONIEMEN) {
+    if (!s.her.test(d)) continue;
+    for (const zoek of s.zoek) {
+      const kandidaat = profiel.schema.find(x => x.naam.toLowerCase().includes(zoek) && x.gl !== profiel.vraagposten);
+      if (kandidaat) return { gl: kandidaat.gl, glName: kandidaat.naam, reden: "herkend concept" };
+    }
+  }
+  // 2) directe woordovereenkomst tussen omschrijving en rekeningnaam
+  // generieke banktermen uitsluiten: "credit" mag niet op "Crediteuren" matchen
+  const STOP = new Set(["CREDIT","DEBIT","CARDS","KAART","PAYMENT","TRANSFER","CHARGE","CHARGES","MOBILE","MOBILEIOS","MOBILEWEB","AZARMOBILEWEB","INVOICE","COMPANY","LIMITED","ARUBA","ORANJESTAD","NOORD","SAVANETA","CARIBBEAN","INTERNATIONAL"]);
+  const woorden = d.trim().split(" ").filter(w => w.length >= 5 && !STOP.has(w));
+  for (const w of woorden) {
+    const kandidaat = profiel.schema.find(x => x.naam.toUpperCase().includes(w) && x.gl !== profiel.vraagposten);
+    if (kandidaat) return { gl: kandidaat.gl, glName: kandidaat.naam, reden: "woord “" + w.toLowerCase() + "”" };
+  }
+  return null;
+}
+
+/* ================= Excel (.xlsx) lezen & schrijven — zonder externe bibliotheken ================= */
+async function xlsxNaarCSV(buffer) {
+  const bestanden = await unzip(buffer);
+  const dec = new TextDecoder();
+  const parser = new DOMParser();
+  let shared = [];
+  if (bestanden.has("xl/sharedStrings.xml")) {
+    const ss = parser.parseFromString(dec.decode(bestanden.get("xl/sharedStrings.xml")), "text/xml");
+    shared = [...ss.getElementsByTagName("si")].map(si => si.textContent);
+  }
+  const bladNaam = [...bestanden.keys()].filter(n => /^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort()[0];
+  if (!bladNaam) throw new Error("Geen werkblad gevonden in het Excel-bestand.");
+  const blad = parser.parseFromString(dec.decode(bestanden.get(bladNaam)), "text/xml");
+  const rijen = [];
+  for (const rij of blad.getElementsByTagName("row")) {
+    const cellen = [];
+    let volgende = 0; // niet elke schrijver zet celverwijzingen (r="A1"); dan positioneel tellen
+    for (const c of rij.getElementsByTagName("c")) {
+      const refLetters = (c.getAttribute("r") || "").replace(/\d+/g, "");
+      const kol = refLetters ? kolomIndex(refLetters) : volgende;
+      volgende = kol + 1;
+      const t = c.getAttribute("t");
+      let v = "";
+      if (t === "inlineStr") v = c.textContent;
+      else {
+        const vEl = c.getElementsByTagName("v")[0];
+        v = vEl ? vEl.textContent : "";
+        if (t === "s") v = shared[+v] != null ? shared[+v] : "";
+      }
+      cellen[kol] = v;
+    }
+    const rijUit = [];
+    for (let i = 0; i < cellen.length; i++) rijUit.push(cellen[i] == null ? "" : cellen[i]);
+    rijen.push(rijUit);
+  }
+  return rijen.map(r => r.map(v => csvVeld(String(v), ",")).join(",")).join("\r\n");
+}
+function kolomIndex(letters) { let n = 0; for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64); return Math.max(0, n - 1); }
+async function unzip(buffer) {
+  const b = new Uint8Array(buffer);
+  const dv = new DataView(buffer);
+  let eocd = -1;
+  for (let i = b.length - 22; i >= Math.max(0, b.length - 65558); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Geen geldig Excel-bestand.");
+  const aantal = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const uit = new Map();
+  for (let i = 0; i < aantal; i++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const methode = dv.getUint16(p + 10, true);
+    const compGrootte = dv.getUint32(p + 20, true);
+    const naamLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commLen = dv.getUint16(p + 32, true);
+    const offset = dv.getUint32(p + 42, true);
+    const naam = new TextDecoder().decode(b.subarray(p + 46, p + 46 + naamLen));
+    const lNaamLen = dv.getUint16(offset + 26, true);
+    const lExtraLen = dv.getUint16(offset + 28, true);
+    const dataStart = offset + 30 + lNaamLen + lExtraLen;
+    const data = b.subarray(dataStart, dataStart + compGrootte);
+    if (methode === 0) uit.set(naam, data);
+    else if (methode === 8) uit.set(naam, await inflate(data));
+    p += 46 + naamLen + extraLen + commLen;
+  }
+  return uit;
+}
+async function inflate(data) {
+  const ds = new DecompressionStream("deflate-raw");
+  const stream = new Blob([data]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+/* Excel-datums kunnen als serienummer binnenkomen (bijv. 46036) */
+function excelDatum(s) {
+  const t = String(s || "").trim();
+  if (/^\d{5}(\.0+)?$/.test(t)) {
+    const d = new Date(Date.UTC(1899, 11, 30) + parseFloat(t) * 86400000);
+    return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + "/" + d.getUTCFullYear();
+  }
+  return t;
+}
+/* xlsx schrijven: minimale maar volwaardige OOXML-structuur, zip zonder compressie */
+function maakXlsx(rijen) {
+  const enc = new TextEncoder();
+  const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const kolLetter = n => { let s = ""; n++; while (n) { s = String.fromCharCode(65 + (n - 1) % 26) + s; n = Math.floor((n - 1) / 26); } return s; };
+  let sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>';
+  rijen.forEach((r, ri) => {
+    sheet += `<row r="${ri + 1}">`;
+    r.forEach((v, ci) => {
+      if (v === "" || v == null) return;
+      const ref = kolLetter(ci) + (ri + 1);
+      if (ri > 0 && /^-?\d+(\.\d+)?$/.test(String(v).trim()))
+        sheet += `<c r="${ref}"><v>${String(v).trim()}</v></c>`;
+      else
+        sheet += `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+    });
+    sheet += "</row>";
+  });
+  sheet += "</sheetData></worksheet>";
+  const bestanden = [
+    ["[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'],
+    ["_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ["xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Blad1" sheetId="1" r:id="rId1"/></sheets></workbook>'],
+    ["xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'],
+    ["xl/worksheets/sheet1.xml", sheet]
+  ].map(([naam, inhoud]) => [naam, enc.encode(inhoud)]);
+  return zipStored(bestanden);
+}
+function zipStored(bestanden) {
+  const enc = new TextEncoder();
+  const delen = [], cd = [];
+  let offset = 0;
+  for (const [naam, data] of bestanden) {
+    const naamB = enc.encode(naam);
+    const crc = crc32(data);
+    const lokaal = new Uint8Array(30 + naamB.length);
+    const dv = new DataView(lokaal.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, data.length, true);
+    dv.setUint32(22, data.length, true);
+    dv.setUint16(26, naamB.length, true);
+    lokaal.set(naamB, 30);
+    delen.push(lokaal, data);
+    const centraal = new Uint8Array(46 + naamB.length);
+    const cdv = new DataView(centraal.buffer);
+    cdv.setUint32(0, 0x02014b50, true);
+    cdv.setUint16(4, 20, true); cdv.setUint16(6, 20, true);
+    cdv.setUint32(16, crc, true);
+    cdv.setUint32(20, data.length, true);
+    cdv.setUint32(24, data.length, true);
+    cdv.setUint16(28, naamB.length, true);
+    cdv.setUint32(42, offset, true);
+    centraal.set(naamB, 46);
+    cd.push(centraal);
+    offset += lokaal.length + data.length;
+  }
+  let cdLen = 0; for (const c of cd) cdLen += c.length;
+  const einde = new Uint8Array(22);
+  const edv = new DataView(einde.buffer);
+  edv.setUint32(0, 0x06054b50, true);
+  edv.setUint16(8, bestanden.length, true);
+  edv.setUint16(10, bestanden.length, true);
+  edv.setUint32(12, cdLen, true);
+  edv.setUint32(16, offset, true);
+  return new Blob([...delen, ...cd, einde], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+}
+let CRC_TABEL = null;
+function crc32(data) {
+  if (!CRC_TABEL) {
+    CRC_TABEL = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_TABEL[i] = c; }
+  }
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) c = CRC_TABEL[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+/* ================= CSV parseren ================= */
+function parseCSV(tekst) {
+  const scheider = detecteerScheider(tekst);
+  const rijen = []; let rij = [], veld = "", inQuote = false;
+  for (let i = 0; i < tekst.length; i++) {
+    const c = tekst[i];
+    if (inQuote) {
+      if (c === '"') { if (tekst[i+1] === '"') { veld += '"'; i++; } else inQuote = false; }
+      else veld += c;
+    } else if (c === '"') inQuote = true;
+    else if (c === scheider) { rij.push(veld); veld = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (veld !== "" || rij.length) { rij.push(veld); rijen.push(rij); rij = []; veld = ""; }
+      if (c === "\r" && tekst[i+1] === "\n") i++;
+    } else veld += c;
+  }
+  if (veld !== "" || rij.length) { rij.push(veld); rijen.push(rij); }
+  return rijen;
+}
+function detecteerScheider(tekst) {
+  const kop = tekst.split(/\r?\n/)[0] || "";
+  return (kop.split(";").length > kop.split(",").length) ? ";" : ",";
+}
+function vindKolom(koppen, ...namen) {
+  const genorm = koppen.map(k => k.toLowerCase().replace(/[^a-z]/g, ""));
+  for (const n of namen) {
+    const idx = genorm.findIndex(k => k.includes(n));
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+function parseBedrag(s) {
+  if (typeof s === "number") return s;
+  s = (s || "").trim().replace(/[^\d.,-]/g, "");
+  if (!s) return 0;
+  const lc = s.lastIndexOf(","), lp = s.lastIndexOf(".");
+  if (lc > lp) s = s.replace(/\./g, "").replace(",", ".");
+  else s = s.replace(/,/g, "");
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+/* Grootboekkaart-export → regels. Twinfield exporteert XLSX mét kopregel, CSV zónder; beide worden herkend. */
+function leesGrootboekkaart(tekst) {
+  if (tekst.slice(0, 2) === "PK")
+    throw new Error("Dit is een Excel-bestand (.xlsx). Open het in Excel en kies Opslaan als → CSV, of gebruik direct de CSV-export uit Twinfield.");
+  const rijen = parseCSV(tekst);
+  if (!rijen.length) throw new Error("Bestand bevat geen dataregels.");
+  const kop = rijen[0];
+  const heeftKop = kop.some(c => /omschrijving|grootboek|boekdatum/i.test(c));
+  let iGl, iGlNm, iDag, iNr, iDat, iPer, iOms, iDeb, iCre, data;
+  if (heeftKop) {
+    iGl   = vindKolom(kop, "codegrootboek");
+    iGlNm = vindKolom(kop, "naamgrootboek");
+    iDag  = vindKolom(kop, "code");
+    iNr   = vindKolom(kop, "boekstuk", "transactienummer", "nummer");
+    iDat  = vindKolom(kop, "boekdatum", "datum");
+    iPer  = vindKolom(kop, "periode");
+    iOms  = vindKolom(kop, "omschrijving");
+    iDeb  = vindKolom(kop, "debet", "debit");
+    iCre  = vindKolom(kop, "credit");
+    if (iOms < 0 || iDeb < 0 || iCre < 0) throw new Error("Kolommen niet herkend — verwacht een Twinfield grootboekkaart-export (met Omschrijving, Debet, Credit).");
+    data = rijen.slice(1);
+  } else {
+    if (kop.length < 11) throw new Error("Kolommen niet herkend — verwacht een Twinfield grootboekkaart-export (17 kolommen of met kopregel).");
+    // Kolom 5 is in de koploze export het boekstuknummer; hieronder wordt
+    // gecontroleerd dat het echt een nummer is voordat het gebruikt wordt.
+    [iGl, iGlNm, iDag, iNr, iDat, iPer, iOms, iDeb, iCre] = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    data = rijen;
+  }
+  return data.filter(r => r.length > 2).map(r => {
+    const nr = iNr >= 0 ? String(r[iNr] || "").trim() : "";
+    return {
+      gl: iGl >= 0 ? (r[iGl] || "").trim() : "",
+      glNaam: iGlNm >= 0 ? (r[iGlNm] || "").trim() : "",
+      dagboek: iDag >= 0 ? (r[iDag] || "").trim() : "",
+      // Alleen een zuiver nummer accepteren: bij een onverwachte kolomindeling
+      // vervalt het boekstuk en valt die regel automatisch terug op de memoriaal-route.
+      boekstuk: /^\d+$/.test(nr) ? nr : "",
+      datum: iDat >= 0 ? excelDatum(r[iDat]) : "",
+      periode: iPer >= 0 ? (r[iPer] || "").trim() : "",
+      omschrijving: (r[iOms] || "").trim(),
+      debet: parseBedrag(r[iDeb]),
+      credit: parseBedrag(r[iCre])
+    };
+  });
+}
+
+/* Eenvoudige code;naam-lijst (rekeningschema, debiteuren) */
+function leesCodeNaamLijst(tekst) {
+  if (tekst.slice(0, 2) === "PK")
+    throw new Error("Dit is een Excel-bestand (.xlsx). Sla het eerst op als CSV.");
+  const rijen = parseCSV(tekst);
+  if (!rijen.length) throw new Error("Bestand is leeg.");
+  let data = rijen, iCode = 0, iNaam = 1;
+  const kop = rijen[0];
+  if (kop.some(c => /code|naam|name/i.test(c)) && !/^\d/.test((kop[0] || "").trim())) {
+    iCode = Math.max(0, vindKolom(kop, "code"));
+    iNaam = vindKolom(kop, "naam", "name");
+    if (iNaam < 0) iNaam = iCode + 1;
+    data = rijen.slice(1);
+  }
+  return data
+    .map(r => ({ code: (r[iCode] || "").trim(), naam: (r[iNaam] || "").trim() }))
+    .filter(x => x.code);
+}
+
+/* ================= Verwerkt-registratie (tegen dubbel boeken) ================= */
+function vingerafdruk(r) {
+  return naarISO(r.datum) + "|" + ((r.debet || 0) - (r.credit || 0)).toFixed(2) + "|" +
+    (r.omsOrigineel || r.omschrijving || "").toUpperCase().replace(/\s+/g, " ").trim().slice(0, 50);
+}
+function markeerVerstuurd() {
+  const vandaag = new Date().toISOString().slice(0, 10);
+  let n = 0;
+  for (const r of regelsSessie) {
+    if (r.skip || !r.keuze || r.keuze === huidig.vraagposten) continue;
+    huidig.verstuurd[vingerafdruk(r)] = vandaag;
+    r.alVerstuurd = vandaag;
+    r.skip = true;
+    n++;
+  }
+  bewaar();
+  return n;
+}
+
+/* ================= Bankafschriften: volledige omschrijvingen ================= */
+function verrijkMetAfschrift(tekst) {
+  if (!regelsSessie.length) throw new Error("Lees eerst de vraagposten in (hierboven), en sleep daarna het afschrift.");
+  const pool = [];
+  for (const rij of parseCSV(tekst)) for (const cel of rij) {
+    const s = String(cel).replace(/\s+/g, " ").trim();
+    if (s.length >= 20) pool.push(s);
+  }
+  let verrijkt = 0;
+  for (const r of regelsSessie) {
+    if (r.volledig) continue;
+    const kort = (r.omsOrigineel || "").toUpperCase().replace(/\s+/g, " ").trim();
+    if (kort.length < 15) continue;
+    const match = pool.find(p => p.toUpperCase().includes(kort) && p.length > r.omsOrigineel.length + 3);
+    if (!match) continue;
+    const idx = match.toUpperCase().indexOf(kort);
+    let vol = match.slice(idx).replace(/[\s0-9.,-]+$/, "").trim();  // datum/bedragen aan het eind eraf
+    if (vol.length <= r.omsOrigineel.length) continue;
+    r.volledig = vol;
+    if (r.omschrijving === r.omsOrigineel) r.omschrijving = vol;
+    verrijkt++;
+  }
+  return verrijkt;
+}
+/* PDF-tekst extraheren (bèta) — laadt pdf.js on demand */
+async function pdfNaarTekst(buffer) {
+  if (!window.pdfjsLib) {
+    await new Promise((ok, nee) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      s.onload = ok;
+      s.onerror = () => nee(new Error("PDF-bibliotheek kon niet laden (internetverbinding nodig voor PDF's). Gebruik anders de CSV- of Excel-versie van het afschrift."));
+      document.head.appendChild(s);
+    });
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+  const doc = await pdfjsLib.getDocument({ data: buffer }).promise;
+  const regels = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const inhoud = await (await doc.getPage(p)).getTextContent();
+    const perY = new Map();
+    for (const item of inhoud.items) {
+      const y = Math.round(item.transform[5]);
+      if (!perY.has(y)) perY.set(y, []);
+      perY.get(y).push(item);
+    }
+    for (const [, items] of [...perY.entries()].sort((a, b) => b[0] - a[0])) {
+      items.sort((a, b) => a.transform[4] - b.transform[4]);
+      const regel = items.map(i => i.str).join(" ").replace(/\s+/g, " ").trim();
+      if (regel) regels.push(regel);
+    }
+  }
+  // als CSV met één kolom teruggeven zodat de rest van de pijplijn hetzelfde blijft
+  return regels.map(l => '"' + l.replace(/"/g, '""') + '"').join("\r\n");
+}
+
+/* ================= Inlezen vraagposten ================= */
+function inlezenVraagposten(tekst) {
+  const eersteRij = parseCSV(tekst)[0] || [];
+  if (eersteRij.length <= 3 && eersteRij.join(",").toLowerCase().includes("klant"))
+    throw new Error("Dit lijkt een klantenlijst — sleep die in het tabblad 'Klanten & instellingen', onderaan bij 'Klantenlijst importeren'.");
+  const alle = leesGrootboekkaart(tekst);
+  const vp = huidig.vraagposten;
+  let regels = alle.filter(r => !r.gl || r.gl === vp);
+  const genegeerd = alle.length - regels.length;
+  regels = regels.filter(r => r.omschrijving);
+  verwerkVraagposten(regels,
+    `${regels.length} vraagposten-regels ingelezen` +
+    (genegeerd ? ` (${genegeerd} regels op andere rekeningen genegeerd)` : "") + `.`);
+}
+function verwerkVraagposten(regels, melding) {
+  const vp = huidig.vraagposten;
+  regelsSessie = regels.map((r, i) => {
+    const regel = classificeer(r.omschrijving, huidig);
+    const sug = regel ? null : suggereer(r.omschrijving, huidig);
+    const keuze = regel ? regel.gl : (r.stornoRekening || (sug ? sug.gl : vp));
+    const rekNaam = (huidig.schema.find(s => s.gl === keuze) || {}).naam || "";
+    const item = {
+      ...r, nr: i + 1, rij: r.rij || null,
+      omschrijving: (r.storno ? "Storno " : "") + netteOmschrijving(r.omschrijving, rekNaam),
+      omsOrigineel: r.omschrijving, volledig: null,
+      keuze,
+      kplKeuze: "",
+      regel, sug, skip: false, alVerstuurd: null
+    };
+    const wanneer = huidig.verstuurd[vingerafdruk(item)];
+    if (wanneer) { item.alVerstuurd = wanneer; item.skip = true; }
+    return item;
+  });
+  toonMelding("melding-inlezen", "ok", melding + ` Actieve klant: <b>${escapeHtml(huidig.code)} · ${escapeHtml(huidig.naam)}</b> — verkeerde klant? Wis het bestand in stap 2 en kies de juiste. Ga naar stap 2 · Controleren.`);
+  vernieuwReview(); kiesTab("controleren");
+  zoekOnlineOnbekenden(false);   // automatisch online opzoeken (indien ingesteld)
+}
+
+/* ================= Leren uit historie ================= */
+function leerUitHistorie(tekst, profiel) {
+  const alle = leesGrootboekkaart(tekst);
+  const telling = {};
+  let bruikbaar = 0;
+  for (const r of alle) {
+    if (!r.omschrijving || !r.gl) continue;
+    if (r.gl === profiel.vraagposten) continue;
+    const w = normaliseer(r.omschrijving).split(" ").filter(Boolean);
+    if (!w.length) continue;
+    const key = w.slice(0, Math.min(3, w.length)).join(" ");
+    telling[key] = telling[key] || {};
+    telling[key][r.gl] = telling[key][r.gl] || { n: 0, naam: r.glNaam };
+    telling[key][r.gl].n++;
+    bruikbaar++;
+    if (r.gl && !profiel.schema.some(s => s.gl === r.gl)) profiel.schema.push({ gl: r.gl, naam: r.glNaam });
+  }
+  let nieuw = 0, bijgewerkt = 0;
+  for (const key in telling) {
+    let tot = 0, beste = null, besteN = 0;
+    for (const gl in telling[key]) {
+      tot += telling[key][gl].n;
+      if (telling[key][gl].n > besteN) { besteN = telling[key][gl].n; beste = gl; }
+    }
+    const bestaand = profiel.rules[key];
+    profiel.rules[key] = { gl: beste, glName: telling[key][beste].naam, seen: (bestaand ? bestaand.seen : 0) + tot, share: besteN / tot };
+    bestaand ? bijgewerkt++ : nieuw++;
+  }
+  profiel.schema.sort((a, b) => a.gl.localeCompare(b.gl));
+  bewaar();
+  return { bruikbaar, nieuw, bijgewerkt };
+}
+
+/* ================= Review-tabel ================= */
+function vernieuwReview() {
+  const tbody = document.querySelector("#tabel-review tbody");
+  tbody.innerHTML = "";
+  // Zonder rekeningschema is de keuzelijst leeg en valt er niets te kiezen —
+  // dat is verwarrend als de app het niet zegt.
+  if (huidig && !huidig.schema.length) {
+    toonMelding("melding-schema-leeg", "fout",
+      `De app kent de grootboekrekeningen van <b>${escapeHtml(huidig.code)}</b> nog niet, daarom is de keuzelijst leeg. ` +
+      `Ga naar <b>Klanten &amp; instellingen</b>, open deze klant en klik op <b>🔗 Leren uit de laatste bankboekstukken in Twinfield</b> — ` +
+      `dat haalt het rekeningschema op én leert meteen hoe deze klant eerder geboekt is. Kom daarna hier terug en lees opnieuw in.`);
+  } else {
+    document.getElementById("melding-schema-leeg").innerHTML = "";
+  }
+  for (const r of regelsSessie) {
+    const tr = document.createElement("tr");
+    if (r.skip) tr.className = "overgeslagen";
+    let badge;
+    if (r.alVerstuurd) badge = `<span class="badge verstuurd" title="Klik op het rijnummer om de markering te wissen en opnieuw te kunnen boeken">✓ verwerkt op ${r.alVerstuurd}</span>`;
+    else if (r.regel && r.regel.benaderd) badge =
+      `<span class="badge zwak" title="Geen exacte treffer; de omschrijving lijkt op de eerder geboekte regel &quot;${escapeHtml(r.regel.key)}&quot; (bijvoorbeeld een naam die anders gespeld is). Controleer deze regel.">lijkt op · ${escapeHtml(r.regel.key)}</span>`;
+    else if (r.regel) badge = r.regel.share >= 0.8
+      ? `<span class="badge regel">regel · ${r.regel.seen}× gezien</span>`
+      : `<span class="badge zwak">wisselend (${Math.round(r.regel.share*100)}%)</span>`;
+    else if (r.stornoRekening) badge = `<span class="badge suggestie" title="Deze creditregel heft een debetregel in hetzelfde boekstuk op; dezelfde rekening voorgesteld zodat ze tegen elkaar wegvallen.">terugstorting</span>`;
+    else if (r.sug) badge = `<span class="badge suggestie" title="${escapeHtml(r.sug.reden)}">suggestie · ${escapeHtml(r.sug.reden)}</span>`;
+    else badge = `<span class="badge vraagpost">→ vraagposten</span>`;
+    tr.innerHTML = `
+      <td style="cursor:pointer" title="Klik om over te slaan">${r.nr}</td>
+      <td>${escapeHtml(r.datum)}</td>
+      <td></td>
+      <td class="num">${r.debet ? r.debet.toFixed(2) : ""}</td>
+      <td class="num">${r.credit ? r.credit.toFixed(2) : ""}</td>
+      <td></td><td>${badge}</td>`;
+    tr.children[0].addEventListener("click", () => {
+      r.skip = !r.skip;
+      if (!r.skip && r.alVerstuurd) { delete huidig.verstuurd[vingerafdruk(r)]; r.alVerstuurd = null; bewaar(); }
+      vernieuwReview();
+    });
+    // omschrijving: aanpasbaar; groene rand = volledige omschrijving uit het afschrift gevonden
+    const omsInp = document.createElement("input");
+    omsInp.type = "text";
+    omsInp.className = "oms-bewerk" + (r.volledig ? " verrijkt" : "");
+    omsInp.value = r.omschrijving;
+    omsInp.title = (r.volledig ? "Volledig (uit afschrift): " + r.volledig : "Origineel (Twinfield): " + r.omsOrigineel);
+    omsInp.addEventListener("change", () => { r.omschrijving = omsInp.value; vernieuwPreviews(); });
+    tr.children[2].appendChild(omsInp);
+    const cel = tr.children[5];
+    const sel = document.createElement("select");
+    sel.className = "gl-keuze";
+    sel.innerHTML = huidig.schema.map(s =>
+      `<option value="${s.gl}" ${s.gl === r.keuze ? "selected" : ""}>${s.gl} · ${escapeHtml(s.naam)}${s.gl === huidig.vraagposten ? " (laten staan)" : ""}</option>`).join("");
+    if (!huidig.schema.some(s => s.gl === r.keuze))
+      sel.insertAdjacentHTML("afterbegin", `<option value="${escapeHtml(r.keuze)}" selected>${escapeHtml(r.keuze)}</option>`);
+    sel.addEventListener("change", () => { r.keuze = sel.value; vernieuwReview(); vernieuwStats(); vernieuwPreviews(); });
+    cel.appendChild(sel);
+    // nummer-veld bij debiteuren (klantnummer) en crediteuren (leveranciersnummer)
+    const soortRelatie = relatieSoort(r.keuze);
+    if (soortRelatie) {
+      const inp = document.createElement("input");
+      inp.type = "text"; inp.className = "kpl-keuze";
+      inp.placeholder = soortRelatie === "deb" ? "klantnummer (KPL)" : "leveranciersnummer (KPL)";
+      inp.value = r.kplKeuze;
+      inp.setAttribute("list", soortRelatie === "deb" ? "lijst-debiteuren" : "lijst-crediteuren");
+      inp.addEventListener("input", () => { r.kplKeuze = inp.value.split(" ")[0]; vernieuwPreviews(); });
+      cel.appendChild(inp);
+    }
+    tbody.appendChild(tr);
+  }
+  // keuzelijsten met debiteuren en crediteuren
+  for (const [id, lijst] of [["lijst-debiteuren", huidig.debiteuren], ["lijst-crediteuren", huidig.crediteuren]]) {
+    let dl = document.getElementById(id);
+    if (!dl) { dl = document.createElement("datalist"); dl.id = id; document.body.appendChild(dl); }
+    dl.innerHTML = (lijst || []).map(d => `<option value="${escapeHtml(d.code)}">${escapeHtml(d.naam)}</option>`).join("");
+  }
+  vernieuwStats(); vernieuwPreviews();
+}
+function vernieuwStats() {
+  let regel = 0, sug = 0, vp = 0, skip = 0;
+  for (const r of regelsSessie) {
+    if (r.skip) { skip++; continue; }
+    if (r.keuze === huidig.vraagposten) vp++;
+    else if (r.regel) regel++;
+    else sug++;
+  }
+  document.getElementById("st-totaal").textContent = regelsSessie.length;
+  document.getElementById("st-herkend").textContent = regel;
+  document.getElementById("st-suggestie").textContent = sug;
+  document.getElementById("st-vraagpost").textContent = vp;
+  document.getElementById("st-skip").textContent = skip;
+}
+
+/* ================= Export A: memoriaal ================= */
+const EXPORT_KOP = ["customer_code","txn_type","fill_date","export_currency","account_number","KPL","side","amount","Invoicenr","description"];
+function exportRijen() {
+  const dagboek = document.getElementById("exp-dagboek").value.trim() || huidig.memoDagboek;
+  const valuta = document.getElementById("exp-valuta").value.trim() || huidig.valuta;
+  const stdKpl = document.getElementById("exp-kpl").value.trim();
+  const rijen = [];
+  for (const r of regelsSessie) {
+    if (r.skip || !r.keuze || r.keuze === huidig.vraagposten) continue;
+    const bedrag = (r.debet || r.credit).toFixed(2);
+    const zijde = r.debet ? "debit" : "credit";
+    const tegenzijde = r.debet ? "credit" : "debit";
+    const oms = r.omschrijving.substring(0, 40);
+    const datum = naarISO(r.datum);
+    const kpl = (relatieSoort(r.keuze) && r.kplKeuze) ? r.kplKeuze : stdKpl;
+    rijen.push([huidig.code, dagboek, datum, valuta, r.keuze, kpl, zijde, bedrag, "", oms]);
+    rijen.push([huidig.code, dagboek, datum, valuta, huidig.vraagposten, stdKpl, tegenzijde, bedrag, "", oms]);
+  }
+  return rijen;
+}
+function naarISO(datum) {
+  const m = (datum || "").match(/^(\d{1,4})[\/\-](\d{1,2})[\/\-](\d{1,4})/);
+  if (!m) return datum;
+  if (m[1].length === 4) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  return `${m[3]}-${pad(m[1])}-${pad(m[2])}`; // Twinfield-exports zijn m/d/yyyy
+}
+function pad(n) { return String(n).padStart(2, "0"); }
+function downloadExport() {
+  const rijen = exportRijen();
+  if (!rijen.length) return;
+  const csv = [EXPORT_KOP.join(",")].concat(rijen.map(r => r.map(v => csvVeld(v, ",")).join(","))).join("\r\n");
+  const naam = `memoriaal_${huidig.code}_${new Date().toISOString().slice(0,10)}.csv`;
+  downloadBestand(naam, csv);
+  audit("memoriaal-export", huidig.code, `${rijen.length / 2} boekingen`);
+  const n = markeerVerstuurd();
+  vernieuwReview();
+  toonMelding("melding-export", "ok", `${naam} gedownload (${rijen.length} regels = ${n} boekingen). Upload via de DirectLink Data Link. De ${n} boekingen zijn gemarkeerd als verwerkt — bij opnieuw inlezen worden ze automatisch overgeslagen (markering wissen: klik op het rijnummer).`);
+}
+
+/* ================= Invullijst voor het Twinfield-scherm =================
+   De bankboeking zelf bijwerken kan niet via de koppeling (Twinfield staat dat
+   alleen toe bij oorsprong "import"; de bankmodule maakt oorsprong "bank").
+   Daarom deze lijst: het denkwerk is gedaan, alleen het overnemen niet. De
+   volgorde is die van het invoerscherm, en de bankomschrijving staat erbij
+   zodat je de regel op je scherm terugvindt. */
+function invullijstRegels() {
+  return regelsSessie
+    .filter(r => !r.skip && !r.alVerstuurd && r.keuze && r.keuze !== huidig.vraagposten)
+    .sort((a, b) => (a.dagboek + a.boekstuk).localeCompare(b.dagboek + b.boekstuk) || (a.rij || 0) - (b.rij || 0));
+}
+function toonInvullijst() {
+  const regels = invullijstRegels();
+  const houder = document.getElementById("invullijst-inhoud");
+  const open = regelsSessie.filter(r => !r.skip && !r.alVerstuurd && (!r.keuze || r.keuze === huidig.vraagposten));
+  if (!regels.length) {
+    houder.innerHTML = "";
+    document.getElementById("btn-invullijst-kopie").style.display = "none";
+    document.getElementById("btn-invullijst-klaar").style.display = "none";
+    toonMelding("melding-invullijst", "fout", "Er zijn geen regels met een gekozen rekening. Ga eerst naar <b>2 · Controleren</b>.");
+    return;
+  }
+  const perBoekstuk = new Map();
+  for (const r of regels) {
+    const k = `${r.dagboek} ${r.boekstuk}`.trim() || "zonder boekstuknummer";
+    if (!perBoekstuk.has(k)) perBoekstuk.set(k, []);
+    perBoekstuk.get(k).push(r);
+  }
+  let html = "";
+  for (const [boekstuk, groep] of perBoekstuk) {
+    html += `<h3 style="margin-top:14px">${escapeHtml(huidig.code)} · ${escapeHtml(boekstuk)} <span class="hint">— ${groep.length} regel${groep.length === 1 ? "" : "s"}</span></h3>` +
+      `<div style="overflow-x:auto"><table><thead><tr><th>Rij</th><th class="num">Bedrag</th><th>Zoals het in Twinfield staat</th><th>Rekening invullen</th><th>Omschrijving (optioneel)</th></tr></thead><tbody>` +
+      groep.map(r => {
+        const naam = (huidig.schema.find(s => s.gl === r.keuze) || {}).naam || "";
+        const kpl = (relatieSoort(r.keuze) && r.kplKeuze) ? r.kplKeuze : "";
+        return `<tr><td class="num">${r.rij || "?"}</td>` +
+          `<td class="num">${(r.debet || r.credit).toFixed(2)}${r.credit ? " C" : ""}</td>` +
+          `<td class="hint">${escapeHtml((r.omsOrigineel || "").trim())}</td>` +
+          `<td><b>${escapeHtml(r.keuze)}</b>${kpl ? ` <span class="hint">+ kpl/rel. ${escapeHtml(kpl)}</span>` : ""} <span class="hint">${escapeHtml(naam)}</span></td>` +
+          `<td>${escapeHtml(r.omschrijving)}</td></tr>`;
+      }).join("") + `</tbody></table></div>`;
+  }
+  if (open.length) {
+    html += `<p class="hint" style="margin-top:12px">Let op: <b>${open.length}</b> regel${open.length === 1 ? "" : "s"} ` +
+      `sta${open.length === 1 ? "at" : "an"} nog op de vraagposten-rekening en ${open.length === 1 ? "staat" : "staan"} dus niet in deze lijst — die moet je zelf beoordelen.</p>`;
+  }
+  houder.innerHTML = html;
+  document.getElementById("btn-invullijst-kopie").style.display = "";
+  document.getElementById("btn-invullijst-klaar").style.display = "";
+  toonMelding("melding-invullijst", "ok",
+    `${regels.length} regels in ${perBoekstuk.size} boekstuk${perBoekstuk.size === 1 ? "" : "ken"}. ` +
+    `Vul ze in Twinfield in en klik daarna op <b>Ingevuld in Twinfield</b>, dan komen ze niet opnieuw in de ronde terug.`);
+}
+function invullijstAlsTekst() {
+  return ["Boekstuk\tRij\tBedrag\tBankomschrijving\tRekening\tKPL\tOmschrijving"]
+    .concat(invullijstRegels().map(r => [
+      `${huidig.code} ${r.dagboek} ${r.boekstuk}`.trim(), r.rij || "",
+      (r.debet ? "" : "-") + (r.debet || r.credit).toFixed(2),
+      (r.omsOrigineel || "").trim(), r.keuze,
+      (relatieSoort(r.keuze) && r.kplKeuze) ? r.kplKeuze : "",
+      r.omschrijving
+    ].join("\t"))).join("\n");
+}
+
+/* ================= Export C: vragenlijst klant ================= */
+const MAANDEN = ["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"];
+function vragenKop() {
+  return ["Klantnaam", "Transactiedatum", "Periode", "Omschrijving", "Debit", "Credit", "Endura notes", huidig.naam.trim() + " description"];
+}
+function vragenRijen() {
+  const rijen = [];
+  for (const r of regelsSessie) {
+    if (r.skip || r.keuze !== huidig.vraagposten) continue;
+    let periode = r.periode;
+    if (!periode) {
+      const iso = naarISO(r.datum);
+      const m = iso.match(/^\d{4}-(\d{2})/);
+      periode = m ? MAANDEN[+m[1] - 1] + " " + iso.slice(0, 4) : "";
+    }
+    rijen.push([huidig.naam.trim(), r.datum, periode, r.omschrijving,
+      r.debet ? r.debet.toFixed(2) : "", r.credit ? r.credit.toFixed(2) : "", "", ""]);
+  }
+  return rijen;
+}
+function downloadVragen() {
+  const rijen = vragenRijen();
+  if (!rijen.length) return;
+  const csv = [vragenKop().map(v => csvVeld(v, ";")).join(";")]
+    .concat(rijen.map(r => r.map(v => csvVeld(v, ";")).join(";"))).join("\r\n");
+  const naam = `vraagposten_${huidig.code}_${new Date().toISOString().slice(0,10)}.csv`;
+  downloadBestand(naam, csv);
+  toonMelding("melding-vragen", "ok", `${naam} gedownload (${rijen.length} openstaande posten). Mail deze naar de klant; de klant vult de laatste kolom in.`);
+}
+function csvVeld(v, scheider) {
+  v = String(v);
+  return (v.includes('"') || v.includes(scheider) || v.includes("\n")) ? '"' + v.replace(/"/g, '""') + '"' : v;
+}
+function downloadBestand(naam, inhoud) {
+  downloadBlob(naam, new Blob(["﻿" + inhoud], { type: "text/csv;charset=utf-8" }));
+}
+function downloadBlob(naam, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = naam; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function downloadExportXlsx() {
+  const rijen = exportRijen();
+  if (!rijen.length) return;
+  const naam = `memoriaal_${huidig.code}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  downloadBlob(naam, maakXlsx([EXPORT_KOP, ...rijen]));
+  toonMelding("melding-export", "ok", `${naam} gedownload (Excel, ter controle — de Data Link verwerkt de CSV-versie).`);
+}
+function downloadVragenXlsx() {
+  const rijen = vragenRijen();
+  if (!rijen.length) return;
+  const naam = `vraagposten_${huidig.code}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  downloadBlob(naam, maakXlsx([vragenKop(), ...rijen]));
+  toonMelding("melding-vragen", "ok", `${naam} gedownload (${rijen.length} openstaande posten). Mail deze naar de klant; de klant vult de laatste kolom in.`);
+}
+
+/* ================= Journaal-weergave ================= */
+function vernieuwJournaal() {
+  const tbody = document.querySelector("#tabel-journaal tbody");
+  if (!huidig) { tbody.innerHTML = ""; return; }
+  const stdKpl = document.getElementById("exp-kpl").value.trim();
+  const glNaam = gl => { const s = huidig.schema.find(x => x.gl === gl); return s ? s.naam : ""; };
+  const boekingen = regelsSessie.filter(r => !r.skip && r.keuze && r.keuze !== huidig.vraagposten);
+  let html = "", totD = 0, totC = 0, nr = 0;
+  for (const r of boekingen) {
+    nr++;
+    const bedrag = r.debet || r.credit;
+    const kpl = (relatieSoort(r.keuze) && r.kplKeuze) ? r.kplKeuze : stdKpl;
+    html += `<tr style="background:var(--grijs)"><td colspan="6"><b>#${nr}</b> · ${escapeHtml(naarISO(r.datum))} · ${escapeHtml(r.omschrijving.substring(0, 60))}</td></tr>`;
+    // debetregel eerst, creditregel eronder (boekhoudconventie)
+    const regels = r.debet
+      ? [[r.keuze, glNaam(r.keuze), kpl, bedrag, 0], [huidig.vraagposten, glNaam(huidig.vraagposten), "", 0, bedrag]]
+      : [[huidig.vraagposten, glNaam(huidig.vraagposten), "", bedrag, 0], [r.keuze, glNaam(r.keuze), kpl, 0, bedrag]];
+    for (const [gl, naam, k, d, c] of regels) {
+      totD += d; totC += c;
+      html += `<tr><td></td><td><b>${escapeHtml(gl)}</b></td><td>${escapeHtml(naam)}</td><td>${escapeHtml(k)}</td><td class="num">${d ? d.toFixed(2) : ""}</td><td class="num">${c ? c.toFixed(2) : ""}</td></tr>`;
+    }
+  }
+  if (!boekingen.length) {
+    html = `<tr><td colspan="6" class="hint">Nog geen te boeken regels — kies eerst rekeningen in stap 2 · Controleren.</td></tr>`;
+  } else {
+    const evenwicht = Math.abs(totD - totC) < 0.005;
+    html += `<tr style="font-weight:600"><td colspan="4">Totaal (${boekingen.length} boekingen)</td><td class="num">${totD.toFixed(2)}</td><td class="num">${totC.toFixed(2)}</td></tr>` +
+      `<tr><td colspan="6" style="color:${evenwicht ? "var(--groen)" : "var(--rood)"}; font-weight:600">${evenwicht ? "✓ Journaal is in evenwicht (debet = credit)" : "⚠ Journaal is NIET in evenwicht — niet versturen!"}</td></tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+/* ================= Direct versturen naar DirectLink ================= */
+const DL_OPSLAG = "bankboeker.directlink.v1";
+
+/* Token versleuteld bewaren: AES-GCM met een niet-uitleesbare sleutel in IndexedDB (advies DirectLink) */
+function openKluis() {
+  return new Promise((ok, nee) => {
+    const req = indexedDB.open("bankboeker-kluis", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("sleutels");
+    req.onsuccess = () => ok(req.result);
+    req.onerror = () => nee(req.error);
+  });
+}
+async function kluisSleutel() {
+  const db = await openKluis();
+  const bestaand = await new Promise((ok, nee) => {
+    const tx = db.transaction("sleutels", "readonly").objectStore("sleutels").get("dl");
+    tx.onsuccess = () => ok(tx.result); tx.onerror = () => nee(tx.error);
+  });
+  if (bestaand) return bestaand;
+  const sleutel = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  await new Promise((ok, nee) => {
+    const tx = db.transaction("sleutels", "readwrite").objectStore("sleutels").put(sleutel, "dl");
+    tx.onsuccess = ok; tx.onerror = () => nee(tx.error);
+  });
+  return sleutel;
+}
+async function versleutelTekst(tekst) {
+  const sleutel = await kluisSleutel();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, sleutel, new TextEncoder().encode(tekst)));
+  return { iv: btoa(String.fromCharCode(...iv)), data: btoa(String.fromCharCode(...data)) };
+}
+async function ontsleutelTekst(obj) {
+  const sleutel = await kluisSleutel();
+  const iv = Uint8Array.from(atob(obj.iv), c => c.charCodeAt(0));
+  const data = Uint8Array.from(atob(obj.data), c => c.charCodeAt(0));
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, sleutel, data));
+}
+async function laadDlInstellingen() {
+  let dl = {};
+  try { dl = JSON.parse(localStorage.getItem(DL_OPSLAG)) || {}; } catch (e) {}
+  document.getElementById("dl-endpoint").value = dl.endpoint || "https://secure.directlink.nu/api/v1/dataimport/upload";
+  let token = dl.token || "";   // oud (onversleuteld) formaat — wordt bij de eerstvolgende wijziging versleuteld
+  if (dl.tokenEnc) { try { token = await ontsleutelTekst(dl.tokenEnc); } catch (e) { token = ""; } }
+  document.getElementById("dl-token").value = token;
+}
+async function bewaarDlInstellingen() {
+  const opslag = { endpoint: document.getElementById("dl-endpoint").value.trim() };
+  const token = document.getElementById("dl-token").value.trim();
+  if (token) {
+    try { opslag.tokenEnc = await versleutelTekst(token); }
+    catch (e) { opslag.token = token; }   // terugval als webcrypto niet beschikbaar is
+  }
+  localStorage.setItem(DL_OPSLAG, JSON.stringify(opslag));
+}
+function xmlEsc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+/* één boeking → Twinfield transactie-XML, volgens de DirectLink-koppelinstructie:
+   destiny=temporary (voorlopig), geen KPL op de tegenrekening */
+function transactieXml(r, dagboek, stdKpl) {
+  const datum = naarISO(r.datum).replace(/-/g, "");
+  const bedrag = (r.debet || r.credit).toFixed(2);
+  const zijde = r.debet ? "debit" : "credit";
+  const tegenzijde = r.debet ? "credit" : "debit";
+  const oms = xmlEsc(r.omschrijving.substring(0, 40));
+  const kpl = (relatieSoort(r.keuze) && r.kplKeuze) ? r.kplKeuze : stdKpl;
+  // Geen <freetext1>: vrije velden zijn per dagboek vaak uitgeschakeld en
+  // Twinfield wijst de hele boeking dan af (geleerd bij de memoriaal-test).
+  const lijn = (gl, dc, kplWaarde) =>
+    `<line type="detail"><dim1>${xmlEsc(gl)}</dim1>${kplWaarde ? `<dim2>${xmlEsc(kplWaarde)}</dim2>` : ""}<value>${bedrag}</value><debitcredit>${dc}</debitcredit><description>${oms}</description></line>`;
+  return `<transaction destiny="temporary"><header><office>${xmlEsc(huidig.code)}</office><code>${xmlEsc(dagboek)}</code><date>${datum}</date></header><lines>` +
+    lijn(r.keuze, zijde, kpl) + lijn(huidig.vraagposten, tegenzijde, "") + `</lines></transaction>`;
+}
+/* Eén memoriaal voor een GROEP regels (bv. alle regels van één bankboekstuk):
+   per regel een paar — de gekozen rekening aan de kant waarop de vraagpost
+   stond, en de tegenboeking op de vraagposten-rekening. De verwijzing (bv.
+   "Bankboeker BNK 202600143") komt in de omschrijving van de tegenregel,
+   zodat in Twinfield te zien is bij welk afschrift dit memoriaal hoort. */
+function memoriaalXmlGroep(rijen, dagboek, kplVoor, referentie) {
+  const datum = naarISO(rijen[0].datum || new Date().toISOString().slice(0, 10)).replace(/-/g, "");
+  // Geen <freetext1> op de regels: Twinfield wees dat af ("Vrij tekstveld 1 is
+  // niet toegestaan op een detailregel" — vrije velden staan per dagboek uit).
+  // De verwijzing naar het bankboekstuk gaat daarom in de omschrijving van de
+  // TEGENREGEL op de vraagposten-rekening; de doelregel houdt de bankomschrijving.
+  const ref = ("Bankboeker " + (referentie || "")).trim().substring(0, 40);
+  let lijnen = "";
+  for (const r of rijen) {
+    const bedrag = (r.debet || r.credit).toFixed(2);
+    const zijde = r.debet ? "debit" : "credit";
+    const tegenzijde = r.debet ? "credit" : "debit";
+    const oms = xmlEsc((r.omschrijving || "").substring(0, 40));
+    const kpl = kplVoor(r);
+    lijnen +=
+      `<line type="detail"><dim1>${xmlEsc(r.keuze)}</dim1>${kpl ? `<dim2>${xmlEsc(kpl)}</dim2>` : ""}<value>${bedrag}</value><debitcredit>${zijde}</debitcredit><description>${oms}</description></line>` +
+      `<line type="detail"><dim1>${xmlEsc(huidig.vraagposten)}</dim1><value>${bedrag}</value><debitcredit>${tegenzijde}</debitcredit><description>${xmlEsc(ref)}</description></line>`;
+  }
+  return `<transaction destiny="temporary"><header><office>${xmlEsc(huidig.code)}</office><code>${xmlEsc(dagboek)}</code><date>${datum}</date></header><lines>${lijnen}</lines></transaction>`;
+}
+/* ================= Conceptboekingen bijwerken (het hart) =================
+   Een bankafschrift staat in Twinfield als één CONCEPT-transactie met veel
+   regels op de vraagposten-rekening. In plaats van er een memoriaal naast te
+   zetten, halen we die transactie compleet op, vervangen we alléén de
+   grootboekrekening van de goedgekeurde regels, en sturen we hem in zijn
+   geheel terug (zelfde boekstuknummer = Twinfield werkt hem bij).
+   Twinfield VERVANGT bij een update de volledige transactie — daarom nooit
+   losse regels sturen, altijd het complete origineel als basis gebruiken. */
+
+async function dlLeesTransactie(office, dagboek, nummer) {
+  const raw = await dlVerstuur(`<read><type>transaction</type><office>${xmlEsc(office)}</office><code>${xmlEsc(dagboek)}</code><number>${xmlEsc(nummer)}</number></read>`);
+  let xmlTekst = raw;
+  try { const j = JSON.parse(raw); xmlTekst = j.response || j.result || j.data || j.xml || j.body || raw; } catch (e) {}
+  const doc = new DOMParser().parseFromString(xmlTekst, "application/xml");
+  const t = doc.getElementsByTagName("transaction")[0];
+  if (!t) throw new Error(`Onverwacht antwoord bij het lezen van ${dagboek} ${nummer}: ${xmlTekst.slice(0, 200)}`);
+  if (t.getAttribute("msgtype") === "error" || t.getAttribute("result") === "0") {
+    throw new Error(`Twinfield bij het lezen van ${dagboek} ${nummer}: ${t.getAttribute("msg") || xmlTekst.slice(0, 200)}`);
+  }
+  return { el: t, raw: xmlTekst };
+}
+
+/* Velden die Twinfield zelf beheert en die een update in de weg zitten.
+   "origin" is volgens Twinfields documentatie alleen-lezen en hoort NIET
+   meegestuurd te worden (case 5 aug 2026). De fout "Oorsprong is alleen-lezen
+   en moet bank zijn" bleek een dwaalspoor: de echte blokkade was een reeds
+   AFGELETTERDE regel in het boekstuk — daar controleren we nu vooraf op. */
+const BIJWERK_WEGLATEN_HEADER = new Set(["user", "inputdate", "modificationdate", "origin", "originreference"]);
+const BIJWERK_WEGLATEN_REGEL = new Set([
+  "basevalue", "reprate", "repvalue", "signedvalue", "baseline",
+  "matchstatus", "matchlevel", "matchdate", "followupnumber", "relation",
+  // "matches" bevat de afletterinformatie (genest, met eigen <line>-elementen)
+  // die Twinfield zelf beheert — in het echte antwoord van BNK 202600143 gezien.
+  "matches",
+  // Openstaande bedragen na afletteren, eveneens door Twinfield berekend
+  // (idem, uit het echte antwoord):
+  "valueopen", "basevalueopen", "repvalueopen",
+  "vatvalue", "vatbasevalue", "vatrepvalue", "vattotal", "vatbasetotal", "vatreptotal",
+  "availableforpayruns", "performancetype", "performancedate", "performancecountry", "performancevatnumber"
+]);
+
+/* Zoek in de opgehaalde transactie de regel die bij deze vraagpost hoort:
+   zelfde rekening, zelfde kant, zelfde bedrag — omschrijving als scheidsrechter
+   wanneer meerdere regels in aanmerking komen. Gevonden regels worden
+   "verbruikt" zodat twee identieke vraagposten elk hun eigen regel krijgen. */
+function zoekRegelInTransactie(transEl, r, vraagposten, gebruikt) {
+  const bedrag = r.debet || r.credit;
+  const zijde = r.debet ? "debit" : "credit";
+  const oms = (r.omschrijving || "").trim().toLowerCase();
+  const kandidaten = [];
+  for (const lijn of transEl.getElementsByTagName("line")) {
+    if (lijn.getAttribute("type") !== "detail") continue;
+    const id = lijn.getAttribute("id") || "";
+    if (gebruikt.has(id)) continue;
+    const pak = naam => { const el = lijn.getElementsByTagName(naam)[0]; return el ? el.textContent.trim() : ""; };
+    if (pak("dim1") !== vraagposten) continue;
+    if (pak("debitcredit") !== zijde) continue;
+    if (Math.abs(Math.abs(parseFloat(pak("value") || "0")) - bedrag) > 0.005) continue;
+    kandidaten.push({ lijn, id, oms: pak("description").trim().toLowerCase() });
+  }
+  if (!kandidaten.length) return null;
+  if (kandidaten.length === 1) return kandidaten[0];
+  const opTekst = kandidaten.find(k => k.oms && oms && (k.oms.startsWith(oms) || oms.startsWith(k.oms)));
+  return opTekst || kandidaten[0];
+}
+
+/* Pas de gekozen regels aan, kloon daarna de transactie en schoon hem op.
+   LET OP de volgorde: de wijzigingen verwijzen naar regels in de GELEZEN boom
+   (daar heeft zoekRegelInTransactie ze gevonden), dus eerst wijzigen en dán
+   klonen — andersom komen de wijzigingen niet in de kopie terecht. */
+function bouwBijwerkXml(transEl, wijzigingen) {
+  // 1. Wijzigingen: rekening (dim1) en eventueel KPL/debiteur (dim2).
+  for (const w of wijzigingen) {
+    const dim1 = w.lijn.getElementsByTagName("dim1")[0];
+    // De naam-attributen horen bij de oude rekening; weghalen, Twinfield kent de code.
+    for (const attr of [...dim1.attributes]) dim1.removeAttribute(attr.name);
+    dim1.textContent = w.rekening;
+    let dim2 = w.lijn.getElementsByTagName("dim2")[0];
+    if (w.kpl) {
+      if (!dim2) {
+        dim2 = w.lijn.ownerDocument.createElement("dim2");
+        dim1.parentNode.insertBefore(dim2, dim1.nextSibling);
+      }
+      dim2.textContent = w.kpl;
+    } else if (dim2) {
+      dim2.parentNode.removeChild(dim2);
+    }
+  }
+  // 2. Kloon en schoon op. Alleen destiny op de transactie zelf;
+  //    lees-attributen (result, location) weg.
+  const kloon = transEl.cloneNode(true);
+  for (const attr of [...kloon.attributes]) kloon.removeAttribute(attr.name);
+  kloon.setAttribute("destiny", "temporary");
+  const header = kloon.getElementsByTagName("header")[0];
+  if (header) for (const el of [...header.children]) {
+    if (BIJWERK_WEGLATEN_HEADER.has(el.tagName.toLowerCase())) header.removeChild(el);
+  }
+  for (const lijn of [...kloon.getElementsByTagName("line")]) {
+    for (const attr of [...lijn.attributes]) {
+      if (attr.name !== "type" && attr.name !== "id") lijn.removeAttribute(attr.name);
+    }
+    for (const el of [...lijn.children]) {
+      if (BIJWERK_WEGLATEN_REGEL.has(el.tagName.toLowerCase())) lijn.removeChild(el);
+    }
+  }
+  return new XMLSerializer().serializeToString(kloon);
+}
+
+function twinfieldFoutenUit(el) {
+  const fouten = [];
+  for (const n of el.querySelectorAll("[msgtype='error'],[msg]")) {
+    const m = n.getAttribute("msg"); if (m && !fouten.includes(m)) fouten.push(m);
+  }
+  return fouten.join(" · ");
+}
+
+async function verstuurDirectLink() {
+  const boekingen = regelsSessie.filter(r => !r.skip && r.keuze && r.keuze !== huidig.vraagposten);
+  if (!boekingen.length) return;
+  const dagboekMemo = document.getElementById("exp-dagboek").value.trim() || huidig.memoDagboek;
+  const stdKpl = document.getElementById("exp-kpl").value.trim();
+  const vandaag = new Date().toISOString().slice(0, 10);
+
+  // Regels mét dagboek+boekstuk worden BIJGEWERKT in hun eigen conceptboeking;
+  // regels zonder gaan als vanouds via een memoriaal.
+  const bijwerken = boekingen.filter(r => r.boekstuk && r.dagboek);
+  const memoriaal = boekingen.filter(r => !(r.boekstuk && r.dagboek));
+  const groepen = new Map();
+  for (const r of bijwerken) {
+    const k = r.dagboek + "~" + r.boekstuk;
+    if (!groepen.has(k)) groepen.set(k, []);
+    groepen.get(k).push(r);
+  }
+  const vraag = [
+    bijwerken.length ? `${bijwerken.length} regels bijwerken in ${groepen.size} bestaande conceptboeking(en)` : null,
+    memoriaal.length ? `${memoriaal.length} regels als memoriaal versturen (geen boekstuknummer bekend)` : null
+  ].filter(Boolean).join(" en ");
+  if (!confirm(`${vraag} voor ${huidig.code} · ${huidig.naam}?\n\nAlles blijft CONCEPT in Twinfield; definitief boeken doe je daar. Elke geslaagde regel wordt hier gemarkeerd als verwerkt.`)) return;
+
+  const kplVoor = r => (relatieSoort(r.keuze) && r.kplKeuze) ? r.kplKeuze : stdKpl;
+  let verstuurdOk = 0, foutTekst = null, naarMemoriaal = 0;
+  huidig.originelen = huidig.originelen || {};
+
+  // ---- Route 1: bestaande conceptboekingen bijwerken, per boekstuk ----
+  let groepNr = 0;
+  for (const [sleutel, rijen] of groepen) {
+    groepNr++;
+    const [dagboek, nummer] = sleutel.split("~");
+    toonMelding("melding-upload", "ok", `Bijwerken… boekstuk ${dagboek} ${nummer} (${groepNr} van ${groepen.size})`);
+    try {
+      const { el, raw } = await dlLeesTransactie(huidig.code, dagboek, nummer);
+      // Reservekopie van het origineel, eenmalig, vóór de eerste wijziging.
+      if (!huidig.originelen[sleutel]) huidig.originelen[sleutel] = { xml: raw, bewaard: vandaag };
+      // Les uit de Twinfield-case (5 aug 2026, proefondervindelijk): een
+      // boekstuk met oorsprong "bank" (gemaakt door de bankkoppeling) is via
+      // ProcessXml NOOIT bij te werken — de API stempelt alles wat binnenkomt
+      // als "import" en dat botst altijd met de opgeslagen oorsprong. Ook een
+      // afgeletterde regel blokkeert een update. In beide gevallen meteen
+      // door naar de memoriaal-route, zonder kansloze poging.
+      const oorsprong = ((el.getElementsByTagName("origin")[0] || {}).textContent || "").trim();
+      const afgeletterd = [...el.getElementsByTagName("line")].some(l => {
+        const m = l.getElementsByTagName("matchstatus")[0];
+        return m && m.textContent.trim() === "matched";
+      });
+      if (oorsprong === "bank" || afgeletterd) {
+        naarMemoriaal += rijen.length;
+        memoriaal.push(...rijen);
+        continue;
+      }
+      const gebruikt = new Set(), wijzigingen = [];
+      for (const r of rijen) {
+        const match = zoekRegelInTransactie(el, r, huidig.vraagposten, gebruikt);
+        if (!match) throw new Error(`regel #${r.nr} ("${r.omschrijving.slice(0, 40)}", ${(r.debet || r.credit).toFixed(2)}) is niet teruggevonden in boekstuk ${dagboek} ${nummer} — staat hij daar nog op ${huidig.vraagposten} als concept?`);
+        gebruikt.add(match.id);
+        wijzigingen.push({ lijn: match.lijn, rekening: r.keuze, kpl: kplVoor(r) });
+      }
+      const antwoordRaw = await dlVerstuur(bouwBijwerkXml(el, wijzigingen));
+      let xmlText = antwoordRaw;
+      try { const j = JSON.parse(antwoordRaw); xmlText = j.response || j.result || j.data || j.xml || j.body || antwoordRaw; } catch (e) {}
+      const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+      const t = doc.getElementsByTagName("transaction")[0];
+      if (!(t && t.getAttribute("result") === "1")) {
+        throw new Error(`Twinfield wees de update van ${dagboek} ${nummer} af: ${t ? (twinfieldFoutenUit(t) || "onbekende reden") : xmlText.replace(/</g, " ").slice(0, 250)}`);
+      }
+      for (const r of rijen) {
+        huidig.verstuurd[vingerafdruk(r)] = vandaag;
+        r.alVerstuurd = vandaag; r.skip = true;
+        verstuurdOk++;
+      }
+    } catch (e) {
+      // Vangnet: wijst Twinfield een update tóch af (bv. tussen ons lezen en
+      // versturen door alsnog afgeletterd), dan is er niets gewijzigd en gaan
+      // de regels alsnog via de memoriaal-route zodat het werk wel af komt.
+      if (/alleen-lezen|read.?only/i.test(e.message)) {
+        naarMemoriaal += rijen.length;
+        memoriaal.push(...rijen);
+        continue;
+      }
+      foutTekst = e.message;
+      break;
+    }
+  }
+
+  // ---- Route 2 (terugval): één memoriaal per bankboekstuk ----
+  // Regels van hetzelfde boekstuk gaan samen in één memoriaal (met verwijzing
+  // naar dat boekstuk in de omschrijving van de tegenregels); regels zonder
+  // boekstuk vormen één restgroep.
+  if (!foutTekst && memoriaal.length) {
+    const memoGroepen = new Map();
+    for (const r of memoriaal) {
+      const k = (r.boekstuk && r.dagboek) ? `${r.dagboek} ${r.boekstuk}` : "";
+      if (!memoGroepen.has(k)) memoGroepen.set(k, []);
+      memoGroepen.get(k).push(r);
+    }
+    for (const [referentie, rijen] of memoGroepen) {
+      toonMelding("melding-upload", "ok", `Memoriaal versturen… ${referentie || "losse regels"} (${rijen.length} regels)`);
+      try {
+        const raw = await dlVerstuur(memoriaalXmlGroep(rijen, dagboekMemo, kplVoor, referentie));
+        let xmlText = raw;
+        try { const j = JSON.parse(raw); xmlText = j.response || j.result || j.data || j.xml || j.body || raw; } catch (e) {}
+        const doc = new DOMParser().parseFromString(xmlText, "application/xml");
+        const t = doc.getElementsByTagName("transaction")[0];
+        if (!(t && t.getAttribute("result") === "1")) throw new Error(`Twinfield wees het memoriaal voor ${referentie || "de losse regels"} af: ${t ? (twinfieldFoutenUit(t) || "onbekende reden") : xmlText.replace(/</g, " ").slice(0, 250)}`);
+        const nummer = (t.getElementsByTagName("number")[0] || {}).textContent || "?";
+        for (const r of rijen) {
+          huidig.verstuurd[vingerafdruk(r)] = vandaag;
+          r.alVerstuurd = vandaag; r.skip = true;
+          verstuurdOk++;
+        }
+        if (typeof audit === "function") audit("memoriaal-aangemaakt", huidig.code, `${dagboekMemo} ${nummer} ← ${referentie || "losse regels"} (${rijen.length} regels)`);
+      } catch (e) { foutTekst = e.message; break; }
+    }
+  }
+
+  bewaar(); vernieuwReview();
+  if (typeof audit === "function") audit("directlink-bijwerken", huidig.code, `${verstuurdOk} van ${boekingen.length} regels (${groepen.size} boekstukken, ${memoriaal.length} memoriaal)`);
+  if (foutTekst) {
+    toonMelding("melding-upload", "fout", `${verstuurdOk} van ${boekingen.length} regels verwerkt, daarna gestopt: ${escapeHtml(foutTekst)} De geslaagde regels zijn gemarkeerd en worden niet opnieuw verstuurd. Tip bij een time-out: controleer éérst in Twinfield of de wijziging er tóch staat.`);
+  } else {
+    const uitleg = naarMemoriaal
+      ? ` Let op: ${naarMemoriaal} regels gingen via een memoriaal, omdat hun boekstuk al een afgeletterde regel bevat (dan weigert Twinfield elke wijziging) — die vraagposten worden dus tegengeboekt in plaats van vervangen.`
+      : "";
+    toonMelding("melding-upload", "ok", `Klaar: ${verstuurdOk} regels verwerkt als concept in Twinfield. Controleer en verwerk ze daar definitief.${uitleg}`);
+  }
+}
+function vernieuwPreviews() {
+  // memoriaal
+  const rijen = exportRijen();
+  document.querySelector("#tabel-preview thead").innerHTML = "<tr>" + EXPORT_KOP.map(k => `<th>${k}</th>`).join("") + "</tr>";
+  document.querySelector("#tabel-preview tbody").innerHTML =
+    rijen.slice(0, 10).map(r => "<tr>" + r.map(v => `<td>${escapeHtml(String(v))}</td>`).join("") + "</tr>").join("") +
+    (rijen.length > 10 ? `<tr><td colspan="10" class="hint">… en nog ${rijen.length - 10} regels</td></tr>` : "");
+  document.getElementById("btn-export").disabled = !rijen.length;
+  document.getElementById("btn-export-xlsx").disabled = !rijen.length;
+  document.getElementById("btn-upload").disabled = !rijen.length;
+  vernieuwJournaal();
+  // vragenlijst
+  const vr = vragenRijen();
+  document.querySelector("#tabel-vragen-preview thead").innerHTML = "<tr>" + vragenKop().map(k => `<th>${escapeHtml(k)}</th>`).join("") + "</tr>";
+  document.querySelector("#tabel-vragen-preview tbody").innerHTML =
+    vr.slice(0, 10).map(r => "<tr>" + r.map(v => `<td>${escapeHtml(String(v))}</td>`).join("") + "</tr>").join("") +
+    (vr.length > 10 ? `<tr><td colspan="8" class="hint">… en nog ${vr.length - 10} regels</td></tr>` : "");
+  document.getElementById("btn-vragen").disabled = !vr.length;
+  document.getElementById("btn-vragen-xlsx").disabled = !vr.length;
+}
+
+/* Correcties → boekingsregels */
+function leerVanCorrecties() {
+  let geleerd = 0;
+  for (const r of regelsSessie) {
+    if (r.skip || !r.keuze || r.keuze === huidig.vraagposten) continue;
+    const w = normaliseer(r.omschrijving).split(" ").filter(Boolean);
+    if (!w.length) continue;
+    const key = w.slice(0, Math.min(3, w.length)).join(" ");
+    const schemaItem = huidig.schema.find(s => s.gl === r.keuze);
+    const bestaand = huidig.rules[key];
+    if (!bestaand || bestaand.gl !== r.keuze) {
+      huidig.rules[key] = { gl: r.keuze, glName: schemaItem ? schemaItem.naam : "", seen: (bestaand ? bestaand.seen : 0) + 1, share: 1 };
+      geleerd++;
+    } else {
+      bestaand.seen++;
+    }
+  }
+  bewaar(); vernieuwKlantInfo(); vernieuwRegels();
+  audit("regels geleerd", huidig.code, `${geleerd} regels`);
+  toonMelding("melding-export", "ok", `${geleerd} boekingsregels toegevoegd of bijgewerkt.`);
+}
+
+/* ================= Verkeer met DirectLink =================
+   In cloud-modus loopt ALLES via ons eigen doorgeefluik (Supabase Edge Function
+   "directlink"): geen CORS, en het DirectLink-token staat op de server in plaats
+   van in elke browser. Zonder cloud-modus valt de app terug op het rechtstreekse
+   endpoint + token uit de instellingen (werkt alleen op een gewhiteliste origin). */
+async function dlVerstuur(xml) {
+  if (CLOUD) {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error("Je bent niet (meer) ingelogd — ververs de pagina en log opnieuw in.");
+    const resp = await fetch(`${CFG.SUPABASE_URL}/functions/v1/directlink`, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/xml" },
+      body: xml
+    });
+    const raw = await resp.text();
+    if (!resp.ok) throw new Error(`Doorgeefluik HTTP ${resp.status}: ${raw.slice(0, 200)}`);
+    return raw;
+  }
+  const endpoint = document.getElementById("dl-endpoint").value.trim();
+  const token = document.getElementById("dl-token").value.trim();
+  if (!endpoint || !token) throw new Error("Vul eerst bij 3 · Doorvoeren het DirectLink-endpoint en Bearer token in (alleen nodig zonder cloud-modus).");
+  bewaarDlInstellingen();
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + token, "Content-Type": "application/xml" },
+    body: xml
+  });
+  const raw = await resp.text();
+  if (!resp.ok) throw new Error(`DirectLink HTTP ${resp.status}: ${raw.slice(0, 200)}`);
+  return raw;
+}
+async function dlLees(xml) {
+  const raw = await dlVerstuur(xml);
+  // DirectLink verpakt de Twinfield-XML standaard in JSON
+  let xmlTekst = raw;
+  try { const j = JSON.parse(raw); xmlTekst = j.response || j.result || j.data || j.xml || j.body || raw; } catch (e) {}
+  const doc = new DOMParser().parseFromString(xmlTekst, "application/xml");
+  if (doc.getElementsByTagName("parsererror").length) throw new Error("Antwoord is geen geldige XML: " + xmlTekst.slice(0, 200));
+  return doc;
+}
+async function voerLiveUit(knopId, meldingId, fn) {
+  const knop = document.getElementById(knopId);
+  knop.disabled = true;
+  toonMelding(meldingId, "ok", "Bezig met ophalen uit Twinfield… (kan 10–30 seconden duren)");
+  try {
+    await fn(meldingId);
+  } catch (e) {
+    const cors = /failed to fetch|networkerror|load failed/i.test(e.message);
+    toonMelding(meldingId, "fout", "Live ophalen mislukt: " + escapeHtml(e.message) +
+      (cors ? ` — dit duidt meestal op CORS: vraag DirectLink om dit adres (${escapeHtml(location.origin)}) te whitelisten.` : ""));
+  }
+  knop.disabled = false;
+}
+function parseBrowse(doc) {
+  const uit = [];
+  for (const tr of doc.getElementsByTagName("tr")) {
+    const rij = {};
+    for (const td of tr.getElementsByTagName("td")) rij[td.getAttribute("field") || ""] = td.textContent;
+    if (Object.keys(rij).length) uit.push(rij);
+  }
+  return uit;
+}
+function datumUitBrowse(s) {
+  const m = (s || "").match(/^(\d{4})(\d{2})(\d{2})$/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : (s || "");
+}
+/* Alle regels op de vraagpostenrekening van één administratie ophalen.
+   Drie lessen uit de proeven van 4 augustus 2026 (browse via de DirectLink-proxy):
+   - De administratie MOET als filterkolom mee met operator "equal". Zonder dat
+     filter kijkt Twinfield alleen in de administratie die aan de DirectLink-
+     definitie hangt. Een reeks (between/like) mag niet: "U hebt geen toegang tot
+     deze administratie". Dus één administratie per aanroep.
+   - Een filter op fin.trs.head.yearperiod laat de vraag hangen: HTTP 500 met een
+     lege inhoud na ~90-120 seconden. Alle andere filters antwoorden in 2 seconden.
+     Daarom géén periodefilter; de hele rekening is klein genoeg om in één keer op
+     te halen en we selecteren daarna in de app zelf.
+   - Filters moeten de operator gebruiken die in de rapportdefinitie staat
+     (op te vragen met <read><type>browse</type><code>030_3</code>): dim1 is
+     "between", office is "equal". */
+async function liveVraagpostRijen(office, gl) {
+  const kol = f => `<column><field>${f}</field><label>${f}</label><visible>true</visible></column>`;
+  const filt = (f, op, van, tot) =>
+    `<column><field>${f}</field><label>${f}</label><visible>true</visible><ask>true</ask>` +
+    `<operator>${op}</operator><from>${van}</from><to>${tot || ""}</to></column>`;
+  const xml = `<columns code="030_3">` +
+    filt("fin.trs.head.office", "equal", office) +
+    filt("fin.trs.line.dim1", "between", gl, gl) +
+    ["fin.trs.head.status", "fin.trs.head.origin", "fin.trs.head.code", "fin.trs.head.number",
+     "fin.trs.head.date", "fin.trs.head.year", "fin.trs.head.period", "fin.trs.head.username",
+     "fin.trs.line.valuesigned", "fin.trs.line.description", "fin.trs.line.dim2"].map(kol).join("") +
+    `</columns>`;
+  const doc = await dlLees(xml);
+  const b = doc.getElementsByTagName("browse")[0];
+  if (b && b.getAttribute("msgtype") === "error") throw new Error("Twinfield: " + b.getAttribute("msg"));
+  return parseBrowse(doc);
+}
+/* Verwijzing die de app in de omschrijving van elke memoriaal-tegenregel zet:
+   "Bankboeker BNK 202600143". Zo herkent hij later welke bankboekstukken al
+   weggeboekt zijn — ook als een collega dat op een andere computer deed. */
+function alWeggeboekt(rijen) {
+  const gedaan = new Set();
+  for (const r of rijen) {
+    const m = (r["fin.trs.line.description"] || "").match(/Bankboeker\s+([A-Za-z0-9_-]+)\s+(\d+)/);
+    if (m) gedaan.add(m[1].toUpperCase() + "|" + m[2]);
+  }
+  return gedaan;
+}
+async function liveVraagposten() {
+  if (!huidig) throw new Error("Kies eerst een klant.");
+  const rijen = await liveVraagpostRijen(huidig.code, huidig.vraagposten);
+  if (!rijen.length) throw new Error(`Twinfield gaf geen regels terug voor rekening ${huidig.vraagposten} in administratie ${huidig.code}.`);
+
+  const { open, definitief, alWeg, overig } = scheidVraagposten(rijen);
+  const nietsTeDoen = [
+    `${definitief} definitieve bankregels (historie, laten staan)`,
+    `${alWeg} conceptregels die al met een Bankboeker-memoriaal weggeboekt zijn`,
+    `${overig} regels van memorialen en handmatige correcties`
+  ].join(", ");
+
+  if (!open.length) {
+    toonMelding("melding-inlezen", "ok",
+      `Niets te doen in <b>${escapeHtml(huidig.code)}</b>: geen openstaande conceptregels op ${escapeHtml(huidig.vraagposten)}. ` +
+      `Wel gevonden en overgeslagen: ${nietsTeDoen}.`);
+    return;
+  }
+
+  const regels = open.map(r => {
+    const v = parseBedrag(r["fin.trs.line.valuesigned"]);
+    const per = +(r["fin.trs.head.period"] || 0);
+    return {
+      gl: huidig.vraagposten, glNaam: "",
+      dagboek: r["fin.trs.head.code"] || "",
+      // Boekstuknummer bewaren: het komt als verwijzing in de omschrijving van de
+      // memoriaal-tegenregel, en daaraan herkent de app dit boekstuk later terug.
+      boekstuk: (r["fin.trs.head.number"] || "").trim(),
+      datum: datumUitBrowse(r["fin.trs.head.date"]),
+      periode: per ? `${MAANDEN[per - 1] || per} ${r["fin.trs.head.year"] || ""}`.trim() : "",
+      omschrijving: (r["fin.trs.line.description"] || "").trim(),
+      debet: v >= 0 ? v : 0,
+      credit: v < 0 ? -v : 0
+    };
+  }).filter(r => r.omschrijving);
+
+  const boekstukken = [...new Set(regels.map(r => r.dagboek + " " + r.boekstuk))];
+  const verrijkt = await verrijkUitBoekstukken(regels);
+  verwerkVraagposten(regels,
+    `${regels.length} openstaande vraagposten live opgehaald uit Twinfield (${huidig.code}, rekening ${huidig.vraagposten}) ` +
+    `uit ${boekstukken.length} bankboekstuk${boekstukken.length === 1 ? "" : "ken"}: ${boekstukken.join(", ")}. ` +
+    (verrijkt ? `Bij ${verrijkt} regels is de volledige bankomschrijving uit het boekstuk gehaald. ` : "") +
+    `Overgeslagen: ${nietsTeDoen}.`);
+}
+/* De browse-lijst geeft de omschrijving afgekapt op 40 tekens; in het boekstuk
+   zelf staat de volledige banktekst in <comment>. Die halen we per boekstuk op
+   (één aanroep per boekstuk), zodat een periode of achternaam niet wegvalt.
+   Ook markeren we terugstortingen: een creditregel met exact hetzelfde bedrag
+   en dezelfde naam als een debetregel in hetzelfde boekstuk is een storno. */
+async function verrijkUitBoekstukken(regels) {
+  const perBoekstuk = new Map();
+  for (const r of regels) {
+    if (!r.dagboek || !r.boekstuk) continue;
+    const k = r.dagboek + "~" + r.boekstuk;
+    if (!perBoekstuk.has(k)) perBoekstuk.set(k, []);
+    perBoekstuk.get(k).push(r);
+  }
+  let verrijkt = 0;
+  for (const [sleutel, groep] of perBoekstuk) {
+    const [dagboek, nummer] = sleutel.split("~");
+    let el;
+    try { ({ el } = await dlLeesTransactie(huidig.code, dagboek, nummer)); } catch (e) { continue; }
+    const pak = (l, n) => { const e = l.getElementsByTagName(n)[0]; return e ? e.textContent.trim() : ""; };
+    // De volgorde onder de detailregels is dezelfde als in het invoerscherm van
+    // Twinfield (de totaalregel met de bankrekening staat daar niet als rij).
+    // Dat nummer helpt bij het handmatig invullen.
+    const kandidaten = [...el.getElementsByTagName("line")]
+      .filter(l => l.getAttribute("type") === "detail")
+      .map((l, i) => ({ rij: i + 1, bedrag: parseFloat(pak(l, "value") || "0"), zijde: pak(l, "debitcredit"),
+                   oms: pak(l, "description"), comment: pak(l, "comment"), rek: pak(l, "dim1"), gebruikt: false }));
+    for (const r of groep) {
+      const bedrag = r.debet || r.credit, zijde = r.debet ? "debit" : "credit";
+      const k = kandidaten.find(c => !c.gebruikt && c.zijde === zijde && Math.abs(c.bedrag - bedrag) < 0.005 &&
+        c.oms.trim().toUpperCase() === (r.omschrijving || "").trim().toUpperCase());
+      if (!k) continue;
+      k.gebruikt = true;
+      r.rij = k.rij;                                   // plaats in het invoerscherm
+      if (k.comment && k.comment.length > r.omschrijving.length) { r.omschrijving = k.comment; verrijkt++; }
+    }
+    // Terugstortingen aanwijzen (tegengestelde kant, zelfde bedrag, zelfde naam).
+    for (const r of groep) {
+      if (!r.credit) continue;
+      const naam = naamWoorden(r.omschrijving).slice(0, 2).join(" ");
+      if (!naam) continue;
+      const heen = kandidaten.find(c => c.zijde === "debit" && Math.abs(c.bedrag - r.credit) < 0.005 &&
+        naamWoorden(c.comment || c.oms).slice(0, 2).join(" ") === naam);
+      if (heen) {
+        r.storno = true;
+        // Is de heenboeking al uitgezocht, dan hoort de terugstorting op
+        // dezelfde rekening: samen vallen ze tegen elkaar weg.
+        if (heen.rek && heen.rek !== huidig.vraagposten) r.stornoRekening = heen.rek;
+      }
+    }
+  }
+  return verrijkt;
+}
+/* ================= Ronde langs alle klanten =================
+   Splitst de rijen van één administratie in: werk (openstaande conceptregels uit
+   de bank) en de rest. Zelfde regels als liveVraagposten, maar zonder de app te
+   vullen — de ronde is alleen een overzicht. */
+function scheidVraagposten(rijen) {
+  const gedaan = alWeggeboekt(rijen);
+  const bank = rijen.filter(r => (r["fin.trs.head.origin"] || "") === "bank");
+  const concept = bank.filter(r => (r["fin.trs.head.status"] || "") === "temporary");
+  const open = concept.filter(r => !gedaan.has((r["fin.trs.head.code"] || "").toUpperCase() + "|" + (r["fin.trs.head.number"] || "").trim()));
+  return {
+    open,
+    definitief: bank.length - concept.length,
+    alWeg: concept.length - open.length,
+    overig: rijen.length - bank.length,
+    boekstukken: [...new Set(open.map(r => (r["fin.trs.head.code"] || "") + " " + (r["fin.trs.head.number"] || "").trim()))].sort()
+  };
+}
+/* Wie boekt deze administratie? Twinfield zet op elk boekstuk de gebruikersnaam
+   (fin.trs.head.username). Boekt een medewerker van ons, dan is de klant voor ons;
+   staat er een naam van de klant zelf, dan boeken zij in house en hoeven wij die
+   administratie niet op te pakken. Systeemnamen (bankkoppeling, Twinfield zelf)
+   zeggen niets en gaan er dus uit. */
+const SYSTEEMBOEKERS = ["site supervisor", "twinfieldcc", "twinfield", "basecone", "directlink"];
+const ENDURA_BOEKERS_STANDAARD = "Sher, Shereen, Jennelee, Awinash, Gracienne, Liscelle, Antoine, Endura, Endura_AI";
+const BOEKERS_OPSLAG = "bankboeker.boekers.v1";
+function enduraBoekers() {
+  const t = localStorage.getItem(BOEKERS_OPSLAG);
+  return (t === null ? ENDURA_BOEKERS_STANDAARD : t).split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+function isOnzeBoeker(naam) {
+  const n = (naam || "").trim().toLowerCase();
+  if (!n) return null;                                  // niets gevonden = geen oordeel
+  return enduraBoekers().some(e => n === e || n.startsWith(e));
+}
+/* De naam op het meest recente boekstuk dat een mens heeft gemaakt. */
+function boekerUitRijen(rijen) {
+  const bruikbaar = rijen
+    .filter(r => !SYSTEEMBOEKERS.includes((r["fin.trs.head.username"] || "").trim().toLowerCase()))
+    .filter(r => (r["fin.trs.head.username"] || "").trim())
+    .sort((a, b) => (b["fin.trs.head.date"] || "").localeCompare(a["fin.trs.head.date"] || ""));
+  return bruikbaar.length ? bruikbaar[0]["fin.trs.head.username"].trim() : "";
+}
+function rondeKlanten() { return profielen.filter(p => p.meedoen !== false); }
+function vernieuwRondeKeuze() {
+  const el = document.getElementById("ronde-keuze");
+  if (!el) return;
+  const mee = rondeKlanten().length, uit = profielen.length - mee;
+  el.innerHTML = profielen.length
+    ? `<b>${mee}</b> van ${profielen.length} klanten staan in de ronde${uit ? `, ${uit} uitgezet` : ""}. ` +
+      `Aan- en uitzetten doe je met het vinkje <b>In ronde</b> bij <i>Klanten &amp; instellingen</i>.`
+    : "Nog geen klanten. Haal ze eerst op bij <i>Klanten &amp; instellingen</i>.";
+}
+/* Verkenning: bij ELKE klant (ook de uitgezette) kijken wie er boekt, en op basis
+   daarvan een voorstel doen. Alleen lezen — de gebruiker bevestigt zelf. */
+let verkenVoorstel = [];
+async function verkenBoekers() {
+  if (rondeBezig) return;
+  if (!profielen.length) { toonMelding("melding-ronde", "fout", "Er zijn nog geen klanten om te verkennen."); return; }
+  rondeBezig = true; rondeStop = false; verkenVoorstel = [];
+  document.getElementById("btn-verken").disabled = true;
+  document.getElementById("btn-ronde-stop").style.display = "";
+  const t0 = Date.now(); const fouten = [];
+  for (let i = 0; i < profielen.length; i++) {
+    if (rondeStop) break;
+    const p = profielen[i];
+    const resterend = i ? Math.round((Date.now() - t0) / i * (profielen.length - i) / 1000) : 0;
+    document.getElementById("ronde-voortgang").innerHTML =
+      `Verkennen: <b>${i + 1} van ${profielen.length}</b> — ${escapeHtml(p.code)}…` +
+      (resterend > 20 ? ` (nog ongeveer ${duurInWoorden(resterend)})` : "");
+    try {
+      const boeker = boekerUitRijen(await liveVraagpostRijen(p.code, p.vraagposten));
+      p.boeker = boeker;
+      const onze = isOnzeBoeker(boeker);
+      verkenVoorstel.push({ code: p.code, naam: p.naam, boeker, voorstel: onze === false ? false : true, nu: p.meedoen !== false });
+      vernieuwVerkenTabel();
+    } catch (e) { fouten.push(`${p.code}: ${e.message}`); }
+  }
+  bewaar(); vernieuwKlantTabel();
+  const anders = verkenVoorstel.filter(v => v.voorstel !== v.nu);
+  document.getElementById("ronde-voortgang").innerHTML = "";
+  toonMelding("melding-ronde", fouten.length ? "fout" : "ok",
+    `Verkenning ${rondeStop ? "gestopt" : "klaar"} in ${duurInWoorden(Math.round((Date.now() - t0) / 1000))}. ` +
+    `${verkenVoorstel.filter(v => v.boeker && isOnzeBoeker(v.boeker) === false).length} administraties worden door iemand anders geboekt. ` +
+    (anders.length ? `<b>${anders.length}</b> voorstellen wijken af van de huidige instelling — controleer de lijst en klik op <b>Voorstel overnemen</b>.`
+                   : "Dat past bij wat er nu is ingesteld; er valt niets te wijzigen.") +
+    (fouten.length ? `<br>Niet gelukt bij ${fouten.length}: ${escapeHtml(fouten.slice(0, 5).join(" · "))}` : ""));
+  rondeBezig = false;
+  document.getElementById("btn-verken").disabled = false;
+  document.getElementById("btn-ronde-stop").style.display = "none";
+  document.getElementById("btn-verken-overnemen").style.display = anders.length ? "" : "none";
+}
+function vernieuwVerkenTabel() {
+  const kaart = document.getElementById("kaart-verkenning");
+  const tb = document.querySelector("#tabel-verkenning tbody");
+  if (!verkenVoorstel.length) { kaart.style.display = "none"; return; }
+  kaart.style.display = "";
+  const oordeel = v => v.boeker === "" ? "onbekend — niemand heeft hier op de vraagpostenrekening geboekt"
+    : (isOnzeBoeker(v.boeker) ? "van ons" : "boekt zelf");
+  tb.innerHTML = [...verkenVoorstel].sort((a, b) => (a.voorstel === b.voorstel ? a.code.localeCompare(b.code) : (a.voorstel ? 1 : -1)))
+    .map(v => `<tr${v.voorstel !== v.nu ? ' style="background:#fff8e1"' : ""}>` +
+      `<td><b>${escapeHtml(v.code)}</b></td><td>${escapeHtml(v.naam)}</td>` +
+      `<td>${escapeHtml(v.boeker || "—")}</td><td class="hint">${oordeel(v)}</td>` +
+      `<td>${v.nu ? "in de ronde" : "uitgezet"}</td>` +
+      `<td><b>${v.voorstel ? "in de ronde" : "uitzetten"}</b></td></tr>`).join("");
+}
+function neemVerkenVoorstelOver() {
+  let gewijzigd = 0;
+  for (const v of verkenVoorstel) {
+    const p = profielen.find(x => x.code === v.code);
+    if (p && (p.meedoen !== false) !== v.voorstel) { p.meedoen = v.voorstel; gewijzigd++; }
+    v.nu = v.voorstel;   // het voorstel is nu de stand: geel markeren mag weg
+  }
+  bewaar(); vernieuwKlantTabel(); vernieuwRondeKeuze(); vernieuwVerkenTabel();
+  if (typeof audit === "function") audit("rondekeuze aangepast", "", `${gewijzigd} klanten via verkenning`);
+  toonMelding("melding-ronde", "ok", `Voorstel overgenomen: ${gewijzigd} klanten aangepast. De ronde loopt nu langs ${rondeKlanten().length} klanten.`);
+  document.getElementById("btn-verken-overnemen").style.display = "none";
+}
+function duurInWoorden(seconden) {
+  if (seconden < 90) return `${seconden} seconden`;
+  const m = Math.round(seconden / 60);
+  return m === 1 ? "1 minuut" : `${m} minuten`;
+}
+let rondeBezig = false, rondeStop = false, rondeUitslag = [];
+async function startRonde() {
+  if (rondeBezig) return;
+  const lijst = rondeKlanten();
+  if (!lijst.length) {
+    toonMelding("melding-ronde", "fout", profielen.length
+      ? "Er staat geen enkele klant in de ronde. Zet bij <b>Klanten &amp; instellingen</b> het vinkje <b>In ronde</b> aan bij de klanten die wij boeken."
+      : "Er zijn nog geen klanten. Ga naar <b>Klanten &amp; instellingen</b> en haal eerst de administraties op.");
+    return;
+  }
+  rondeBezig = true; rondeStop = false; rondeUitslag = [];
+  document.getElementById("btn-ronde").disabled = true;
+  document.getElementById("btn-ronde-stop").style.display = "";
+  document.getElementById("melding-ronde").innerHTML = "";
+  const fouten = [];
+  const t0 = Date.now();
+  for (let i = 0; i < lijst.length; i++) {
+    if (rondeStop) break;
+    const p = lijst[i];
+    const resterend = i ? Math.round((Date.now() - t0) / i * (lijst.length - i) / 1000) : 0;
+    document.getElementById("ronde-voortgang").innerHTML =
+      `Bezig: <b>${i + 1} van ${lijst.length}</b> — ${escapeHtml(p.code)}…` +
+      (resterend > 20 ? ` (nog ongeveer ${duurInWoorden(resterend)})` : "");
+    try {
+      const rijen = await liveVraagpostRijen(p.code, p.vraagposten);
+      const boeker = boekerUitRijen(rijen);
+      if (boeker) p.boeker = boeker;                    // gratis meegenomen: wie hier boekt
+      const d = scheidVraagposten(rijen);
+      if (d.open.length) rondeUitslag.push({ code: p.code, naam: p.naam, aantal: d.open.length, boekstukken: d.boekstukken, boeker: p.boeker });
+      vernieuwRondeTabel();
+    } catch (e) {
+      fouten.push(`${p.code}: ${e.message}`);
+    }
+  }
+  bewaar();
+  const totaal = rondeUitslag.reduce((s, r) => s + r.aantal, 0);
+  document.getElementById("ronde-voortgang").innerHTML = "";
+  toonMelding("melding-ronde", fouten.length ? "fout" : "ok",
+    `${rondeStop ? "Ronde gestopt" : "Ronde klaar"} in ${duurInWoorden(Math.round((Date.now() - t0) / 1000))}: ` +
+    `<b>${rondeUitslag.length}</b> klanten met werk, <b>${totaal}</b> openstaande vraagposten in totaal.` +
+    (fouten.length ? `<br>Niet gelukt bij ${fouten.length}: ${escapeHtml(fouten.slice(0, 5).join(" · "))}` : ""));
+  if (typeof audit === "function") audit("ronde gelopen", "", `${rondeUitslag.length} klanten met werk, ${totaal} regels`);
+  rondeBezig = false;
+  document.getElementById("btn-ronde").disabled = false;
+  document.getElementById("btn-ronde-stop").style.display = "none";
+}
+function vernieuwRondeTabel() {
+  const tb = document.querySelector("#tabel-ronde tbody");
+  const lijst = [...rondeUitslag].sort((a, b) => b.aantal - a.aantal);
+  tb.innerHTML = lijst.map(r =>
+    `<tr><td><b>${escapeHtml(r.code)}</b></td><td>${escapeHtml(r.naam)}${r.boeker ? `<br><span class="hint">boekt: ${escapeHtml(r.boeker)}</span>` : ""}</td><td class="num">${r.aantal}</td>` +
+    `<td class="hint">${escapeHtml(r.boekstukken.slice(0, 6).join(", "))}${r.boekstukken.length > 6 ? ` … (${r.boekstukken.length} boekstukken)` : ""}</td>` +
+    `<td><button class="knop stil" data-ronde-klant="${escapeHtml(r.code)}">Oppakken</button></td></tr>`).join("");
+  tb.querySelectorAll("[data-ronde-klant]").forEach(b => b.addEventListener("click", () => pakKlantOp(b.dataset.rondeKlant)));
+}
+/* Klant uit de rondelijst als actieve klant zetten en de vraagposten inlezen. */
+async function pakKlantOp(code) {
+  const p = profielen.find(x => x.code === code);
+  if (!p) return;
+  huidig = p; regelsSessie = []; allesVernieuwen();
+  kiesTab("inlezen");
+  await voerLiveUit("btn-live-vraagposten", "melding-inlezen", liveVraagposten);
+}
+async function liveDimensies(office, dimtype) {
+  let doc = await dlLees(`<dimensions><office>${office}</office><dimtype>${dimtype}</dimtype></dimensions>`);
+  let dims = doc.getElementsByTagName("dimension");
+  if (!dims.length) {
+    doc = await dlLees(`<list><type>dimensions</type><office>${office}</office><dimtype>${dimtype}</dimtype></list>`);
+    dims = doc.getElementsByTagName("dimension");
+  }
+  // Twinfield levert twee vormen: <dimension><code>0090</code><name>…</name></dimension>
+  // en — wat de <list>-aanroep teruggeeft — <dimension name="Grond">0090</dimension>.
+  // Beide moeten werken; de tweede vorm werd eerder gemist, waardoor het live
+  // ophalen van het rekeningschema altijd 0 rekeningen opleverde.
+  const uit = [];
+  for (const d of dims) {
+    const codeEl = d.getElementsByTagName("code")[0];
+    const naamEl = d.getElementsByTagName("name")[0];
+    const code = codeEl ? codeEl.textContent.trim() : (d.childElementCount ? "" : d.textContent.trim());
+    const naam = naamEl ? naamEl.textContent.trim() : (d.getAttribute("name") || "");
+    if (code) uit.push({ code, naam });
+  }
+  return uit;
+}
+async function liveSchema(meldingId) {
+  const p = profielInBewerking(meldingId); if (!p) return;
+  const alles = [...await liveDimensies(p.code, "BAS"), ...await liveDimensies(p.code, "PNL")];
+  if (!alles.length) throw new Error("Twinfield gaf geen grootboekrekeningen terug voor " + p.code + ".");
+  let nieuw = 0;
+  for (const x of alles) {
+    const bestaand = p.schema.find(s => s.gl === x.code);
+    if (bestaand) { if (x.naam) bestaand.naam = x.naam; } else { p.schema.push({ gl: x.code, naam: x.naam }); nieuw++; }
+  }
+  p.schema.sort((a, b) => a.gl.localeCompare(b.gl));
+  bewaar(); vernieuwUploadStatus(p); vernieuwKlantInfo();
+  toonMelding(meldingId, "ok", `${alles.length} rekeningen live opgehaald (${nieuw} nieuw; totaal ${p.schema.length}).`);
+}
+/* Leren uit de bankboekstukken zelf, via de API. Beter dan een export inlezen:
+   in het boekstuk staat de VOLLEDIGE bankomschrijving (<comment>), terwijl de
+   vraagpostenlijst hem op 40 tekens afkapt. Bij Herber bleek dat het verschil
+   tussen "I.F.O.CESAR" (lijkt een tip) en "I.F.O. CESAR ARENAS PATINO SALARY
+   07/2026" (blijkt een salaris) — en dus tussen rekening 3000 en 1800. */
+async function liveLeren(meldingId) {
+  const p = profielInBewerking(meldingId) || huidig;
+  if (!p) throw new Error("Kies eerst een klant.");
+  const maxTerug = Math.max(1, Math.min(60, +document.getElementById("leren-aantal").value || 20));
+  const rijen = await liveVraagpostRijen(p.code, p.vraagposten);
+  const bank = rijen.filter(r => (r["fin.trs.head.origin"] || "") === "bank");
+  if (!bank.length) throw new Error(`Geen bankboekstukken gevonden bij ${p.code} — zonder startpunt weet de app niet waar ze moet beginnen.`);
+  const hoogste = new Map();                                  // dagboek → hoogste boekstuknummer
+  for (const r of bank) {
+    const d = r["fin.trs.head.code"] || "", n = (r["fin.trs.head.number"] || "").trim();
+    if (d && n && (!hoogste.has(d) || n > hoogste.get(d))) hoogste.set(d, n);
+  }
+  const telling = {};
+  let gelezen = 0, regelsGezien = 0, mislukt = 0;
+  for (const [dagboek, top] of hoogste) {
+    let nummer = +top;
+    for (let i = 0; i < maxTerug && nummer > 0; i++, nummer--) {
+      toonMelding(meldingId, "ok", `Leren… ${dagboek} ${nummer} (${gelezen + 1} van ${maxTerug * hoogste.size})`);
+      let el;
+      try { ({ el } = await dlLeesTransactie(p.code, dagboek, String(nummer))); } catch (e) { mislukt++; continue; }
+      gelezen++;
+      const pak = (l, n2) => { const e = l.getElementsByTagName(n2)[0]; return e ? e.textContent.trim() : ""; };
+      for (const l of el.getElementsByTagName("line")) {
+        if (l.getAttribute("type") !== "detail") continue;
+        const gl = pak(l, "dim1");
+        if (!gl || gl === p.vraagposten) continue;            // nog niet uitgezocht: niets te leren
+        const oms = pak(l, "comment") || pak(l, "description");
+        const k = sleutels(oms)[0];
+        if (!k) continue;
+        const glNaam = (l.getElementsByTagName("dim1")[0] || {}).getAttribute ? (l.getElementsByTagName("dim1")[0].getAttribute("name") || "") : "";
+        telling[k] = telling[k] || {};
+        telling[k][gl] = telling[k][gl] || { n: 0, laatst: "", naam: glNaam };
+        telling[k][gl].n++;
+        const nr = String(nummer);
+        if (nr > telling[k][gl].laatst) telling[k][gl].laatst = nr;
+        regelsGezien++;
+        if (glNaam && !p.schema.some(s => s.gl === gl)) p.schema.push({ gl, naam: glNaam });
+      }
+    }
+  }
+  let nieuw = 0, bijgewerkt = 0;
+  for (const k in telling) {
+    // De recentste boeking wint: boekingsregels veranderen in de tijd.
+    let beste = null, besteNr = "", besteN = 0, totaal = 0;
+    for (const gl in telling[k]) {
+      const t = telling[k][gl];
+      totaal += t.n;
+      if (t.laatst > besteNr || (t.laatst === besteNr && t.n > besteN)) { besteNr = t.laatst; besteN = t.n; beste = gl; }
+    }
+    if (!beste) continue;
+    const regel = { gl: beste, glName: telling[k][beste].naam || (p.schema.find(s => s.gl === beste) || {}).naam || "",
+                    seen: besteN, share: besteN / totaal };   // fractie, zoals leerUitHistorie
+    if (p.rules[k]) bijgewerkt++; else nieuw++;
+    p.rules[k] = regel;
+  }
+  p.schema.sort((a, b) => a.gl.localeCompare(b.gl));
+  bewaar(); vernieuwUploadStatus(p); vernieuwKlantInfo(); vernieuwRegels();
+  if (typeof audit === "function") audit("geleerd uit Twinfield", p.code, `${gelezen} boekstukken, ${nieuw} nieuwe regels`);
+  toonMelding(meldingId, "ok", `${gelezen} bankboekstukken gelezen (${regelsGezien} geboekte regels): ` +
+    `<b>${nieuw}</b> nieuwe en <b>${bijgewerkt}</b> bijgewerkte boekingsregels, schema nu ${p.schema.length} rekeningen.` +
+    (mislukt ? ` ${mislukt} boekstuknummers bestonden niet (overgeslagen).` : ""));
+}
+async function liveRelaties(meldingId, dimtype, veld, woord) {
+  const p = profielInBewerking(meldingId); if (!p) return;
+  const lijst = await liveDimensies(p.code, dimtype);
+  if (!lijst.length) throw new Error(`Twinfield gaf geen ${woord} terug voor ${p.code}.`);
+  let nieuw = 0;
+  for (const x of lijst) {
+    const bestaand = p[veld].find(d => d.code === x.code);
+    if (bestaand) { if (x.naam) bestaand.naam = x.naam; } else { p[veld].push(x); nieuw++; }
+  }
+  p[veld].sort((a, b) => a.code.localeCompare(b.code));
+  bewaar(); vernieuwUploadStatus(p); vernieuwKlantInfo();
+  toonMelding(meldingId, "ok", `${lijst.length} ${woord} live opgehaald (${nieuw} nieuw; totaal ${p[veld].length}).`);
+}
+const liveDebiteuren = meldingId => liveRelaties(meldingId, "DEB", "debiteuren", "debiteuren");
+const liveCrediteuren = meldingId => liveRelaties(meldingId, "CRD", "crediteuren", "crediteuren");
+async function liveAdministraties(meldingId) {
+  const doc = await dlLees(`<list><type>offices</type></list>`);
+  const offices = [...doc.getElementsByTagName("office")];
+  if (!offices.length) throw new Error("Twinfield gaf geen administraties terug.");
+  let nieuw = 0, bestond = 0, genegeerd = 0;
+  for (const o of offices) {
+    const code = (o.textContent || "").trim();
+    const naam = o.getAttribute("name") || code;
+    if (!code) continue;
+    if (negeerlijst.includes(code.toUpperCase())) { genegeerd++; continue; }   // eerder verwijderd
+    if (profielen.some(p => p.code.toUpperCase() === code.toUpperCase())) { bestond++; continue; }
+    const p = { code, naam, vraagposten: "2999", debiteurenGl: "", crediteurenGl: "", memoDagboek: "MEMO", valuta: "AWG", kpl: "", dagboeken: "", schema: [], debiteuren: [], crediteuren: [], rules: {} };
+    migreer(p); profielen.push(p); nieuw++;
+  }
+  profielen.sort((a, b) => a.code.localeCompare(b.code));
+  if (!huidig) huidig = profielen[0] || null;
+  bewaar(); allesVernieuwen();
+  if (typeof audit === "function") audit("administraties live opgehaald", "", `${nieuw} nieuw`);
+  toonMelding(meldingId, "ok", `${offices.length} administraties opgehaald: ${nieuw} nieuw, ${bestond} bestonden al` +
+    (genegeerd ? `, ${genegeerd} eerder verwijderde overgeslagen (hieronder weer toe te laten)` : "") +
+    `. Controleer per nieuwe klant de vraagposten-rekening (standaard 2999).`);
+}
+
+/* ================= Online opzoeken (Google Programmable Search, gratis laag) ================= */
+const ZOEK_OPSLAG = "bankboeker.zoeken.v1";
+function laadZoekInstellingen() {
+  let z = {};
+  try { z = JSON.parse(localStorage.getItem(ZOEK_OPSLAG)) || {}; } catch (e) {}
+  document.getElementById("zk-key").value = z.key || "";
+  document.getElementById("zk-cx").value = z.cx || "";
+  document.getElementById("zk-suffix").value = z.suffix !== undefined ? z.suffix : "Aruba";
+  document.getElementById("zk-auto").checked = z.auto !== false;
+}
+function bewaarZoekInstellingen() {
+  localStorage.setItem(ZOEK_OPSLAG, JSON.stringify(zoekInstellingen()));
+}
+function zoekInstellingen() {
+  return {
+    key: document.getElementById("zk-key").value.trim(),
+    cx: document.getElementById("zk-cx").value.trim(),
+    suffix: document.getElementById("zk-suffix").value.trim(),
+    auto: document.getElementById("zk-auto").checked
+  };
+}
+/* de tegenpartijnaam uit de omschrijving halen als zoekterm */
+function zoekSleutel(oms) {
+  let w = normaliseer(oms).split(" ").filter(x => x.length >= 2);
+  if (w[0] === "POS") w = w.slice(1);
+  w = w.slice(0, 4);
+  const sleutel = w.join(" ");
+  return sleutel.length >= 8 ? sleutel : "";
+}
+async function googleZoek(query) {
+  const inst = zoekInstellingen();
+  const url = "https://www.googleapis.com/customsearch/v1?key=" + encodeURIComponent(inst.key) +
+    "&cx=" + encodeURIComponent(inst.cx) + "&q=" + encodeURIComponent(query + (inst.suffix ? " " + inst.suffix : ""));
+  const resp = await fetch(url);
+  if (resp.status === 429 || resp.status === 403) throw new Error("Google-zoeklimiet bereikt (100 gratis per dag) of sleutel/Zoekmachine-ID ongeldig.");
+  if (!resp.ok) throw new Error("Google antwoordde HTTP " + resp.status);
+  const j = await resp.json();
+  return (j.items || []).slice(0, 3).map(i => (i.title || "") + " " + (i.snippet || "")).join(" ").replace(/\s+/g, " ").trim();
+}
+async function zoekOnlineOnbekenden(handmatig) {
+  if (!huidig || !regelsSessie.length) return;
+  const inst = zoekInstellingen();
+  if (!inst.key || !inst.cx) {
+    if (handmatig) toonMelding("melding-inlezen", "fout", "Vul eerst de Google API-sleutel en Zoekmachine-ID in (tabblad Klanten & instellingen, onderaan).");
+    return;
+  }
+  if (!handmatig && !inst.auto) return;
+  const kandidaten = regelsSessie.filter(r => !r.skip && !r.regel && !r.sug && !r.alVerstuurd && zoekSleutel(r.omsOrigineel)).slice(0, 25);
+  if (!kandidaten.length) {
+    if (handmatig) toonMelding("melding-inlezen", "ok", "Geen onbekende omschrijvingen om op te zoeken.");
+    return;
+  }
+  toonMelding("melding-inlezen", "ok", `Bezig met online opzoeken van ${kandidaten.length} onbekende omschrijvingen…`);
+  let gevonden = 0, opgezocht = 0, fout = null;
+  for (const r of kandidaten) {
+    const sleutel = zoekSleutel(r.omsOrigineel);
+    let tekst = huidig.zoekCache[sleutel];
+    if (tekst === undefined) {
+      try { tekst = await googleZoek(sleutel); opgezocht++; } catch (e) { fout = e.message; break; }
+      huidig.zoekCache[sleutel] = tekst;   // ook lege resultaten cachen: niet nogmaals zoeken
+      bewaar();
+    }
+    if (!tekst) continue;
+    const sug = suggereer(tekst, huidig);
+    if (sug) {
+      r.sug = { ...sug, reden: "online: " + sug.reden };
+      if (!r.keuze || r.keuze === huidig.vraagposten) r.keuze = sug.gl;
+      gevonden++;
+    }
+  }
+  vernieuwReview();
+  toonMelding("melding-inlezen", fout ? "fout" : "ok",
+    fout ? `Online opzoeken gestopt na ${opgezocht} zoekopdrachten: ${escapeHtml(fout)}`
+         : `Online opzoeken klaar: ${gevonden} van ${kandidaten.length} onbekende omschrijvingen kregen een voorstel (${opgezocht} nieuwe zoekopdrachten, rest uit de cache).`);
+}
+
+/* ================= Klanten & instellingen ================= */
+function vernieuwKlantSelect() {
+  const sel = document.getElementById("klant-select");
+  sel.innerHTML = profielen.map((p, i) => `<option value="${i}" ${p === huidig ? "selected" : ""}>${p.code} · ${escapeHtml(p.naam)}</option>`).join("");
+}
+function vernieuwKlantInfo() {
+  if (!huidig) return;
+  document.getElementById("kop-klant").textContent = `${huidig.code} · ${huidig.naam}`;
+  document.getElementById("info-vraagposten").value = huidig.vraagposten;
+  document.getElementById("info-regels").value =
+    Object.keys(huidig.rules).length + " regels · " + huidig.schema.length + " rekeningen · " + (huidig.debiteuren || []).length + " debiteuren";
+  document.getElementById("exp-dagboek").value = huidig.memoDagboek || "";
+  document.getElementById("exp-valuta").value = huidig.valuta || "";
+  document.getElementById("exp-kpl").value = huidig.kpl || "";
+  document.getElementById("regels-klantnaam").textContent = huidig.naam;
+}
+function vernieuwKlantTabel() {
+  const tbody = document.querySelector("#tabel-klanten tbody");
+  tbody.innerHTML = "";
+  profielen.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td></td><td><b>${escapeHtml(p.code)}</b></td><td>${escapeHtml(p.naam)}</td>
+      <td class="hint">${escapeHtml(p.boeker || "")}</td>
+      <td>${escapeHtml(p.vraagposten)}</td>
+      <td>${escapeHtml(p.debiteurenGl || "")}</td>
+      <td>${escapeHtml(p.crediteurenGl || "")}</td>
+      <td class="num">${Object.keys(p.rules).length}</td><td class="num">${p.schema.length}</td><td class="num">${(p.debiteuren || []).length + (p.crediteuren || []).length}</td><td></td>`;
+    const vink = document.createElement("input");
+    vink.type = "checkbox"; vink.checked = p.meedoen !== false;
+    vink.title = "Meenemen in de ronde langs alle klanten";
+    vink.addEventListener("change", () => {
+      p.meedoen = vink.checked; bewaar(); vernieuwRondeKeuze();
+      audit("rondekeuze aangepast", p.code, vink.checked ? "in de ronde" : "uitgezet");
+    });
+    tr.firstElementChild.appendChild(vink);
+    const acties = tr.lastElementChild;
+    const b1 = document.createElement("button"); b1.className = "knop stil"; b1.textContent = "Instellingen"; b1.style.marginRight = "6px";
+    b1.addEventListener("click", () => openInstellingen(i));
+    const b2 = document.createElement("button"); b2.className = "knop gevaar"; b2.textContent = "Verwijderen";
+    b2.addEventListener("click", () => {
+      // Geen browser-popup (confirm): die wordt nogal eens geblokkeerd en dan
+      // lijkt de knop kapot. De knop vraagt zelf om een tweede klik en springt
+      // na 5 seconden vanzelf terug.
+      if (b2.dataset.zeker !== "1") {
+        const n = Object.keys(p.rules).length;
+        b2.dataset.zeker = "1";
+        b2.textContent = n ? `Zeker? ${n} regels gaan mee` : "Zeker weten?";
+        setTimeout(() => { b2.dataset.zeker = ""; b2.textContent = "Verwijderen"; }, 5000);
+        return;
+      }
+      profielen.splice(i, 1);
+      if (huidig === p) huidig = profielen[0] || null;
+      if (bewerkIndex === i) sluitInstellingen();
+      negeer(p.code);   // niet opnieuw laten binnenkomen bij "Administraties live ophalen"
+      verwijderCloud(p.code); audit("klant verwijderd", p.code, "");
+      bewaar(); allesVernieuwen();
+    });
+    acties.append(b1, b2);
+    tbody.appendChild(tr);
+  });
+}
+function openInstellingen(i) {
+  bewerkIndex = i;
+  const kaart = document.getElementById("kaart-instellingen");
+  kaart.style.display = "";
+  document.getElementById("kaart-uploads").style.display = i >= 0 ? "" : "none";
+  if (i >= 0) {
+    const p = profielen[i];
+    document.getElementById("klant-form-titel").textContent = "Instellingen: " + p.code + " · " + p.naam;
+    document.getElementById("kf-code").value = p.code;
+    document.getElementById("kf-naam").value = p.naam;
+    document.getElementById("kf-vraagposten").value = p.vraagposten;
+    document.getElementById("kf-debiteurengl").value = p.debiteurenGl || "";
+    document.getElementById("kf-crediteurengl").value = p.crediteurenGl || "";
+    document.getElementById("kf-memo").value = p.memoDagboek || "";
+    document.getElementById("kf-valuta").value = p.valuta || "";
+    document.getElementById("kf-dagboeken").value = p.dagboeken || "";
+    vernieuwUploadStatus(p);
+  } else {
+    document.getElementById("klant-form-titel").textContent = "Nieuwe klant (sla eerst op, upload daarna schema/debiteuren/historie)";
+    for (const id of ["kf-code","kf-naam","kf-vraagposten","kf-debiteurengl","kf-crediteurengl","kf-memo","kf-valuta","kf-dagboeken"])
+      document.getElementById(id).value = "";
+  }
+  kaart.scrollIntoView({ behavior: "smooth" });
+}
+function vernieuwUploadStatus(p) {
+  document.getElementById("schema-status").textContent = `— ${p.schema.length} rekeningen bekend`;
+  document.getElementById("deb-status").textContent = `— ${(p.debiteuren || []).length} debiteuren bekend`;
+  document.getElementById("cred-status").textContent = `— ${(p.crediteuren || []).length} crediteuren bekend`;
+  document.getElementById("regels-status").textContent = `— ${Object.keys(p.rules).length} boekingsregels bekend`;
+}
+function sluitInstellingen() {
+  bewerkIndex = -1;
+  document.getElementById("kaart-instellingen").style.display = "none";
+}
+function klantOpslaan() {
+  const code = document.getElementById("kf-code").value.trim();
+  const naam = document.getElementById("kf-naam").value.trim();
+  const vraagposten = document.getElementById("kf-vraagposten").value.trim();
+  if (!code || !naam || !vraagposten) { toonMelding("melding-klant", "fout", "Code, naam en vraagposten-rekening zijn verplicht."); return; }
+  const basis = bewerkIndex >= 0 ? profielen[bewerkIndex] : { rules: {}, schema: [], debiteuren: [], crediteuren: [], kpl: "" };
+  if (bewerkIndex >= 0 && basis.code && basis.code !== code) verwijderCloud(basis.code);
+  const p = { ...basis, code, naam, vraagposten,
+    debiteurenGl: document.getElementById("kf-debiteurengl").value.trim(),
+    crediteurenGl: document.getElementById("kf-crediteurengl").value.trim(),
+    memoDagboek: document.getElementById("kf-memo").value.trim(),
+    valuta: document.getElementById("kf-valuta").value.trim(),
+    dagboeken: document.getElementById("kf-dagboeken").value.trim() };
+  migreer(p);
+  if (bewerkIndex >= 0) { const wasHuidig = huidig === profielen[bewerkIndex]; profielen[bewerkIndex] = p; if (wasHuidig) huidig = p; }
+  else { profielen.push(p); ontNegeer(p.code); bewerkIndex = profielen.length - 1; if (!huidig) huidig = p; }
+  bewaar(); allesVernieuwen();
+  openInstellingen(bewerkIndex);
+  toonMelding("melding-klant", "ok", "Opgeslagen.");
+}
+
+/* ================= Regels-tab ================= */
+function vernieuwRegels() {
+  const zoek = document.getElementById("regels-zoek").value.toUpperCase();
+  const tbody = document.querySelector("#tabel-regels tbody");
+  tbody.innerHTML = "";
+  if (!huidig) return;
+  const items = Object.entries(huidig.rules)
+    .filter(([k]) => !zoek || k.includes(zoek))
+    .sort((a, b) => b[1].seen - a[1].seen);
+  for (const [key, r] of items.slice(0, 400)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${escapeHtml(key)}</td><td><b>${escapeHtml(r.gl)}</b></td><td>${escapeHtml(r.glName || "")}</td>
+      <td class="num">${r.seen}</td><td class="num">${Math.round((r.share || 1) * 100)}%</td><td></td>`;
+    const b = document.createElement("button"); b.className = "knop gevaar"; b.textContent = "×"; b.title = "Regel verwijderen";
+    b.addEventListener("click", () => { delete huidig.rules[key]; bewaar(); vernieuwRegels(); vernieuwKlantInfo(); });
+    tr.lastElementChild.appendChild(b);
+    tbody.appendChild(tr);
+  }
+}
+
+/* ================= Profielen delen ================= */
+function profielenExporteren() {
+  const blob = new Blob([JSON.stringify(profielen, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `bankboeker_profielen_${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+function profielenImporteren(tekst) {
+  const nieuw = JSON.parse(tekst);
+  if (!Array.isArray(nieuw)) throw new Error("Geen geldig profielenbestand.");
+  let toegevoegd = 0, vervangen = 0;
+  for (const p of nieuw) {
+    p.rules = regelsNaarMap(p.rules);
+    migreer(p);
+    const idx = profielen.findIndex(x => x.code === p.code);
+    if (idx >= 0) { profielen[idx] = p; vervangen++; } else { profielen.push(p); ontNegeer(p.code); toegevoegd++; }
+  }
+  huidig = profielen[0];
+  bewaar(); allesVernieuwen();
+  alert(`Import klaar: ${toegevoegd} nieuwe, ${vervangen} vervangen profielen.`);
+}
+
+/* ================= Herhaalboekingen =================
+   Vaste boekingen (huur, lease, afschrijvingen) die de dagelijkse ronde — de
+   edge function "herhaalboekingen", aangeroepen door pg_cron om 07:00 Arubaanse
+   tijd — op de ingestelde dag als concept-memoriaal naar Twinfield stuurt.
+   Dit tabblad beheert alleen de lijst (tabel public.herhaalboekingen); het
+   versturen zelf gebeurt op de server, zodat de app er niet voor open hoeft
+   te staan. Werkt daarom alleen in cloud-modus. */
+const HH_MAANDEN = ["januari","februari","maart","april","mei","juni","juli","augustus","september","oktober","november","december"];
+let herhaalLijst = [];
+let hhBewerkId = null;   // null = formulier dicht, 0 = nieuw, anders id
+function hhPlaceholders(tekst, isoDatum) {
+  const [j, m] = (isoDatum || "").split("-").map(Number);
+  return String(tekst || "")
+    .replace(/\{maand\}/gi, HH_MAANDEN[m - 1] || "")
+    .replace(/\{jaar\}/gi, String(j || ""))
+    .replace(/\{kwartaal\}/gi, "Q" + Math.ceil(m / 3));
+}
+function hhTotaal(rij) {
+  let debet = 0;
+  for (const r of (rij.regels || [])) if (r.zijde === "debit") debet += Number(r.bedrag) || 0;
+  return debet;
+}
+function hhRitmeTekst(r) { return r === "kwartaal" ? "per kwartaal" : r; }
+async function laadHerhaal() {
+  if (!CLOUD) {
+    toonMelding("melding-herhaal", "fout", "Herhaalboekingen werken alleen in cloud-modus (met inlog) — de dagelijkse ronde draait op de server.");
+    return;
+  }
+  const { data, error } = await sb.from("herhaalboekingen").select("*").order("office").order("naam");
+  if (error) { toonMelding("melding-herhaal", "fout", "Kan de herhaalboekingen niet laden: " + escapeHtml(error.message)); return; }
+  herhaalLijst = data || [];
+  vernieuwHerhaalTabel();
+  laadHerhaalLog();
+}
+function vernieuwHerhaalTabel() {
+  const tbody = document.querySelector("#tabel-herhaal tbody");
+  tbody.innerHTML = "";
+  if (!herhaalLijst.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="hint">Nog geen herhaalboekingen — maak de eerste aan met de knop hierboven.</td></tr>`;
+    return;
+  }
+  for (const rij of herhaalLijst) {
+    const profiel = profielen.find(p => p.code === rij.office);
+    const tr = document.createElement("tr");
+    if (!rij.actief) tr.style.opacity = ".45";
+    const status = rij.laatst_status
+      ? `<span class="hint" style="color:${/^[\d-]+: fout/.test(rij.laatst_status) ? "var(--rood)" : "var(--groen)"}">${escapeHtml(rij.laatst_status)}</span>`
+      : `<span class="hint">nog nooit verstuurd</span>`;
+    tr.innerHTML = `<td><b>${escapeHtml(rij.office)}</b>${profiel ? " · " + escapeHtml(profiel.naam) : ""}</td>
+      <td>${escapeHtml(rij.naam)}${rij.actief ? "" : ' <span class="badge vraagpost">uit</span>'}</td>
+      <td>${escapeHtml(hhRitmeTekst(rij.ritme))} (dag ${rij.dag})</td>
+      <td>${escapeHtml(rij.volgende_datum)}</td>
+      <td class="num">${hhTotaal(rij).toFixed(2)}</td>
+      <td>${status}</td><td style="white-space:nowrap"></td>`;
+    const acties = tr.lastElementChild;
+    const maakKnop = (tekst, klasse, titel, fn, vraagTekst) => {
+      const b = document.createElement("button");
+      b.className = "knop " + klasse; b.textContent = tekst; b.title = titel || "";
+      b.style.cssText = "padding:5px 9px; font-size:12px; margin:0 4px 4px 0";
+      if (vraagTekst) metTweedeKlik(b, vraagTekst, fn);
+      else b.addEventListener("click", fn);
+      acties.appendChild(b);
+    };
+    maakKnop("Bewerken", "stil", "", () => openHerhaalForm(rij));
+    maakKnop(rij.actief ? "Uitzetten" : "Aanzetten", "stil", "Aan/uit voor de dagelijkse ronde", async () => {
+      const { error } = await sb.from("herhaalboekingen").update({ actief: !rij.actief, updated_by: gebruiker ? gebruiker.email : null }).eq("id", rij.id);
+      if (error) { toonMelding("melding-herhaal", "fout", "Wijzigen mislukt: " + escapeHtml(error.message)); return; }
+      audit(rij.actief ? "herhaalboeking uitgezet" : "herhaalboeking aangezet", rij.office, rij.naam);
+      laadHerhaal();
+    });
+    maakKnop("Verstuur nu", "stil", "Stuurt deze boeking nu als concept naar Twinfield, met vandaag als boekdatum. De planning schuift NIET door.",
+      () => verstuurHerhaalNu(rij), `Zeker? ${hhTotaal(rij).toFixed(2)} naar Twinfield`);
+    maakKnop("×", "gevaar", "Verwijderen — de klok verstuurt hem dan niet meer", async () => {
+      const { error } = await sb.from("herhaalboekingen").delete().eq("id", rij.id);
+      if (error) { toonMelding("melding-herhaal", "fout", "Verwijderen mislukt: " + escapeHtml(error.message)); return; }
+      audit("herhaalboeking verwijderd", rij.office, rij.naam);
+      if (hhBewerkId === rij.id) sluitHerhaalForm();
+      laadHerhaal();
+    }, "Zeker? Weg is weg");
+    tbody.appendChild(tr);
+  }
+}
+async function laadHerhaalLog() {
+  const tbody = document.querySelector("#tabel-herhaal-log tbody");
+  const { data, error } = await sb.from("herhaal_log").select("*").order("at", { ascending: false }).limit(30);
+  if (error) { tbody.innerHTML = `<tr><td colspan="6" class="hint">Logboek kon niet geladen worden: ${escapeHtml(error.message)}</td></tr>`; return; }
+  tbody.innerHTML = (data && data.length)
+    ? data.map(r => `<tr><td style="white-space:nowrap">${escapeHtml(new Date(r.at).toLocaleString("nl-NL", { timeZone: "America/Aruba" }))}</td>
+        <td>${escapeHtml(r.office || "")}</td><td>${escapeHtml(r.naam || "")}</td><td>${escapeHtml(r.boekdatum || "")}</td>
+        <td style="color:${/^fout|^\s*fout/i.test(r.status) ? "var(--rood)" : "var(--groen)"}">${escapeHtml(r.status)}</td>
+        <td>${escapeHtml(r.aanroeper || "")}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="hint">Nog niets verstuurd.</td></tr>`;
+}
+/* ---- Formulier ---- */
+function vulHhKlantSelect(gekozen) {
+  const sel = document.getElementById("hh-klant");
+  sel.innerHTML = profielen.map(p => `<option value="${escapeHtml(p.code)}" ${p.code === gekozen ? "selected" : ""}>${escapeHtml(p.code)} · ${escapeHtml(p.naam)}</option>`).join("");
+}
+function hhProfiel() {
+  const code = document.getElementById("hh-klant").value;
+  return profielen.find(p => p.code === code) || null;
+}
+function openHerhaalForm(rij) {
+  hhBewerkId = rij ? rij.id : 0;
+  document.getElementById("kaart-hh-form").style.display = "";
+  document.getElementById("hh-form-titel").textContent = rij ? `Herhaalboeking bewerken: ${rij.naam}` : "Nieuwe herhaalboeking";
+  vulHhKlantSelect(rij ? rij.office : (huidig ? huidig.code : ""));
+  document.getElementById("hh-naam").value = rij ? rij.naam : "";
+  document.getElementById("hh-ritme").value = rij ? rij.ritme : "maandelijks";
+  document.getElementById("hh-datum").value = rij ? rij.volgende_datum : "";
+  document.getElementById("hh-actief").checked = rij ? !!rij.actief : true;
+  const p = hhProfiel();
+  document.getElementById("hh-dagboek").value = rij ? rij.dagboek : ((p && p.memoDagboek) || "MEMO");
+  vernieuwHhRegels(rij ? (rij.regels || []) : [{ rekening: "", kpl: "", omschrijving: "", bedrag: "", zijde: "debit" }, { rekening: "", kpl: "", omschrijving: "", bedrag: "", zijde: "credit" }]);
+  document.getElementById("melding-hh-form").innerHTML = "";
+  document.getElementById("kaart-hh-form").scrollIntoView({ behavior: "smooth" });
+}
+function sluitHerhaalForm() {
+  hhBewerkId = null;
+  document.getElementById("kaart-hh-form").style.display = "none";
+}
+/* De regels staan als invulvelden in de tabel; leesRegelRijen() haalt ze eruit. */
+function vernieuwHhRegels(regels) {
+  const tbody = document.querySelector("#tabel-hh-regels tbody");
+  tbody.innerHTML = "";
+  const p = hhProfiel();
+  // datalist met het rekeningschema van de gekozen klant
+  let dl = document.getElementById("dl-hh-rekeningen");
+  if (!dl) { dl = document.createElement("datalist"); dl.id = "dl-hh-rekeningen"; document.body.appendChild(dl); }
+  dl.innerHTML = p ? p.schema.map(s => `<option value="${escapeHtml(s.gl)}">${escapeHtml(s.gl)} · ${escapeHtml(s.naam)}</option>`).join("") : "";
+  for (const r of regels) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><input type="text" class="hh-rekening" list="dl-hh-rekeningen" placeholder="bv. 4310" style="min-width:150px" value="${escapeHtml(r.rekening || "")}"></td>
+      <td><input type="text" class="hh-kpl" placeholder="mag leeg" style="min-width:100px" value="${escapeHtml(r.kpl || "")}"></td>
+      <td><input type="text" class="hh-oms" placeholder="bv. Huur {maand} {jaar}" maxlength="40" style="min-width:220px" value="${escapeHtml(r.omschrijving || "")}"></td>
+      <td><input type="number" class="hh-bedrag" step="0.01" min="0" style="min-width:110px; text-align:right" value="${r.bedrag === "" || r.bedrag == null ? "" : Number(r.bedrag)}"></td>
+      <td><select class="hh-zijde"><option value="debit" ${r.zijde !== "credit" ? "selected" : ""}>Debet</option><option value="credit" ${r.zijde === "credit" ? "selected" : ""}>Credit</option></select></td>
+      <td></td>`;
+    const b = document.createElement("button");
+    b.className = "knop gevaar"; b.textContent = "×"; b.title = "Regel weghalen";
+    b.style.cssText = "padding:5px 9px; font-size:12px";
+    b.addEventListener("click", () => { tr.remove(); vernieuwHhBalans(); });
+    tr.lastElementChild.appendChild(b);
+    tr.addEventListener("input", vernieuwHhBalans);
+    tbody.appendChild(tr);
+  }
+  vernieuwHhBalans();
+}
+function leesRegelRijen() {
+  const uit = [];
+  for (const tr of document.querySelectorAll("#tabel-hh-regels tbody tr")) {
+    const pak = kl => tr.querySelector("." + kl).value.trim();
+    uit.push({
+      rekening: pak("hh-rekening"),
+      kpl: pak("hh-kpl"),
+      omschrijving: pak("hh-oms"),
+      bedrag: tr.querySelector(".hh-bedrag").value === "" ? "" : (parseFloat(tr.querySelector(".hh-bedrag").value) || 0),
+      zijde: tr.querySelector(".hh-zijde").value
+    });
+  }
+  return uit;
+}
+function vernieuwHhBalans() {
+  let debet = 0, credit = 0;
+  for (const r of leesRegelRijen()) (r.zijde === "debit" ? (debet += Number(r.bedrag) || 0) : (credit += Number(r.bedrag) || 0));
+  const el = document.getElementById("hh-balans");
+  const evenwicht = Math.abs(debet - credit) < 0.005 && debet > 0;
+  el.style.color = evenwicht ? "var(--groen)" : "var(--rood)";
+  el.textContent = `Debet ${debet.toFixed(2)} · Credit ${credit.toFixed(2)} — ${evenwicht ? "✓ in evenwicht" : "moet gelijk zijn vóór opslaan"}`;
+}
+async function herhaalOpslaan() {
+  const office = document.getElementById("hh-klant").value;
+  const naam = document.getElementById("hh-naam").value.trim();
+  const dagboek = document.getElementById("hh-dagboek").value.trim() || "MEMO";
+  const ritme = document.getElementById("hh-ritme").value;
+  const datum = document.getElementById("hh-datum").value;
+  const regels = leesRegelRijen().filter(r => r.rekening || r.bedrag);
+  if (!office || !naam || !datum) { toonMelding("melding-hh-form", "fout", "Administratie, naam en eerste boekdatum zijn verplicht."); return; }
+  if (!regels.length || regels.some(r => !r.rekening || !(r.bedrag > 0))) { toonMelding("melding-hh-form", "fout", "Elke regel heeft een grootboekrekening en een bedrag boven nul nodig."); return; }
+  let debet = 0, credit = 0;
+  for (const r of regels) (r.zijde === "debit" ? (debet += Number(r.bedrag)) : (credit += Number(r.bedrag)));
+  if (Math.abs(debet - credit) > 0.005) { toonMelding("melding-hh-form", "fout", `Debet (${debet.toFixed(2)}) en credit (${credit.toFixed(2)}) zijn niet gelijk — zo wijst Twinfield de boeking af.`); return; }
+  const rij = {
+    office, naam, dagboek, ritme,
+    dag: +datum.slice(8, 10),
+    volgende_datum: datum,
+    regels,
+    actief: document.getElementById("hh-actief").checked,
+    updated_by: gebruiker ? gebruiker.email : null
+  };
+  const { error } = hhBewerkId
+    ? await sb.from("herhaalboekingen").update(rij).eq("id", hhBewerkId)
+    : await sb.from("herhaalboekingen").insert(rij);
+  if (error) { toonMelding("melding-hh-form", "fout", "Opslaan mislukt: " + escapeHtml(error.message)); return; }
+  audit(hhBewerkId ? "herhaalboeking bewerkt" : "herhaalboeking aangemaakt", office, `${naam} · ${ritme} · eerstvolgende ${datum} · ${debet.toFixed(2)}`);
+  sluitHerhaalForm();
+  toonMelding("melding-herhaal", "ok", `Opgeslagen. "${escapeHtml(naam)}" gaat ${hhRitmeTekst(ritme)} mee in de ochtendronde; eerstvolgende keer: ${escapeHtml(datum)}.`);
+  laadHerhaal();
+}
+/* Handmatig versturen: zelfde XML als de server bouwt, maar met vandaag als
+   boekdatum en zonder de planning door te schuiven. Gaat via het gewone
+   doorgeefluik, dus dit werkt alleen ingelogd. */
+function herhaalXml(rij, isoDatum) {
+  const datum = isoDatum.replace(/-/g, "");
+  let lijnen = "";
+  for (const r of rij.regels) {
+    const oms = xmlEsc(hhPlaceholders(r.omschrijving || "", isoDatum).substring(0, 40));
+    lijnen += `<line type="detail"><dim1>${xmlEsc(r.rekening)}</dim1>${r.kpl ? `<dim2>${xmlEsc(r.kpl)}</dim2>` : ""}<value>${Number(r.bedrag).toFixed(2)}</value><debitcredit>${r.zijde}</debitcredit><description>${oms}</description></line>`;
+  }
+  return `<transaction destiny="temporary"><header><office>${xmlEsc(rij.office)}</office><code>${xmlEsc(rij.dagboek)}</code><date>${datum}</date></header><lines>${lijnen}</lines></transaction>`;
+}
+async function verstuurHerhaalNu(rij) {
+  // De bevestiging zit in de knop zelf (tweede klik) — geen confirm-popup,
+  // die wordt in het voorbeeldvenster geblokkeerd.
+  const vandaag = new Date().toLocaleDateString("en-CA", { timeZone: "America/Aruba" });
+  toonMelding("melding-herhaal", "ok", "Bezig met versturen…");
+  let status;
+  try {
+    const raw = await dlVerstuur(herhaalXml(rij, vandaag));
+    let xmlTekst = raw;
+    try { const j = JSON.parse(raw); xmlTekst = j.response || j.result || j.data || j.xml || j.body || raw; } catch (e) {}
+    const m = xmlTekst.match(/<transaction[^>]*\bresult="(\d)"/);
+    if (m && m[1] === "1") {
+      const nr = xmlTekst.match(/<number>(\d+)<\/number>/);
+      status = `handmatig verstuurd als concept${nr ? ` (boekstuk ${nr[1]})` : ""}`;
+      toonMelding("melding-herhaal", "ok", `Verstuurd als concept — controleer hem in Twinfield (${escapeHtml(rij.office)}, dagboek ${escapeHtml(rij.dagboek)}).`);
+    } else {
+      status = "fout: Twinfield wees de boeking af — " + xmlTekst.replace(/</g, " ").replace(/\s+/g, " ").trim().slice(0, 250);
+      toonMelding("melding-herhaal", "fout", escapeHtml(status));
+    }
+  } catch (e) {
+    status = "fout: " + e.message;
+    toonMelding("melding-herhaal", "fout", "Versturen mislukt: " + escapeHtml(e.message));
+  }
+  await sb.from("herhaal_log").insert({ herhaal_id: rij.id, office: rij.office, naam: rij.naam, boekdatum: vandaag, status, aanroeper: gebruiker ? gebruiker.email : "handmatig" });
+  await sb.from("herhaalboekingen").update({ laatst_verstuurd: new Date().toISOString(), laatst_status: `${vandaag}: ${status}`, updated_by: gebruiker ? gebruiker.email : null }).eq("id", rij.id);
+  audit("herhaalboeking handmatig verstuurd", rij.office, `${rij.naam}: ${status}`);
+  laadHerhaal();
+}
+/* De hele ochtendronde nu draaien (zelfde edge function als de klok aanroept). */
+async function herhaalRondeNu() {
+  if (!CLOUD) return;
+  const knop = document.getElementById("btn-hh-ronde");
+  knop.disabled = true;
+  toonMelding("melding-herhaal", "ok", "Ronde draait… (verstuurt alles wat vandaag of eerder aan de beurt is)");
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) throw new Error("Je bent niet (meer) ingelogd.");
+    const resp = await fetch(`${CFG.SUPABASE_URL}/functions/v1/herhaalboekingen`, {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+      body: "{}"
+    });
+    const j = await resp.json().catch(() => null);
+    if (!resp.ok || !j) throw new Error(`de ronde antwoordde HTTP ${resp.status}`);
+    const gelukt = (j.uitslagen || []).filter(u => u.gelukt).length;
+    toonMelding("melding-herhaal", "ok",
+      j.aantal === 0 ? "Niets aan de beurt — er stond geen herhaalboeking gepland voor vandaag of eerder."
+        : `Ronde klaar: ${gelukt} van ${j.aantal} verstuurd als concept. De uitslag per boeking staat in het logboek hieronder.`);
+  } catch (e) {
+    toonMelding("melding-herhaal", "fout", "Ronde draaien mislukte: " + escapeHtml(e.message));
+  }
+  knop.disabled = false;
+  laadHerhaal();
+}
+
+/* Geen browser-popup (confirm) bij belangrijke knoppen: die wordt in het
+   voorbeeldvenster geblokkeerd en dan lijkt de knop kapot (les van 4 aug,
+   opnieuw geleerd 1 sep). De knop vraagt zelf om een tweede klik en springt
+   na 5 seconden vanzelf terug. */
+function metTweedeKlik(knop, vraagTekst, fn) {
+  knop.addEventListener("click", () => {
+    if (knop.dataset.zeker !== "1") {
+      knop.dataset.zeker = "1";
+      knop.dataset.oud = knop.textContent;
+      knop.textContent = typeof vraagTekst === "function" ? vraagTekst() : vraagTekst;
+      setTimeout(() => {
+        if (knop.dataset.zeker === "1") { knop.dataset.zeker = ""; knop.textContent = knop.dataset.oud; }
+      }, 5000);
+      return;
+    }
+    knop.dataset.zeker = ""; knop.textContent = knop.dataset.oud;
+    fn();
+  });
+}
+
+/* ================= Gebruikersbeheer =================
+   Accounts voor medewerkers, via de edge function "gebruikers" (service-rol).
+   Alleen beheerders (secret BANKBOEKER_BEHEERDERS) zien dit blok en mogen
+   aanmaken/resetten/verwijderen. Standaardwachtwoord enter123; de app dwingt
+   daarna een eigen wachtwoord af (vlag moet_wachtwoord_wijzigen). */
+async function gebruikersAanroep(actie, email) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error("Je bent niet (meer) ingelogd — ververs de pagina en log opnieuw in.");
+  const resp = await fetch(`${CFG.SUPABASE_URL}/functions/v1/gebruikers`, {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+    body: JSON.stringify(email ? { actie, email } : { actie })
+  });
+  const j = await resp.json().catch(() => null);
+  if (!resp.ok) throw new Error((j && j.fout) || `HTTP ${resp.status}`);
+  return j;
+}
+async function initGebruikersBlok() {
+  if (!CLOUD || !gebruiker) return;
+  try {
+    const wie = await gebruikersAanroep("wie-ben-ik");
+    if (!wie.beheerder) return;   // geen beheerder → blok blijft onzichtbaar
+    document.getElementById("kaart-gebruikers").style.display = "";
+    laadGebruikers();
+  } catch (e) { /* blok blijft onzichtbaar; niets aan de hand */ }
+}
+function gbDatum(iso) {
+  return iso ? new Date(iso).toLocaleDateString("nl-NL", { timeZone: "America/Aruba", day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+}
+async function laadGebruikers() {
+  const tbody = document.querySelector("#tabel-gebruikers tbody");
+  tbody.innerHTML = `<tr><td colspan="5" class="hint">Laden…</td></tr>`;
+  let lijst;
+  try { lijst = (await gebruikersAanroep("lijst")).gebruikers; }
+  catch (e) { tbody.innerHTML = `<tr><td colspan="5" class="hint">Laden mislukt: ${escapeHtml(e.message)}</td></tr>`; return; }
+  tbody.innerHTML = "";
+  for (const u of lijst) {
+    const tr = document.createElement("tr");
+    const ikzelf = gebruiker && u.email === gebruiker.email;
+    tr.innerHTML = `<td><b>${escapeHtml(u.email)}</b>${ikzelf ? ' <span class="hint">(jij)</span>' : ""}</td>
+      <td>${gbDatum(u.aangemaakt)}</td><td>${gbDatum(u.laatste_inlog)}</td>
+      <td>${u.moet_wijzigen ? '<span class="badge zwak">enter123 — moet nog wijzigen</span>' : '<span class="badge regel">eigen wachtwoord</span>'}</td>
+      <td style="white-space:nowrap"></td>`;
+    const acties = tr.lastElementChild;
+    const knop = (tekst, klasse, vraagTekst, fn) => {
+      const b = document.createElement("button");
+      b.className = "knop " + klasse; b.textContent = tekst;
+      b.style.cssText = "padding:5px 9px; font-size:12px; margin:0 4px 4px 0";
+      metTweedeKlik(b, vraagTekst, fn);
+      acties.appendChild(b);
+    };
+    knop("Wachtwoord resetten", "stil", "Zeker? Terug naar enter123", async () => {
+      try {
+        const r = await gebruikersAanroep("reset", u.email);
+        audit("wachtwoord gereset", "", u.email);
+        toonMelding("melding-gebruikers", "ok", escapeHtml(r.melding));
+      } catch (e) { toonMelding("melding-gebruikers", "fout", escapeHtml(e.message)); }
+      laadGebruikers();
+    });
+    if (!ikzelf) knop("×", "gevaar", "Zeker? Account gaat weg", async () => {
+      try {
+        const r = await gebruikersAanroep("verwijderen", u.email);
+        audit("gebruiker verwijderd", "", u.email);
+        toonMelding("melding-gebruikers", "ok", escapeHtml(r.melding));
+      } catch (e) { toonMelding("melding-gebruikers", "fout", escapeHtml(e.message)); }
+      laadGebruikers();
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+/* ================= Hulpjes & events ================= */
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function toonMelding(id, soort, tekst) {
+  document.getElementById(id).innerHTML = `<div class="melding ${soort}">${tekst}</div>`;
+}
+function kiesTab(naam) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === naam));
+  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal"])
+    document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
+  if (naam === "herhaal") laadHerhaal();
+}
+function koppelDropzone(zoneId, fileId, meldingId, verwerk) {
+  const zone = document.getElementById(zoneId), file = document.getElementById(fileId);
+  zone.addEventListener("click", () => file.click());
+  zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("sleep"); });
+  zone.addEventListener("dragleave", () => zone.classList.remove("sleep"));
+  zone.addEventListener("drop", e => { e.preventDefault(); zone.classList.remove("sleep"); leesBestand(e.dataTransfer.files[0]); });
+  file.addEventListener("change", () => { leesBestand(file.files[0]); file.value = ""; });
+  function leesBestand(f) {
+    if (!f) return;
+    const lezer = new FileReader();
+    lezer.onload = async () => {
+      try {
+        const buf = lezer.result;
+        const kop = new Uint8Array(buf.slice(0, 4));
+        // Excel ("PK") en PDF ("%PDF") eerst omzetten; anders als tekst lezen
+        let tekst;
+        if (kop[0] === 0x50 && kop[1] === 0x4B) tekst = await xlsxNaarCSV(buf);
+        else if (kop[0] === 0x25 && kop[1] === 0x50 && kop[2] === 0x44 && kop[3] === 0x46) tekst = await pdfNaarTekst(buf);
+        else tekst = new TextDecoder("utf-8").decode(buf);
+        await verwerk(tekst);
+      } catch (e) { toonMelding(meldingId, "fout", "Fout: " + escapeHtml(e.message)); }
+    };
+    lezer.readAsArrayBuffer(f);
+  }
+}
+function profielInBewerking(meldingId) {
+  if (bewerkIndex < 0 || !profielen[bewerkIndex]) {
+    toonMelding(meldingId, "fout", "Sla de klant eerst op en open daarna de instellingen opnieuw.");
+    return null;
+  }
+  return profielen[bewerkIndex];
+}
+function allesVernieuwen() {
+  vernieuwKlantSelect(); vernieuwKlantInfo(); vernieuwKlantTabel(); vernieuwRegels(); vernieuwRondeKeuze(); vernieuwNegeerlijst();
+  if (regelsSessie.length) vernieuwReview();
+  else { vernieuwStats(); vernieuwPreviews(); }
+}
+// voorkom dat de browser een gedropt bestand zelf opent als het naast een dropzone valt
+document.addEventListener("dragover", e => e.preventDefault());
+document.addEventListener("drop", e => e.preventDefault());
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.tab)));
+document.getElementById("klant-select").addEventListener("change", e => {
+  huidig = profielen[+e.target.value]; regelsSessie = []; allesVernieuwen();
+});
+koppelDropzone("drop-vraagposten", "file-vraagposten", "melding-inlezen", tekst => {
+  if (!huidig) throw new Error("Maak eerst een klantprofiel aan.");
+  inlezenVraagposten(tekst);
+});
+koppelDropzone("drop-afschrift", "file-afschrift", "melding-afschrift", tekst => {
+  const n = verrijkMetAfschrift(tekst);
+  vernieuwReview();
+  toonMelding("melding-afschrift", n ? "ok" : "fout",
+    n ? `${n} regels verrijkt met de volledige omschrijving (groene rand in stap 2 · Controleren).`
+      : "Geen overeenkomende omschrijvingen gevonden in dit bestand. Controleer of het afschrift dezelfde periode dekt als de ingelezen vraagposten.");
+});
+koppelDropzone("drop-klantenlijst", "file-klantenlijst", "melding-klantenlijst", tekst => {
+  const lijst = leesCodeNaamLijst(tekst);
+  let nieuw = 0, overgeslagen = 0;
+  for (const x of lijst) {
+    if (!x.code || profielen.some(p => p.code.toUpperCase() === x.code.toUpperCase())) { overgeslagen++; continue; }
+    const p = { code: x.code, naam: x.naam || x.code, vraagposten: "2999", debiteurenGl: "", crediteurenGl: "",
+      memoDagboek: "MEMO", valuta: "AWG", kpl: "", dagboeken: "", schema: [], debiteuren: [], crediteuren: [], rules: {} };
+    migreer(p);
+    profielen.push(p);
+    ontNegeer(p.code);   // bewust geïmporteerd, dus weer toelaten
+    nieuw++;
+  }
+  profielen.sort((a, b) => a.code.localeCompare(b.code));
+  if (!huidig) huidig = profielen[0] || null;
+  bewaar(); allesVernieuwen();
+  audit("klantenlijst import", "", `${nieuw} nieuwe profielen`);
+  toonMelding("melding-klantenlijst", "ok", `${nieuw} nieuwe klantprofielen aangemaakt, ${overgeslagen} bestonden al of hadden geen code. Controleer per klant de vraagposten-rekening (standaard 2999) via Instellingen.`);
+});
+koppelDropzone("drop-historie", "file-historie", "melding-historie", tekst => {
+  const p = profielInBewerking("melding-historie"); if (!p) return;
+  const res = leerUitHistorie(tekst, p);
+  vernieuwUploadStatus(p); vernieuwKlantInfo(); vernieuwRegels();
+  toonMelding("melding-historie", "ok", `${res.bruikbaar} geboekte regels verwerkt: ${res.nieuw} nieuwe en ${res.bijgewerkt} bijgewerkte boekingsregels.`);
+});
+koppelDropzone("drop-schema", "file-schema", "melding-schema", tekst => {
+  const p = profielInBewerking("melding-schema"); if (!p) return;
+  const lijst = leesCodeNaamLijst(tekst);
+  let nieuw = 0;
+  for (const x of lijst) {
+    const bestaand = p.schema.find(s => s.gl === x.code);
+    if (bestaand) { if (x.naam) bestaand.naam = x.naam; }
+    else { p.schema.push({ gl: x.code, naam: x.naam }); nieuw++; }
+  }
+  p.schema.sort((a, b) => a.gl.localeCompare(b.gl));
+  bewaar(); vernieuwUploadStatus(p); vernieuwKlantInfo();
+  toonMelding("melding-schema", "ok", `${lijst.length} rekeningen gelezen, ${nieuw} nieuw toegevoegd (totaal ${p.schema.length}).`);
+});
+function relatiesUitBestand(meldingId, veld, woord) {
+  return tekst => {
+    const p = profielInBewerking(meldingId); if (!p) return;
+    const lijst = leesCodeNaamLijst(tekst);
+    let nieuw = 0;
+    for (const x of lijst) {
+      const bestaand = p[veld].find(d => d.code === x.code);
+      if (bestaand) { if (x.naam) bestaand.naam = x.naam; }
+      else { p[veld].push(x); nieuw++; }
+    }
+    p[veld].sort((a, b) => a.code.localeCompare(b.code));
+    bewaar(); vernieuwUploadStatus(p); vernieuwKlantInfo();
+    toonMelding(meldingId, "ok", `${lijst.length} ${woord} gelezen, ${nieuw} nieuw toegevoegd (totaal ${p[veld].length}).`);
+  };
+}
+koppelDropzone("drop-debiteuren", "file-debiteuren", "melding-debiteuren", relatiesUitBestand("melding-debiteuren", "debiteuren", "debiteuren"));
+koppelDropzone("drop-crediteuren", "file-crediteuren", "melding-crediteuren", relatiesUitBestand("melding-crediteuren", "crediteuren", "crediteuren"));
+document.getElementById("btn-export").addEventListener("click", downloadExport);
+document.getElementById("btn-export-xlsx").addEventListener("click", downloadExportXlsx);
+document.getElementById("btn-vragen").addEventListener("click", downloadVragen);
+document.getElementById("btn-vragen-xlsx").addEventListener("click", downloadVragenXlsx);
+document.getElementById("btn-upload").addEventListener("click", verstuurDirectLink);
+["dl-endpoint","dl-token"].forEach(id => document.getElementById(id).addEventListener("change", bewaarDlInstellingen));
+laadDlInstellingen();
+document.getElementById("btn-live-vraagposten").addEventListener("click", () => voerLiveUit("btn-live-vraagposten", "melding-inlezen", liveVraagposten));
+document.getElementById("btn-ronde").addEventListener("click", startRonde);
+document.getElementById("btn-verken").addEventListener("click", verkenBoekers);
+document.getElementById("btn-verken-overnemen").addEventListener("click", neemVerkenVoorstelOver);
+document.getElementById("btn-ronde-stop").addEventListener("click", () => { rondeStop = true; });
+document.getElementById("ronde-boekers").value = localStorage.getItem(BOEKERS_OPSLAG) ?? ENDURA_BOEKERS_STANDAARD;
+document.getElementById("ronde-boekers").addEventListener("change", e => {
+  localStorage.setItem(BOEKERS_OPSLAG, e.target.value);
+  verkenVoorstel = verkenVoorstel.map(v => ({ ...v, voorstel: isOnzeBoeker(v.boeker) === false ? false : true }));
+  vernieuwVerkenTabel();
+  document.getElementById("btn-verken-overnemen").style.display = verkenVoorstel.some(v => v.voorstel !== v.nu) ? "" : "none";
+});
+document.getElementById("btn-live-administraties").addEventListener("click", () => voerLiveUit("btn-live-administraties", "melding-klantenlijst", liveAdministraties));
+document.getElementById("btn-live-schema").addEventListener("click", () => voerLiveUit("btn-live-schema", "melding-schema", liveSchema));
+document.getElementById("btn-live-debiteuren").addEventListener("click", () => voerLiveUit("btn-live-debiteuren", "melding-debiteuren", liveDebiteuren));
+document.getElementById("btn-live-crediteuren").addEventListener("click", () => voerLiveUit("btn-live-crediteuren", "melding-crediteuren", liveCrediteuren));
+document.getElementById("btn-live-leren").addEventListener("click", () => voerLiveUit("btn-live-leren", "melding-historie", liveLeren));
+document.getElementById("btn-invullijst").addEventListener("click", toonInvullijst);
+document.getElementById("btn-invullijst-kopie").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(invullijstAlsTekst());
+    toonMelding("melding-invullijst", "ok", "Gekopieerd. Plak het in Excel of Word (de kolommen komen vanzelf goed).");
+  } catch (e) {
+    toonMelding("melding-invullijst", "fout", "Kopiëren lukte niet — selecteer de tabel dan met de muis en kopieer met Ctrl+C.");
+  }
+});
+document.getElementById("btn-invullijst-klaar").addEventListener("click", () => {
+  const aantal = invullijstRegels().length;
+  if (!confirm(`${aantal} regels markeren als verwerkt?\n\nDoe dit pas als je ze in Twinfield hebt ingevuld. Ze verdwijnen dan uit de ronde; terugdraaien kan door in stap 2 op het rijnummer te klikken.`)) return;
+  const n = markeerVerstuurd();
+  if (typeof audit === "function") audit("handmatig ingevuld in Twinfield", huidig.code, `${n} regels`);
+  vernieuwReview(); toonInvullijst();
+  toonMelding("melding-invullijst", "ok", `${n} regels gemarkeerd als verwerkt.`);
+});
+document.getElementById("btn-zoek-onbekend").addEventListener("click", () => zoekOnlineOnbekenden(true));
+document.getElementById("btn-sessie-wissen").addEventListener("click", () => {
+  if (!regelsSessie.length) return;
+  if (!confirm(`Het ingelezen bestand (${regelsSessie.length} regels) wissen? Er wordt niets geboekt of opgeslagen.`)) return;
+  regelsSessie = [];
+  vernieuwReview();
+  toonMelding("melding-inlezen", "ok", "Ingelezen bestand gewist. Kies de juiste klant en lees opnieuw in.");
+  kiesTab("inlezen");
+});
+function koppelWisKnop(knopId, veld, omschrijving) {
+  document.getElementById(knopId).addEventListener("click", () => {
+    const p = profielInBewerking("melding-opschonen"); if (!p) return;
+    const aantal = Array.isArray(p[veld]) ? p[veld].length : Object.keys(p[veld] || {}).length;
+    if (!confirm(`${omschrijving} van ${p.code} · ${p.naam} wissen (${aantal} stuks)?\n\nDit kan niet ongedaan worden gemaakt.`)) return;
+    p[veld] = Array.isArray(p[veld]) ? [] : {};
+    bewaar(); vernieuwUploadStatus(p); vernieuwKlantInfo(); vernieuwRegels(); vernieuwKlantTabel();
+    if (typeof audit === "function") audit("opschonen", p.code, `${omschrijving}: ${aantal} gewist`);
+    toonMelding("melding-opschonen", "ok", `${omschrijving} van ${escapeHtml(p.code)} gewist (${aantal} verwijderd).`);
+  });
+}
+koppelWisKnop("btn-wis-regels", "rules", "Boekingsregels");
+koppelWisKnop("btn-wis-verstuurd", "verstuurd", "Verwerkt-markeringen");
+koppelWisKnop("btn-wis-schema", "schema", "Rekeningschema");
+koppelWisKnop("btn-wis-debiteuren", "debiteuren", "Debiteurenlijst");
+koppelWisKnop("btn-wis-zoekcache", "zoekCache", "Zoek-cache");
+["zk-key","zk-cx","zk-suffix","zk-auto"].forEach(id => document.getElementById(id).addEventListener("change", bewaarZoekInstellingen));
+laadZoekInstellingen();
+document.getElementById("btn-leer").addEventListener("click", leerVanCorrecties);
+document.getElementById("btn-klant-opslaan").addEventListener("click", klantOpslaan);
+document.getElementById("btn-klant-nieuw").addEventListener("click", () => openInstellingen(-1));
+document.getElementById("btn-klant-sluiten").addEventListener("click", sluitInstellingen);
+document.getElementById("btn-profiel-export").addEventListener("click", profielenExporteren);
+document.getElementById("btn-profiel-import").addEventListener("click", () => document.getElementById("file-profielen").click());
+document.getElementById("file-profielen").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const lezer = new FileReader();
+  lezer.onload = () => { try { profielenImporteren(lezer.result); } catch (err) { alert("Import mislukt: " + err.message); } };
+  lezer.readAsText(f);
+  e.target.value = "";
+});
+document.getElementById("regels-zoek").addEventListener("input", vernieuwRegels);
+{
+  const aanmaakKnop = document.getElementById("btn-gb-aanmaken");
+  const wapenUit = () => { aanmaakKnop.dataset.zeker = ""; aanmaakKnop.textContent = "+ Account aanmaken"; };
+  aanmaakKnop.addEventListener("click", async () => {
+    const email = document.getElementById("gb-email").value.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toonMelding("melding-gebruikers", "fout", "Vul eerst een volledig e-mailadres in.");
+      wapenUit();
+      return;
+    }
+    // Geen browser-popup (confirm): geblokkeerd in het voorbeeldvenster.
+    // Tweede klik binnen 5 seconden = echt aanmaken.
+    if (aanmaakKnop.dataset.zeker !== "1") {
+      document.getElementById("melding-gebruikers").innerHTML = "";
+      aanmaakKnop.dataset.zeker = "1";
+      aanmaakKnop.textContent = "Zeker? Wachtwoord wordt enter123";
+      setTimeout(() => { if (aanmaakKnop.dataset.zeker === "1") wapenUit(); }, 5000);
+      return;
+    }
+    wapenUit();
+    try {
+      const r = await gebruikersAanroep("aanmaken", email);
+      audit("gebruiker aangemaakt", "", email);
+      document.getElementById("gb-email").value = "";
+      toonMelding("melding-gebruikers", "ok", escapeHtml(r.melding));
+    } catch (e) { toonMelding("melding-gebruikers", "fout", escapeHtml(e.message)); }
+    laadGebruikers();
+  });
+}
+document.getElementById("btn-hh-nieuw").addEventListener("click", () => {
+  if (!CLOUD) { toonMelding("melding-herhaal", "fout", "Herhaalboekingen werken alleen in cloud-modus (met inlog)."); return; }
+  openHerhaalForm(null);
+});
+document.getElementById("btn-hh-ronde").addEventListener("click", herhaalRondeNu);
+document.getElementById("btn-hh-regel").addEventListener("click", () => {
+  vernieuwHhRegels([...leesRegelRijen(), { rekening: "", kpl: "", omschrijving: "", bedrag: "", zijde: "credit" }]);
+});
+document.getElementById("btn-hh-opslaan").addEventListener("click", herhaalOpslaan);
+document.getElementById("btn-hh-sluiten").addEventListener("click", sluitHerhaalForm);
+document.getElementById("hh-klant").addEventListener("change", () => {
+  // andere klant = ander rekeningschema en (meestal) ander memoriaal-dagboek
+  const p = hhProfiel();
+  if (p && p.memoDagboek) document.getElementById("hh-dagboek").value = p.memoDagboek;
+  vernieuwHhRegels(leesRegelRijen());
+});
+["exp-dagboek","exp-valuta","exp-kpl"].forEach(id => document.getElementById(id).addEventListener("input", vernieuwPreviews));
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const knop = document.getElementById("btn-login");
+  knop.disabled = true; knop.textContent = "Bezig…";
+  const { error } = await sb.auth.signInWithPassword({
+    email: document.getElementById("login-email").value.trim(),
+    password: document.getElementById("login-wachtwoord").value
+  });
+  knop.disabled = false; knop.textContent = "Inloggen";
+  if (error) {
+    const tekst = /invalid login credentials/i.test(error.message)
+      ? "E-mailadres of wachtwoord klopt niet."
+      : "Inloggen mislukt: " + escapeHtml(error.message);
+    toonMelding("melding-login", "fout", tekst);
+  }
+});
+document.getElementById("btn-uitloggen").addEventListener("click", () => sb.auth.signOut());
+document.getElementById("wachtwoord-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const nieuw = document.getElementById("ww-nieuw").value;
+  const nogeens = document.getElementById("ww-nogeens").value;
+  if (nieuw.length < 8) { toonMelding("melding-wachtwoord", "fout", "Minimaal 8 tekens."); return; }
+  if (nieuw.toLowerCase() === "enter123") { toonMelding("melding-wachtwoord", "fout", "Kies een ander wachtwoord dan het standaardwachtwoord."); return; }
+  if (nieuw !== nogeens) { toonMelding("melding-wachtwoord", "fout", "De twee wachtwoorden zijn niet gelijk."); return; }
+  const knop = document.getElementById("btn-wachtwoord");
+  knop.disabled = true; knop.textContent = "Bezig…";
+  const { error } = await sb.auth.updateUser({ password: nieuw, data: { moet_wachtwoord_wijzigen: false } });
+  if (error) {
+    knop.disabled = false; knop.textContent = "Opslaan en doorgaan";
+    toonMelding("melding-wachtwoord", "fout", "Opslaan mislukt: " + escapeHtml(error.message));
+    return;
+  }
+  location.reload();
+});
+
+(async function init() {
+  document.getElementById("voet-modus").textContent = CLOUD
+    ? "gedeelde database — wijzigingen zijn zichtbaar voor alle collega's"
+    : "lokale modus (nog geen database gekoppeld — zie SETUP.md)";
+  const ok = await initAuth();
+  if (!ok) return;                       // login- of wachtwoord-overlay staat open
+  profielen = await laadProfielen();
+  huidig = profielen[0] || null;
+  allesVernieuwen();
+  initGebruikersBlok();                  // toont het gebruikersblok alleen voor beheerders
+})();
+
+</script>
+</body>
+</html>

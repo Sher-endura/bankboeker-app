@@ -3556,6 +3556,8 @@ async function faBulkGoedkeuren() {
   }
   knop.disabled = false;
   await laadFacturen();
+  // Stond rechts een document open dat nu is goedgekeurd: dicht, anders lijkt het nog te beoordelen.
+  if (faGekozen && !FA_BEOORDELEN.includes((faDocs.find(x => x.id === faGekozen.id) || {}).status)) faSluitDetail();
   toonMelding("melding-facturen", overgeslagen.length ? "fout" : "ok",
     `${goed} goedgekeurd — Shai vult ze bij zijn volgende ronde in en boekt ze door.` +
     (overgeslagen.length ? `<br>Niet goedgekeurd (open ze en verbeter ze eerst):<br>${overgeslagen.map(escapeHtml).join("<br>")}` : ""));
@@ -4012,9 +4014,7 @@ async function faGoedkeuren() {
     await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "goedgekeurd", details: { verbeteringen: nieuweRegels.length }, door: wie });
     toonMelding("melding-fa-detail", "ok", `Goedgekeurd en onthouden${nieuweRegels.length ? `, plus je uitleg als regel` : ""}. De robot vult het bij de volgende ronde in Basecone in.`);
     await laadFacturen();
-    // Door naar het volgende document dat beoordeeld moet worden.
-    const volgende = faDocs.find(x => x.office === d.office && ["voorstel", "voorleggen"].includes(x.status));
-    if (volgende) setTimeout(() => openFactuur(volgende.id), 900);
+    faVolgendeOfSluiten(d.office, `Goedgekeurd${nieuweRegels.length ? " en je uitleg onthouden" : ""}.`);
   } catch (e) {
     toonMelding("melding-fa-detail", "fout", "Goedkeuren mislukt: " + escapeHtml(e.message));
   }
@@ -4043,7 +4043,29 @@ async function faZetStatus(status, logActie) {
   const { error } = await sb.from("basecone_documenten").update({ status, updated_by: wie }).eq("id", d.id);
   if (error) { toonMelding("melding-fa-detail", "fout", escapeHtml(error.message)); return; }
   await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: logActie, door: wie });
-  await laadFacturen(); await openFactuur(d.id);
+  await laadFacturen();
+  if (status === "overgeslagen") faVolgendeOfSluiten(d.office, "Overgeslagen.");
+  else await openFactuur(d.id);
+}
+/* Na goedkeuren/overslaan: door naar het volgende document dat beoordeeld moet worden (eerst dezelfde
+   administratie, in de volgorde van de lijst), of het rechterdeel sluiten als er niets meer is
+   (Shereen 10 okt: het laatst goedgekeurde document bleef open staan). */
+function faVolgendeOfSluiten(office, melding) {
+  const open = faZichtbaar().filter(x => FA_BEOORDELEN.includes(x.status));
+  const volgende = open.find(x => x.office === office) || open[0];
+  if (volgende) {
+    openFactuur(volgende.id).then(() => toonMelding("melding-fa-detail", "ok", `${escapeHtml(melding)} Dit is het volgende document.`));
+    return;
+  }
+  faSluitDetail(`${melding} Alles is beoordeeld — Shai vult de goedgekeurde documenten in Basecone in en boekt ze door.`);
+}
+function faSluitDetail(tekst) {
+  faGekozen = null;
+  document.getElementById("fa-inhoud").style.display = "none";
+  const leeg = document.getElementById("fa-leeg");
+  leeg.style.display = "";
+  leeg.textContent = tekst || "Klik links op een document om het hier te openen.";
+  vernieuwFaTabel();
 }
 async function laadFaRegels() {
   const office = document.getElementById("kb-office").value;

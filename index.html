@@ -4126,7 +4126,7 @@ async function laadKennisTab() {
 }
 /* Kennisbank (database-update 3): wat de robot uit goedgekeurde documenten onthield. */
 let faKennis = [], faKennisSoort = "leverancier", faKennisNamen = {};
-const FA_KENNIS_SOORTEN = { leverancier: "Leveranciers", artikel: "Artikelen", handschrift: "Handgeschreven" };
+const FA_KENNIS_SOORTEN = { leverancier: "Leveranciers", artikel: "Artikelen", handschrift: "Handgeschreven", uitgezet: "Uitgezet" };
 async function laadFaKennis() {
   const office = document.getElementById("kb-office").value;
   document.getElementById("fa-kennis-office").textContent = office ? `· ${office}` : "";
@@ -4155,13 +4155,19 @@ async function laadFaKennis() {
     const zonder = offices.filter(o => !(st || []).some(r => r.office === o));
     if (zonder.length) faKennisSchemaOphalen(zonder);
   }
-  let q2 = sb.from("basecone_kennis").select("id", { count: "exact", head: true }).eq("actief", false);
-  if (office) q2 = q2.eq("office", office);
-  const { count } = await q2;
-  faKennisUit = count || 0;
+  // Uitgezette regels ook ophalen: eerst bekijken (tabje Uitgezet), dan pas verwijderen (Shereen 10 okt).
+  faKennisUitRijen = [];
+  for (let van = 0; van < 100000; van += 1000) {
+    let q2 = sb.from("basecone_kennis").select("*").eq("actief", false).order("id").range(van, van + 999);
+    if (office) q2 = q2.eq("office", office);
+    const { data } = await q2;
+    faKennisUitRijen.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  faKennisUit = faKennisUitRijen.length;
   vernieuwFaKennis();
 }
-let faKennisUit = 0;
+let faKennisUit = 0, faKennisUitRijen = [];
 async function faKennisSchemaOphalen(offices) {
   for (const o of offices) {
     try {
@@ -4202,7 +4208,7 @@ function vernieuwFaKennis() {
   const tabs = document.getElementById("fa-kennis-tabs");
   const { levNaam, groepVan } = faKennisGroepen();
   // Leveranciers en artikelen samenvoegen over de klanten heen.
-  const groepen = { leverancier: new Map(), artikel: new Map(), handschrift: new Map() };
+  const groepen = { leverancier: new Map(), artikel: new Map(), handschrift: new Map(), uitgezet: new Map(faKennisUitRijen.map(k => [k.id, [k]])) };
   for (const k of faKennis) {
     const sleutel = k.soort === "leverancier" ? groepVan(k)
       : k.soort === "artikel" ? `${groepVan(k)}|${faNorm(k.voorbeeld) || k.sleutel}`
@@ -4230,6 +4236,7 @@ function vernieuwFaKennis() {
     leverancier: ["Leverancier", "Klanten (crediteur)", "In Twinfield geboekt op", "Goedgekeurd: rekening", "Goed / verbeterd", "Basecone klopte", "Laatst", ""],
     artikel: ["Leverancier", "Artikel", "Rekening (per klant)", "Keer", "Gewisseld", "Laatst", ""],
     handschrift: ["Aantekening", "Klant", "Rekening", "Keer", "Gewisseld", "Laatst gezien bij", "Laatst", ""],
+    uitgezet: ["Soort", "Klant", "Wat", "Rekening", "Laatst", ""],
   }[faKennisSoort];
   document.querySelector("#tabel-fa-kennis thead").innerHTML = `<tr>${kop.map(h => `<th>${h}</th>`).join("")}</tr>`;
   const tbody = document.querySelector("#tabel-fa-kennis tbody");
@@ -4264,15 +4271,20 @@ function vernieuwFaKennis() {
       const rek = [...perRek.values()].map(({ k, klanten }) => `${faKennisRek(k.office, k.grootboek)} <span style="font-size:12px">(${escapeHtml([...new Set(klanten)].join(", "))})</span>`).join("<br>");
       tr.innerHTML = `<td>${escapeHtml(levNaam[`${k0.office}|${k0.leverancier}`] || k0.leverancier)}</td><td>${escapeHtml(k0.voorbeeld || "")}</td>
         <td style="font-size:13px">${rek}</td><td>${rijen.reduce((s, k) => s + k.bevestigd, 0)}</td><td>${rijen.reduce((s, k) => s + (k.verbeterd || 0), 0) || ""}</td><td>${datum(laatst(rijen))}</td><td></td>`;
+    } else if (faKennisSoort === "uitgezet") {
+      const lev = k0.soort === "leverancier" ? ((k0.gegevens && k0.gegevens.twinfield && k0.gegevens.twinfield.naam) || k0.voorbeeld) : k0.voorbeeld;
+      tr.innerHTML = `<td>${escapeHtml(FA_KENNIS_SOORTEN[k0.soort] || k0.soort)}</td><td>${escapeHtml(k0.office)}</td><td>${escapeHtml(lev || k0.leverancier || "")}</td>
+        <td>${faKennisRek(k0.office, k0.grootboek)}</td><td>${datum(k0.laatst_gezien)}</td><td></td>`;
     } else {
       const g = k0.gegevens || {};
       tr.innerHTML = `<td>${escapeHtml(k0.voorbeeld || "")}</td><td>${escapeHtml(k0.office)}</td><td>${faKennisRek(k0.office, k0.grootboek)}</td><td>${k0.bevestigd}</td><td>${k0.verbeterd || ""}</td>
         <td>${escapeHtml(g.leverancier || "")}</td><td>${datum(k0.laatst_gezien)}</td><td></td>`;
     }
     const b = document.createElement("button");
-    b.className = "knop stil"; b.textContent = "Vergeten"; b.style.cssText = "padding:4px 9px; font-size:12px";
+    const terug = faKennisSoort === "uitgezet";
+    b.className = "knop stil"; b.textContent = terug ? "Terugzetten" : "Vergeten"; b.style.cssText = "padding:4px 9px; font-size:12px";
     metTweedeKlik(b, "Zeker?", async () => {
-      const { error } = await sb.from("basecone_kennis").update({ actief: false }).in("id", rijen.map(k => k.id));
+      const { error } = await sb.from("basecone_kennis").update({ actief: terug }).in("id", rijen.map(k => k.id));
       if (error) { toonMelding("melding-facturen", "fout", "Vergeten mislukt: " + escapeHtml(error.message)); return; }
       laadFaKennis();
     });

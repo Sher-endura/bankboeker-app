@@ -3325,6 +3325,7 @@ const FA_FILTERS = {
   robot: { tekst: "Wacht op robot", statussen: ["goedgekeurd"] },
   ingevuld: { tekst: "Ingevuld / geboekt", statussen: ["ingevuld", "geboekt"] },
   fout: { tekst: "Fout", statussen: ["fout"] },
+  overgeslagen: { tekst: "Overgeslagen", statussen: ["overgeslagen"] },
   alles: { tekst: "Alles", statussen: null },
 };
 const FA_STATUS_TEKST = {
@@ -3896,7 +3897,7 @@ async function openFactuur(id) {
   document.getElementById("btn-fa-goedkeuren").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-opnieuw").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-overslaan").style.display = beoordelen ? "" : "none";
-  document.getElementById("btn-fa-terug").style.display = d.status === "goedgekeurd" ? "" : "none";
+  document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen"].includes(d.status) ? "" : "none";
   for (const el of document.querySelectorAll("#kaart-fa-detail .fa-form input, #kaart-fa-detail .fa-form select")) el.disabled = !beoordelen;
 }
 function vernieuwFaRegels(regels) {

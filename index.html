@@ -564,6 +564,11 @@
         <p style="margin:0 0 4px"><span id="fa-som"></span></p>
         <label style="margin-top:2px">Waarom verbeter je dit? (optioneel — wordt een regel voor de robot)</label>
         <input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris">
+        <select id="fa-reden-voor" style="width:auto; margin-top:4px" title="Voor wie geldt je uitleg?">
+          <option value="leverancier">Geldt alleen voor deze leverancier</option>
+          <option value="klant">Geldt voor alle leveranciers van deze klant</option>
+          <option value="alle">Geldt voor alle klanten</option>
+        </select>
         <p style="margin:10px 0 4px">
           <button class="knop" id="btn-fa-goedkeuren">✓ Goedkeuren</button>
           <button class="knop stil" id="btn-fa-opnieuw">Opnieuw lezen</button>
@@ -3363,6 +3368,45 @@ async function laadRobotStatus() {
   vak.className = "fa-robot " + soort;
   vak.innerHTML = `<b>Robot: ${escapeHtml(tekst)}</b>${data.bericht ? " — " + escapeHtml(data.bericht) : ""} · laatst gemeld ${minuten < 1 ? "net" : minuten + " min geleden"}${oud ? " (lang niet gemeld — draait hij nog?)" : ""}`;
 }
+/* ↻ Verversen (Shereen 10 okt): lijst opnieuw laden én de voorstellen die nog beoordeeld moeten worden
+   en gelezen zijn vóór de nieuwste regel/uitleg, opnieuw laten lezen — dan nemen ze die kennis mee
+   (meldingen en zekerheid worden opnieuw bepaald). Kost ±6 ct per voorstel (Opus). */
+let faHerlezenBezig = false;
+async function faVerversen() {
+  await laadFacturen();
+  if (faHerlezenBezig) return;
+  const open = faDocs.filter(d => FA_BEOORDELEN.includes(d.status));
+  if (!open.length) return;
+  const offices = [...new Set(open.map(d => d.office))];
+  const { data: regels } = await sb.from("basecone_regels").select("office, created_at").eq("actief", true).in("office", [...offices, "*"]);
+  const nieuwsteRegel = (office) => Math.max(0, ...(regels || []).filter(r => r.office === office || r.office === "*").map(r => new Date(r.created_at).getTime()));
+  const { data: gelezen } = await sb.from("basecone_log").select("document_id, at").eq("actie", "voorstel").in("document_id", open.map(d => d.id));
+  const laatstGelezen = {};
+  for (const g of gelezen || []) laatstGelezen[g.document_id] = Math.max(laatstGelezen[g.document_id] || 0, new Date(g.at).getTime());
+  const oud = open.filter(d => (laatstGelezen[d.id] || 0) < nieuwsteRegel(d.office));
+  if (!oud.length) return;
+  faHerlezenBezig = true;
+  const knop = document.getElementById("btn-fa-ververs"); knop.disabled = true;
+  const { data: { session } } = await sb.auth.getSession();
+  let klaar = 0; const mis = [];
+  for (const d of oud) {
+    toonMelding("melding-facturen", "ok", `Shai leest ${oud.length} voorstel(len) opnieuw met je nieuwste uitleg… ${klaar}/${oud.length} (± ${oud.length * 6} cent)`);
+    try {
+      const resp = await fetch(`${CFG.SUPABASE_URL}/functions/v1/factuur-lezen`, {
+        method: "POST", headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+        body: JSON.stringify({ document_id: d.id }),
+      });
+      if (!resp.ok) { const r = await resp.json().catch(() => ({})); mis.push(`${d.bestandsnaam}: ${r.fout || resp.status}`); }
+    } catch (e) { mis.push(`${d.bestandsnaam}: ${e.message}`); }
+    klaar++;
+  }
+  faHerlezenBezig = false; knop.disabled = false;
+  await laadFacturen();
+  toonMelding("melding-facturen", mis.length ? "fout" : "ok",
+    `${klaar - mis.length} voorstel(len) opnieuw gelezen met je nieuwste uitleg.` + (mis.length ? `<br>Niet gelukt:<br>${mis.map(escapeHtml).join("<br>")}` : ""));
+  if (faGekozen && oud.some(d => d.id === faGekozen.id)) openFactuur(faGekozen.id);
+}
+
 /* "▶ Shai nu laten draaien": een regel in basecone_log; Shai kijkt tijdens het wachten elke halve
    minuut of die er is en begint dan meteen een ronde (ook buiten werktijd). */
 async function faNuDraaien() {
@@ -3745,6 +3789,7 @@ async function openFactuur(id) {
   document.getElementById("fa-titel").textContent = `${d.bestandsnaam || d.id} · ${d.office}`;
   document.getElementById("melding-fa-detail").innerHTML = "";
   document.getElementById("fa-reden").value = "";
+  document.getElementById("fa-reden-voor").value = "leverancier";
 
   // Scan(s)
   const scan = document.getElementById("fa-scan");
@@ -3889,7 +3934,11 @@ async function faGoedkeuren() {
   const nieuweRegels = [];
   const wie = gebruiker ? gebruiker.email : null;
   const reden = document.getElementById("fa-reden").value.trim();
-  if (reden) nieuweRegels.push({ office: d.office, soort: "leverancier", sleutel: leverancier, bron: "geleerd", created_by: wie, toelichting: reden });
+  // Voor wie de uitleg geldt (Shereen 10 okt: een datumregel bij Verina bedoelde ze voor iedereen).
+  const voor = document.getElementById("fa-reden-voor").value;
+  if (reden) nieuweRegels.push(voor === "leverancier"
+    ? { office: d.office, soort: "leverancier", sleutel: leverancier, bron: "geleerd", created_by: wie, toelichting: reden }
+    : { office: voor === "alle" ? "*" : d.office, soort: "algemeen", sleutel: null, bron: "geleerd", created_by: wie, toelichting: reden });
 
   const knop = document.getElementById("btn-fa-goedkeuren"); knop.disabled = true;
   try {
@@ -4287,7 +4336,7 @@ document.getElementById("btn-hh-nieuw").addEventListener("click", () => {
   openHerhaalForm(null);
 });
 document.getElementById("btn-hh-ronde").addEventListener("click", herhaalRondeNu);
-document.getElementById("btn-fa-ververs").addEventListener("click", laadFacturen);
+document.getElementById("btn-fa-ververs").addEventListener("click", faVerversen);
 /* Scan vergroten in het scherm zelf (niet in een nieuw tabblad zonder weg terug). */
 (function () {
   const vg = document.getElementById("fa-vergroting"), img = document.getElementById("fa-vergroting-img"), zoom = document.getElementById("btn-vg-zoom");

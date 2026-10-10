@@ -529,6 +529,7 @@
   <div class="kaart">
     <h2>Basecone — inkoopfacturen</h2>
     <div id="fa-robot" class="fa-robot"></div>
+    <p style="margin:0 0 10px"><button class="knop stil" id="btn-fa-nu" style="padding:6px 12px" title="Shai wacht anders tot zijn volgende ronde (elk uur). Hij begint binnen een halve minuut.">▶ Shai nu laten draaien</button> <span id="fa-nu-melding" style="font-size:13px"></span></p>
     <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</details>
     <div class="fa-balk">
       <select id="fa-office" style="width:auto"></select>
@@ -3362,6 +3363,20 @@ async function laadRobotStatus() {
   vak.className = "fa-robot " + soort;
   vak.innerHTML = `<b>Robot: ${escapeHtml(tekst)}</b>${data.bericht ? " — " + escapeHtml(data.bericht) : ""} · laatst gemeld ${minuten < 1 ? "net" : minuten + " min geleden"}${oud ? " (lang niet gemeld — draait hij nog?)" : ""}`;
 }
+/* "▶ Shai nu laten draaien": een regel in basecone_log; Shai kijkt tijdens het wachten elke halve
+   minuut of die er is en begint dan meteen een ronde (ook buiten werktijd). */
+async function faNuDraaien() {
+  const knop = document.getElementById("btn-fa-nu"), m = document.getElementById("fa-nu-melding");
+  knop.disabled = true;
+  const { data: st } = await sb.from("robot_status").select("status, bericht").eq("id", "basecone").maybeSingle();
+  if (st && st.status === "werkt") {
+    m.textContent = "Shai is al bezig — wat je goedkeurt, pakt hij in deze of de volgende ronde op.";
+  } else {
+    const { error } = await sb.from("basecone_log").insert({ actie: "nu draaien", door: gebruiker ? gebruiker.email : null });
+    m.textContent = error ? "Lukte niet: " + error.message : "Gevraagd — Shai begint binnen een halve minuut (als zijn venster op de robotcomputer open staat).";
+  }
+  setTimeout(() => { knop.disabled = false; laadRobotStatus(); }, 30000);
+}
 function vernieuwFaFilters() {
   const vak = document.getElementById("fa-filters");
   vak.innerHTML = "";
@@ -4319,6 +4334,7 @@ addEventListener("resize", faHoogte);
 })();
 document.getElementById("fa-office").addEventListener("change", () => { vernieuwFaFilters(); vernieuwFaTabel(); });
 document.getElementById("fa-zekerheid").addEventListener("change", vernieuwFaTabel);
+document.getElementById("btn-fa-nu").addEventListener("click", faNuDraaien);
 document.getElementById("fa-sorteer-zekerheid").addEventListener("click", faSorteerZekerheid);
 document.getElementById("kb-office").addEventListener("change", () => { laadFaRegels(); laadFaKennis(); });
 document.getElementById("btn-kb-ververs").addEventListener("click", laadKennisTab);

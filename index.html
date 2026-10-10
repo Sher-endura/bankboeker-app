@@ -108,6 +108,11 @@
   .fa-form label { display: block; font-size: 12px; font-weight: 600; color: var(--tekst); margin: 8px 0 3px; }
   .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
   .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
+  .fa-voorleg { background: #fff4e0; border-left: 4px solid var(--oranje); border-radius: 6px; padding: 10px 14px; margin: 8px 0; font-size: 14px; color: var(--tekst); line-height: 1.5; }
+  .fa-punten { margin: 8px 0; padding-left: 0; list-style: none; font-size: 14px; color: var(--tekst); line-height: 1.5; }
+  .fa-punten li { position: relative; padding: 7px 0 7px 22px; border-bottom: 1px solid var(--rand); }
+  .fa-punten li:last-child { border-bottom: 0; }
+  .fa-punten li::before { content: "⚠"; position: absolute; left: 0; top: 7px; color: var(--oranje); }
   .fa-ai { margin-top: 14px; font-size: 13px; color: var(--tekst); } .fa-ai summary { cursor: pointer; font-weight: 600; }
   .fa-ai dl { margin: 8px 0; } .fa-ai dt { font-weight: 600; margin-top: 6px; } .fa-ai dd { margin: 2px 0 0 0; }
   .dropzone { border: 2px dashed var(--rand); border-radius: 8px; padding: 20px; text-align: center; color: #777; font-size: 13px; cursor: pointer; }
@@ -3442,7 +3447,9 @@ function vernieuwFaTabel() {
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
   for (const d of lijst) {
     const v = d.goedgekeurd || d.voorstel || {};
-    const let_ = (v.waarschuwingen || []).length;
+    const pnt = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
+    const alle = [...(pnt.voorleg ? [pnt.voorleg] : []), ...pnt.lijst];
+    const let_ = alle.length;
     const tr = document.createElement("tr");
     if (faGekozen && faGekozen.id === d.id) tr.classList.add("gekozen");
     tr.title = `${d.bestandsnaam || d.id} · ${d.office}`;
@@ -3455,7 +3462,7 @@ function vernieuwFaTabel() {
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(v.datum))}</td>
       <td class="num">${v.credit ? "−" : ""}${faBedrag(v.bedrag)}</td>
       <td>${escapeHtml(v.zekerheid || "")}</td>
-      <td>${let_ ? `<span class="fa-let" title="${escapeHtml((v.waarschuwingen || []).map(w => "• " + w).join("\n"))}">${let_}</span>` : ""}${d.status === "fout" ? `<span class="fa-fout">${escapeHtml((d.opmerking || "").slice(0, 60))}</span>` : ""}</td>`;
+      <td>${let_ ? `<span class="fa-let" title="${escapeHtml(alle.map(w => "• " + w).join("\n"))}">${let_}</span>` : ""}${d.status === "fout" ? `<span class="fa-fout">${escapeHtml((d.opmerking || "").slice(0, 60))}</span>` : ""}</td>`;
     tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink")) openFactuur(d.id); });
     const vink = tr.querySelector(".fa-vink-rij");
     if (vink) vink.addEventListener("change", () => { vink.checked ? faVink.add(d.id) : faVink.delete(d.id); faBulkStand(); });
@@ -3614,12 +3621,36 @@ function faMetNamen(tekst) {
   for (const m of t.matchAll(/(?<![\w\/.,:-])(C\d{4}|\d{4})(?![\w\/.,:-]\w)/gi)) {
     const code = m[0], naam = naamVan(code);
     if (!naam) continue;
+    // Geen rekeningnaam achter een factuur-/bon-/klantnummer ("factuurnummer 4853 (Viering Opening)", 10 okt).
+    if (/(nummer|nummers|nr\.?|no\.?|#|invoice|factuur|bon|ref\.?|referentie)\s*$/i.test(t.slice(Math.max(0, m.index - 20), m.index))) continue;
     const erna = t.slice(m.index + code.length, m.index + code.length + naam.length + 4).toLowerCase();
     if (erna.replace(/^[\s(-]+/, "").startsWith(naam.toLowerCase().slice(0, 12))) continue;   // staat er al
     uit += escapeHtml(t.slice(vanaf, m.index + code.length)) + ` <span class="fa-naam">(${escapeHtml(naam)})</span>`;
     vanaf = m.index + code.length;
   }
   return uit + escapeHtml(t.slice(vanaf));
+}
+/* Opmerkingen van Shai ontdubbelen. Twee meldingen gaan over hetzelfde als ze dezelfde datums/bedragen
+   noemen en hetzelfde kernwoord hebben (bv. "uploaddatum") — dan blijft de langste (meest uitleg) staan.
+   Datums tellen gelijk in elke schrijfwijze: 10-10-2026 = 2026-10-10. */
+function faOpmerkingen(voorleg, waarschuwingen) {
+  const datums = (t) => [...String(t).matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b|\b(\d{1,2})-(\d{1,2})-(\d{4})\b/g)]
+    .map(m => m[1] ? `${m[1]}${m[2]}${m[3]}` : `${m[6]}${m[5].padStart(2, "0")}${m[4].padStart(2, "0")}`);
+  const KERN = /uploaddatum|vervaldatum|factuurnummer|dubbel|crediteur|rekening|btw|valuta|creditnota|handgeschreven|tel(len)? (niet )?op/gi;
+  const sleutel = (t) => ({ d: new Set(datums(t)), k: new Set((String(t).toLowerCase().match(KERN) || [])) });
+  const zelfde = (a, b) => {
+    const x = sleutel(a), y = sleutel(b);
+    if (!x.d.size || !y.d.size || !x.k.size) return false;
+    const gedeeldD = [...x.d].some(v => y.d.has(v)), gedeeldK = [...x.k].some(v => y.k.has(v));
+    return gedeeldD && gedeeldK;
+  };
+  const lijst = [];
+  for (const w of waarschuwingen) {
+    if (!w || (voorleg && zelfde(w, voorleg))) continue;
+    const i = lijst.findIndex(x => zelfde(x, w));
+    if (i < 0) lijst.push(w); else if (w.length > lijst[i].length) lijst[i] = w;
+  }
+  return { voorleg: voorleg || null, lijst };
 }
 /* Naam van de crediteur in het veld, achter de code. */
 function faCrediteurNaam() {
@@ -3823,8 +3854,12 @@ async function openFactuur(id) {
   const opm = [];
   const tw = d.invul_resultaat && d.invul_resultaat.twinfield;
   if (d.status === "geboekt" && tw) opm.push(`<div class="melding ok">✓ Geboekt in Twinfield — dagboek <b>${escapeHtml(tw.dagboek || "")}</b>, boekstuk <b>${escapeHtml(String(tw.boekstuk || ""))}</b>${tw.geboekt_op ? " · " + escapeHtml(new Date(tw.geboekt_op).toLocaleString("nl-NL", { timeZone: "America/Aruba" })) : ""}</div>`);
-  if (d.opmerking) opm.push(`<div class="melding ${d.status === "fout" ? "fout" : "ok"}" style="${d.status === "fout" ? "" : "background:#fff4e0;color:var(--tekst)"}">${faMetNamen(d.opmerking)}</div>`);
-  for (const w of v.waarschuwingen || []) opm.push(`<div class="fa-let">⚠ ${faMetNamen(w)}</div>`);
+  // Eén melding per onderwerp (Shereen 10 okt: dezelfde datummelding stond er 3×): de reden om voor
+  // te leggen bovenaan, daaronder de overige punten als lijst — zonder herhalingen.
+  const punten = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
+  if (d.status === "fout" && d.opmerking) opm.push(`<div class="melding fout">${faMetNamen(d.opmerking)}</div>`);
+  if (punten.voorleg) opm.push(`<div class="fa-voorleg"><b>Waarom Shai dit voorlegt</b><br>${faMetNamen(punten.voorleg)}</div>`);
+  if (punten.lijst.length) opm.push(`<ul class="fa-punten">${punten.lijst.map(w => `<li>${faMetNamen(w)}</li>`).join("")}</ul>`);
   document.getElementById("fa-opmerking").innerHTML = opm.join("");
   document.getElementById("fa-opmerking-kop").style.display = opm.length ? "" : "none";
 

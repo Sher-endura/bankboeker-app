@@ -88,6 +88,8 @@
     font-size: 14px; color: var(--tekst); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fa-crd-naam.onbekend { color: var(--rood, #b42318); font-weight: 600; }
   .fa-crd-naam.nieuw { color: var(--paars); font-weight: 600; }
+  .fa-datum-tekst { font-size: 13px; color: var(--tekst); margin-top: 3px; min-height: 18px; }
+  .fa-datum-tekst b { color: var(--blauw-d); }
   .fa-nieuw-crd { border: 1px solid var(--paars); border-radius: 6px; background: #f6f1fc; padding: 10px 12px; margin: 8px 0; font-size: 13px; color: var(--tekst); }
   .fa-nc-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 12px; }
   .fa-nc-raster label { margin-top: 0; }
@@ -604,8 +606,8 @@
           <div><label>Valuta</label><select id="fa-valuta"><option>AWG</option><option>USD</option><option>EUR</option><option>XCG</option><option>ANG</option></select></div>
         </div>
         <div class="rij">
-          <div><label>Factuurdatum *</label><input type="date" id="fa-datum"></div>
-          <div><label>Vervaldatum (leeg = Basecone rekent)</label><input type="date" id="fa-vervaldatum"></div>
+          <div><label>Factuurdatum *</label><input type="date" id="fa-datum"><div class="fa-datum-tekst" id="fa-datum-tekst"></div></div>
+          <div><label>Vervaldatum (leeg = Basecone rekent)</label><input type="date" id="fa-vervaldatum"><div class="fa-datum-tekst" id="fa-verval-tekst"></div></div>
         </div>
         <div class="fa-vinkjes">
           <label><input type="checkbox" id="fa-credit"> Creditfactuur</label>
@@ -3854,6 +3856,7 @@ async function openFactuur(id) {
   faCrediteurNaam();
   zet("fa-bedrag", faBedrag(v.bedrag)); zet("fa-valuta", v.valuta || "AWG");
   zet("fa-datum", v.datum); zet("fa-vervaldatum", v.vervaldatum);
+  faDatumTekst();
   zet("fa-omschrijving", v.omschrijving);
   document.getElementById("fa-credit").checked = !!v.credit;
   document.getElementById("fa-betaalbatch").checked = !!v.niet_in_betaalbatch;
@@ -3937,6 +3940,19 @@ function faSom() {
     ? `<span style="color:var(--groen); font-weight:600">Regels tellen op tot het totaal ✓</span>`
     : `<span class="fa-fout">Regels ${faBedrag(som / 100)} ≠ totaal ${faBedrag(totaal / 100)}</span>`) +
     (onbekend.length ? ` <span class="fa-fout">Onbekende rekening: ${escapeHtml(onbekend.join(", "))}</span>` : "");
+}
+/* Datum voluit in tekst + de periode (Shereen 10 okt): het datumvak toont de volgorde van de browser
+   (mm/dd/jjjj), daardoor kan iemand denken dat 10/04 april is. */
+const FA_MAANDEN = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"];
+function faDatumVoluit(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  return m ? { tekst: `${Number(m[3])} ${FA_MAANDEN[Number(m[2]) - 1]} ${m[1]}`, periode: `${FA_MAANDEN[Number(m[2]) - 1]} ${m[1]} (${m[1]}/${Number(m[2])})` } : null;
+}
+function faDatumTekst() {
+  const d = faDatumVoluit(document.getElementById("fa-datum").value);
+  document.getElementById("fa-datum-tekst").innerHTML = d ? `${escapeHtml(d.tekst)} · <b>periode ${escapeHtml(d.periode)}</b>` : "";
+  const v = faDatumVoluit(document.getElementById("fa-vervaldatum").value);
+  document.getElementById("fa-verval-tekst").textContent = v ? v.tekst : "";
 }
 function faOmsTeller() {
   const n = document.getElementById("fa-omschrijving").value.length;
@@ -4447,6 +4463,8 @@ metTweedeKlik(document.getElementById("btn-fa-overslaan"), "Zeker? Klik nog eens
 document.getElementById("btn-fa-terug").addEventListener("click", () => faZetStatus("voorstel", "terug naar beoordelen"));
 document.getElementById("btn-fa-regel").addEventListener("click", () => vernieuwFaRegels([...leesFaRegels(), { grootboek: "", bedrag: 0, inhoud: "", omschrijving: document.getElementById("fa-omschrijving").value }]));
 document.getElementById("fa-omschrijving").addEventListener("input", faOmsTeller);
+document.getElementById("fa-datum").addEventListener("input", faDatumTekst);
+document.getElementById("fa-vervaldatum").addEventListener("input", faDatumTekst);
 document.getElementById("fa-bedrag").addEventListener("input", faSom);
 document.getElementById("btn-hh-regel").addEventListener("click", () => {
   vernieuwHhRegels([...leesRegelRijen(), { rekening: "", kpl: "", omschrijving: "", bedrag: "", zijde: "credit" }]);

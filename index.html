@@ -48,6 +48,58 @@
   .stat b { font-size: 20px; display: block; }
   .stat span { font-size: 12px; color: #666; }
   .hint { font-size: 12px; color: #666; line-height: 1.5; }
+  /* Facturen (Basecone-robot) — bijschriften in de gewone tekstkleur, geen lichtgrijs */
+  .fa-uitleg { font-size: 13px; color: var(--tekst); line-height: 1.5; margin: 6px 0 12px; }
+  .fa-robot { padding: 9px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; background: var(--grijs); color: var(--tekst); }
+  .fa-robot.goed { background: #e5f5ec; } .fa-robot.let { background: #fff4e0; } .fa-robot.slecht { background: #fbeaea; }
+  .fa-balk { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .fa-filter { border: 1px solid var(--rand); background: #fff; color: var(--tekst); border-radius: 14px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+  .fa-filter.actief { background: var(--blauw); border-color: var(--blauw); color: #fff; }
+  #tabel-facturen tbody tr { cursor: pointer; } #tabel-facturen tbody tr:hover { background: #eef5fb; }
+  #tabel-facturen tbody tr.gekozen { background: #dcebf8; }
+  .fa-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #fff; background: #4b5563; }
+  .fa-status.voorstel { background: var(--blauw); } .fa-status.voorleggen { background: var(--oranje); }
+  .fa-status.goedgekeurd { background: var(--paars); } .fa-status.ingevuld, .fa-status.geboekt { background: var(--groen); }
+  .fa-status.fout { background: var(--rood); }
+  .fa-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+  /* Gesplitst scherm zoals in Basecone: lijst links, document rechts, scheiding versleepbaar */
+  main.breed { max-width: none; }
+  .fa-split { display: grid; grid-template-columns: var(--fa-links, 42%) 10px minmax(0, 1fr); height: calc(100vh - 110px); min-height: 480px; margin-bottom: 16px; }
+  .fa-split > .kaart { margin: 0; overflow: auto; min-width: 0; }
+  .fa-scheiding { cursor: col-resize; position: relative; touch-action: none; }
+  .fa-scheiding::after { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: var(--rand); }
+  .fa-scheiding:hover::after, .fa-scheiding.sleept::after { background: var(--blauw); left: 3px; width: 4px; }
+  #tabel-facturen thead th { position: sticky; top: -18px; background: #fff; z-index: 1; }
+  .fa-leeg { color: var(--tekst); font-size: 14px; padding: 30px 6px; }
+  @media (max-width: 900px) {
+    .fa-split { grid-template-columns: 1fr; height: auto; }
+    .fa-scheiding { display: none; }
+    .fa-split > .kaart { overflow: visible; margin-bottom: 16px; }
+  }
+  .fa-scan img { width: 100%; border: 1px solid var(--rand); border-radius: 6px; margin-bottom: 8px; cursor: zoom-in; }
+  .fa-crd-vak { position: relative; }
+  .fa-naam { font-weight: 400; }
+  .fa-crd-naam { position: absolute; left: 5.2em; right: 2.2em; top: 50%; transform: translateY(-50%); pointer-events: none;
+    font-size: 14px; color: var(--tekst); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fa-crd-naam.onbekend { color: var(--rood, #b42318); font-weight: 600; }
+  .fa-keuzelijst { position: fixed; z-index: 150; background: #fff; border: 1px solid var(--rand); border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.15); overflow-y: auto; font-size: 14px; color: var(--tekst); }
+  .fa-keuzelijst div { padding: 6px 10px; cursor: pointer; display: flex; gap: 10px; }
+  .fa-keuzelijst div b { min-width: 52px; }
+  .fa-keuzelijst div.actief, .fa-keuzelijst div:hover { background: #dcebf8; }
+  .fa-keuzelijst .leeg { cursor: default; }
+  .fa-vergroting { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.82); display: flex; flex-direction: column; }
+  .fa-vergroting-balk { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; }
+  .fa-vergroting-balk button { background: #fff; color: var(--tekst); border: 0; border-radius: 6px; padding: 8px 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .fa-vergroting-vak { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 0 14px 14px; }
+  .fa-vergroting-vak img { max-width: 100%; max-height: calc(100vh - 80px); background: #fff; cursor: zoom-in; }
+  .fa-vergroting-vak img.echt { max-width: none; max-height: none; cursor: zoom-out; }
+  .fa-scan iframe { width: 100%; height: 70vh; border: 1px solid var(--rand); border-radius: 6px; }
+  .fa-form label { display: block; font-size: 12px; font-weight: 600; color: var(--tekst); margin: 8px 0 3px; }
+  .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
+  .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
+  .fa-ai { margin-top: 14px; font-size: 13px; color: var(--tekst); } .fa-ai summary { cursor: pointer; font-weight: 600; }
+  .fa-ai dl { margin: 8px 0; } .fa-ai dt { font-weight: 600; margin-top: 6px; } .fa-ai dd { margin: 2px 0 0 0; }
   .dropzone { border: 2px dashed var(--rand); border-radius: 8px; padding: 20px; text-align: center; color: #777; font-size: 13px; cursor: pointer; }
   .dropzone.sleep { border-color: var(--blauw); background: #eef5fb; }
   .dropzone.klein { padding: 12px; }
@@ -63,7 +115,7 @@
 <body>
 <header>
   <h1>Bankboeker</h1>
-  <span class="sub">vraagposten → grootboek · via DirectLink Data Link · v4.0-web</span>
+  <span class="sub">vraagposten → grootboek · via DirectLink Data Link · v4.1-web</span>
   <span style="flex:1"></span>
   <span class="sub" id="kop-klant"></span>
   <span class="sub" id="kop-gebruiker" style="display:none"></span>
@@ -77,6 +129,8 @@
   <button data-tab="klanten">Klanten &amp; instellingen</button>
   <button data-tab="regels">Boekingsregels</button>
   <button data-tab="herhaal">📅 Herhaal</button>
+  <button data-tab="facturen">🧾 Basecone</button>
+  <button data-tab="kennis">🧠 Knowledgebase Shai</button>
 </nav>
 <main>
 
@@ -460,8 +514,123 @@
   </div>
 </section>
 
+<!-- ============ TAB: FACTUREN (Basecone-robot) ============ -->
+<section id="tab-facturen" style="display:none">
+  <div class="kaart">
+    <h2>Basecone — inkoopfacturen</h2>
+    <div id="fa-robot" class="fa-robot"></div>
+    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed — pas dán vult de robot het in Basecone in en drukt op <b>Opslaan</b>. Op <b>Boek</b> drukt hij nooit (fase 1). Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</details>
+    <div class="fa-balk">
+      <select id="fa-office" style="width:auto"></select>
+      <span id="fa-filters"></span>
+      <button class="knop stil" id="btn-fa-ververs" style="padding:6px 12px">↻ Verversen</button>
+    </div>
+    <div id="melding-facturen"></div>
+  </div>
+
+  <div class="fa-split" id="fa-split">
+    <div class="kaart">
+      <table id="tabel-facturen">
+        <thead><tr><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th>Zekerheid</th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="fa-scheiding" id="fa-scheiding" title="Sleep om de breedte aan te passen (dubbelklik = terug naar standaard)"></div>
+    <div class="kaart" id="kaart-fa-detail">
+    <p class="fa-leeg" id="fa-leeg">Klik links op een document om het hier te openen.</p>
+    <div id="fa-inhoud" style="display:none">
+    <h2 id="fa-titel">Document</h2>
+    <div class="fa-detail">
+      <div class="fa-scan" id="fa-scan"></div>
+      <div class="fa-form">
+        <p style="margin:0 0 4px"><span id="fa-som"></span></p>
+        <label style="margin-top:2px">Waarom verbeter je dit? (optioneel — wordt een regel voor de robot)</label>
+        <input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris">
+        <p style="margin:10px 0 4px">
+          <button class="knop" id="btn-fa-goedkeuren">✓ Goedkeuren</button>
+          <button class="knop stil" id="btn-fa-opnieuw">Opnieuw lezen</button>
+          <button class="knop stil" id="btn-fa-terug" style="display:none">Terug naar beoordelen</button>
+          <button class="knop stil" id="btn-fa-overslaan">Overslaan</button>
+        </p>
+        <div id="melding-fa-detail"></div>
+        <div class="rij">
+          <div><label>Crediteur * <button type="button" class="knop stil" id="btn-fa-crd-ververs" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Net een crediteur aangemaakt in Twinfield? Haal de lijst opnieuw op.">↻ Crediteuren uit Twinfield</button></label><div class="fa-crd-vak"><input type="text" id="fa-crediteur" placeholder="bv. C0197 of een naam" autocomplete="off"><span id="fa-crediteur-naam" class="fa-crd-naam"></span></div></div>
+          <div><label>Factuurnummer *</label><input type="text" id="fa-factuurnummer"></div>
+        </div>
+        <datalist id="fa-crediteuren"></datalist>
+        <div class="rij">
+          <div><label>Bedrag (incl. alles) *</label><input type="text" id="fa-bedrag"></div>
+          <div><label>Valuta</label><select id="fa-valuta"><option>AWG</option><option>USD</option><option>EUR</option><option>XCG</option><option>ANG</option></select></div>
+        </div>
+        <div class="rij">
+          <div><label>Factuurdatum *</label><input type="date" id="fa-datum"></div>
+          <div><label>Vervaldatum (leeg = Basecone rekent)</label><input type="date" id="fa-vervaldatum"></div>
+        </div>
+        <div class="fa-vinkjes">
+          <label><input type="checkbox" id="fa-credit"> Creditfactuur</label>
+          <label><input type="checkbox" id="fa-betaalbatch"> Niet in betaalbatch (al betaald)</label>
+        </div>
+        <label>Omschrijving * <span id="fa-oms-teller"></span></label>
+        <input type="text" id="fa-omschrijving" maxlength="40">
+        <h3>Boekingsregels</h3>
+        <table id="tabel-fa-regels">
+          <thead><tr><th>Grootboekrekening</th><th class="num">Bedrag</th><th>Omschrijving regel</th><th>Wat de robot zag</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <datalist id="fa-rekeningen"></datalist>
+        <p style="margin:6px 0"><button class="knop stil" id="btn-fa-regel" style="padding:5px 10px; font-size:12px">+ Regel</button></p>
+      </div>
+    </div>
+    <!-- Over de volle breedte van het rechterdeel, onder scan en velden -->
+    <div class="fa-onder">
+      <h3 id="fa-opmerking-kop">Opmerkingen van Shai</h3>
+      <div id="fa-opmerking"></div>
+      <details class="fa-ai"><summary>Hoe de robot het las</summary><div id="fa-ai"></div></details>
+    </div>
+    </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ============ TAB: KNOWLEDGEBASE SHAI (wat de Basecone-robot weet) ============ -->
+<section id="tab-kennis" style="display:none">
+  <div class="kaart">
+    <h2>Knowledgebase Shai</h2>
+    <p class="fa-uitleg">Alles wat Shai (de Basecone-robot) weet: wat hij uit goedkeuringen, het Basecone-archief en Twinfield heeft geleerd, en de regels die jij hem geeft. Jouw regels gaan altijd voor.</p>
+    <div class="fa-balk">
+      <select id="kb-office" style="width:auto"></select>
+      <button class="knop stil" id="btn-kb-ververs" style="padding:6px 12px">↻ Verversen</button>
+    </div>
+  </div>
+
+  <div class="kaart">
+    <h2>Wat Shai onthoudt <span id="fa-kennis-office"></span></h2>
+    <p class="fa-uitleg">Bij elke goedkeuring onthoudt Shai hoe het geboekt is: per leverancier, per artikel en per handgeschreven aantekening. Bij het volgende document van dezelfde leverancier krijgt hij dat mee, en wijkt hij ervan af, dan legt hij het aan je voor. Verandert de rekening van een artikel, dan geldt voortaan de nieuwste. Daarnaast haalt Shai één keer per dag uit Twinfield op <b>waar de inkoopfacturen per crediteur geboekt zijn</b> (laatste 18 maanden, kost geen AI-credits), en hij heeft de geboekte documenten uit het Basecone-archief geleerd ("bron: archief"); jouw regels gaan altijd voor die historie. <b>Basecone klopte</b> telt hoe vaak de eigen herkenning van Basecone helemaal goed was — dat is het bewijs om later bij een vaste leverancier zonder AI te werken.</p>
+    <div class="fa-balk">
+      <span id="fa-kennis-tabs"></span>
+      <input type="search" id="fa-kennis-zoek" placeholder="Zoeken…" style="width:200px">
+    </div>
+    <div style="overflow-x:auto"><table id="tabel-fa-kennis"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="kaart">
+    <h2>Regels voor Shai <span id="fa-regels-office"></span></h2>
+    <p class="fa-uitleg">Deze regels gaan bij elk document mee naar de leesfunctie en gaan vóór alles wat Shai onthoudt. "Alle" geldt voor elke administratie.</p>
+    <div style="overflow-x:auto"><table id="tabel-fa-robotregels"><thead><tr><th>Voor</th><th>Soort</th><th>Regel</th><th>Bron</th><th></th></tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
 </main>
-<footer>Bankboeker <b>v4.0-web</b> (31-08-2026) · <span id="voet-modus">lokale modus</span> · Endura Accounting &amp; Advisory</footer>
+<!-- Vergroting van een scan (tabblad Basecone): in het scherm zelf, ✕ / Escape / klik ernaast sluit -->
+<div id="fa-vergroting" class="fa-vergroting" style="display:none" role="dialog" aria-label="Scan vergroot">
+  <div class="fa-vergroting-balk">
+    <button type="button" id="btn-vg-zoom">🔍 Ware grootte</button>
+    <button type="button" id="btn-vg-sluit">✕ Sluiten</button>
+  </div>
+  <div class="fa-vergroting-vak" id="fa-vergroting-vak"><img id="fa-vergroting-img" alt="scan"></div>
+</div>
+<footer>Bankboeker <b>v4.1-web</b> (10-10-2026) · <span id="voet-modus">lokale modus</span> · Endura Accounting &amp; Advisory</footer>
 
 <!-- ============ LOGIN-OVERLAY (alleen in cloud-modus) ============ -->
 <div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--grijs); z-index:100; align-items:center; justify-content:center;">
@@ -3055,11 +3224,529 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp
 function toonMelding(id, soort, tekst) {
   document.getElementById(id).innerHTML = `<div class="melding ${soort}">${tekst}</div>`;
 }
+/* ================= Facturen (Basecone-robot) =================
+   De robot (map robot/) leest scans in Basecone en de edge function factuur-lezen
+   maakt per document een voorstel in public.basecone_documenten. Hier keurt een
+   medewerker dat goed; daarna vult de robot het in Basecone in en drukt op Opslaan
+   (fase 1: nooit Boek). Verbeteringen worden regels in public.basecone_regels.
+   Zie docs/BASECONE-ROBOT-START.md. */
+let faRekNamen = {}, faCrdNamen = {};   // "BINGO|7103" → "Kostprijs food", "BINGO|C0175" → "Compra", voor de lijst
+let faDocs = [], faGekozen = null, faFilter = "beoordelen", faStam = { BAS: [], CRD: [] };
+const FA_FILTERS = {
+  beoordelen: { tekst: "Te beoordelen", statussen: ["voorstel", "voorleggen"] },
+  voorleggen: { tekst: "Alleen voorleggen", statussen: ["voorleggen"] },
+  robot: { tekst: "Wacht op robot", statussen: ["goedgekeurd"] },
+  ingevuld: { tekst: "Ingevuld", statussen: ["ingevuld", "geboekt"] },
+  fout: { tekst: "Fout", statussen: ["fout"] },
+  alles: { tekst: "Alles", statussen: null },
+};
+const FA_STATUS_TEKST = {
+  nieuw: "nieuw", gelezen: "wordt gelezen", voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "goedgekeurd",
+  ingevuld: "ingevuld in Basecone", fout: "fout", geboekt: "geboekt", overgeslagen: "overgeslagen",
+};
+const datumNlKort = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? iso.split("-").reverse().join("-") : (iso || ""));   // 2026-10-01 → 01-10-2026
+const faBedrag = (n) => (n === null || n === undefined || n === "" ? "" : Number(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const faGetal = (s) => Number(String(s).trim().replace(/\./g, "").replace(",", ".")) || 0;   // "1.574,75" → 1574.75
+
+async function laadFacturen() {
+  if (!CLOUD) { toonMelding("melding-facturen", "fout", "Het tabblad Basecone werkt alleen in cloud-modus (met inlog)."); return; }
+  laadRobotStatus();
+  const { data, error } = await sb.from("basecone_documenten")
+    .select("id, office, bestandsnaam, status, voorstel, goedgekeurd, opmerking, geupload_op, updated_at")
+    .order("updated_at", { ascending: false }).limit(500);
+  if (error) {
+    toonMelding("melding-facturen", "fout", /does not exist|relation|could not find the table|schema cache/i.test(error.message)
+      ? "De database is nog niet klaar voor de robot: database-update 2 moet nog gedraaid worden."
+      : "Kan de documenten niet laden: " + escapeHtml(error.message));
+    return;
+  }
+  document.getElementById("melding-facturen").innerHTML = "";
+  requestAnimationFrame(faHoogte);
+  faDocs = data || [];
+  // Namen van de grootboekrekeningen (uit de Twinfield-cache van de leesfunctie).
+  const faOffices = [...new Set(faDocs.map(d => d.office))];
+  if (faOffices.length) {
+    const { data: st } = await sb.from("twinfield_stamdata").select("office, soort, data").in("soort", ["BAS", "CRD"]).in("office", faOffices);
+    faRekNamen = {}; faCrdNamen = {};
+    for (const rij of st || []) for (const x of rij.data || []) (rij.soort === "CRD" ? faCrdNamen : faRekNamen)[`${rij.office}|${x.code}`] = x.naam;
+  }
+  const kies = document.getElementById("fa-office");
+  const offices = [...new Set(faDocs.map(d => d.office))].sort();
+  const vorige = kies.value;
+  kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
+  vernieuwFaFilters();
+  vernieuwFaTabel();
+}
+async function laadRobotStatus() {
+  const vak = document.getElementById("fa-robot");
+  const { data } = await sb.from("robot_status").select("*").eq("id", "basecone").maybeSingle();
+  if (!data) { vak.className = "fa-robot"; vak.textContent = "De robot heeft zich nog niet gemeld."; return; }
+  const minuten = Math.round((Date.now() - new Date(data.laatste_hartslag).getTime()) / 60000);
+  const oud = minuten > 45;
+  const soort = data.status === "inloggen_nodig" || data.status === "fout" || data.status === "gestopt" ? "slecht" : oud ? "let" : "goed";
+  const tekst = { werkt: "aan het werk", wacht: "wacht op de volgende ronde", inloggen_nodig: "moet inloggen op Basecone", fout: "fout", gestopt: "gestopt" }[data.status] || data.status;
+  vak.className = "fa-robot " + soort;
+  vak.innerHTML = `<b>Robot: ${escapeHtml(tekst)}</b>${data.bericht ? " — " + escapeHtml(data.bericht) : ""} · laatst gemeld ${minuten < 1 ? "net" : minuten + " min geleden"}${oud ? " (lang niet gemeld — draait hij nog?)" : ""}`;
+}
+function vernieuwFaFilters() {
+  const vak = document.getElementById("fa-filters");
+  vak.innerHTML = "";
+  const office = document.getElementById("fa-office").value;
+  for (const [sleutel, f] of Object.entries(FA_FILTERS)) {
+    const aantal = faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status))).length;
+    const b = document.createElement("button");
+    b.className = "fa-filter" + (sleutel === faFilter ? " actief" : "");
+    b.textContent = `${f.tekst} (${aantal})`;
+    b.addEventListener("click", () => { faFilter = sleutel; vernieuwFaFilters(); vernieuwFaTabel(); });
+    vak.appendChild(b);
+  }
+  requestAnimationFrame(faHoogte);   // de knoppenbalk kan van hoogte veranderen
+}
+function vernieuwFaTabel() {
+  const tbody = document.querySelector("#tabel-facturen tbody");
+  const office = document.getElementById("fa-office").value;
+  const f = FA_FILTERS[faFilter];
+  const lijst = faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status)));
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="8" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
+  for (const d of lijst) {
+    const v = d.goedgekeurd || d.voorstel || {};
+    const let_ = (v.waarschuwingen || []).length;
+    const tr = document.createElement("tr");
+    if (faGekozen && faGekozen.id === d.id) tr.classList.add("gekozen");
+    tr.title = `${d.bestandsnaam || d.id} · ${d.office}`;
+    tr.innerHTML = `<td><span class="fa-status ${escapeHtml(d.status)}">${escapeHtml(FA_STATUS_TEKST[d.status] || d.status)}</span></td>
+      <td style="font-size:13px"><b>${escapeHtml(v.crediteur || "")}</b> ${escapeHtml(faCrdNamen[`${d.office}|${v.crediteur}`] || "")}</td>
+      <td style="font-size:13px">${[...new Set((v.regels || []).map(r => r.grootboek))]
+        .map(g => `<b>${escapeHtml(g)}</b> ${escapeHtml(faRekNamen[`${d.office}|${g}`] || "")}`).join("<br>")}</td>
+      <td style="font-size:13px">${escapeHtml(v.omschrijving || "")}</td>
+      <td style="white-space:nowrap">${escapeHtml(datumNlKort(v.datum))}</td>
+      <td class="num">${v.credit ? "−" : ""}${faBedrag(v.bedrag)}</td>
+      <td>${escapeHtml(v.zekerheid || "")}</td>
+      <td>${let_ ? `<span class="fa-let" title="${escapeHtml((v.waarschuwingen || []).map(w => "• " + w).join("\n"))}">${let_}</span>` : ""}${d.status === "fout" ? `<span class="fa-fout">${escapeHtml((d.opmerking || "").slice(0, 60))}</span>` : ""}</td>`;
+    tr.addEventListener("click", () => openFactuur(d.id));
+    tbody.appendChild(tr);
+  }
+}
+async function laadFaStam(office) {
+  const { data } = await sb.from("twinfield_stamdata").select("soort, data").eq("office", office);
+  faStam = { BAS: [], CRD: [] };
+  for (const r of data || []) faStam[r.soort] = r.data || [];
+  document.getElementById("fa-rekeningen").innerHTML = faStam.BAS.map(x => `<option value="${escapeHtml(x.code)}">${escapeHtml(x.naam)}</option>`).join("");
+  document.getElementById("fa-crediteuren").innerHTML = faStam.CRD.map(x => `<option value="${escapeHtml(x.code)}">${escapeHtml(x.naam)}</option>`).join("");
+}
+/* Nieuwe crediteur net in Twinfield aangemaakt? De lijst is anders een kopie van hooguit een
+   dag oud (twinfield_stamdata, ververst door de leesfunctie). Deze knop haalt hem meteen op. */
+/* Eigen keuzelijst voor crediteur en grootboekrekening: altijd direct onder het veld (de
+   browserlijst klapte omhoog over de velden heen), zoeken op code én naam, pijltjes/Enter/Escape. */
+const faLijst = (() => { const d = document.createElement("div"); d.className = "fa-keuzelijst"; d.style.display = "none"; document.body.appendChild(d); return d; })();
+function faKeuzelijst(veld, bron) {
+  let treffers = [], actief = 0;
+  const toon = () => {
+    const q = veld.value.trim().toLowerCase();
+    const alle = bron() || [];
+    treffers = (q ? alle.filter(x => x.code.toLowerCase().startsWith(q) || (x.naam || "").toLowerCase().includes(q)) : alle).slice(0, 60);
+    actief = 0;
+    faLijst.innerHTML = treffers.length
+      ? treffers.map((x, i) => `<div data-i="${i}" class="${i === 0 ? "actief" : ""}"><b>${escapeHtml(x.code)}</b><span>${escapeHtml(x.naam || "")}</span></div>`).join("")
+      : `<div class="leeg">Niets gevonden</div>`;
+    const vak = veld.getBoundingClientRect();
+    const onder = innerHeight - vak.bottom - 8, boven = vak.top - 8;
+    const omhoog = onder < 160 && boven > onder;
+    faLijst.style.left = vak.left + "px";
+    faLijst.style.width = Math.max(vak.width, 320) + "px";
+    faLijst.style.maxHeight = Math.min(320, omhoog ? boven : onder) + "px";
+    faLijst.style.top = omhoog ? "" : (vak.bottom + 2) + "px";
+    faLijst.style.bottom = omhoog ? (innerHeight - vak.top + 2) + "px" : "";
+    faLijst.style.display = "";
+    faLijst.onmousedown = (e) => {
+      e.preventDefault();   // focus in het veld houden
+      const rij = e.target.closest("[data-i]");
+      if (rij) kies(treffers[+rij.dataset.i]);
+    };
+  };
+  const verberg = () => { faLijst.style.display = "none"; };
+  const kies = (x) => { if (!x) return; veld.value = x.code; verberg(); veld.dispatchEvent(new Event("input")); };
+  const markeer = () => [...faLijst.children].forEach((c, i) => { c.classList.toggle("actief", i === actief); if (i === actief) c.scrollIntoView({ block: "nearest" }); });
+  veld.addEventListener("focus", toon);
+  veld.addEventListener("input", (e) => { if (e.isTrusted) toon(); });
+  veld.addEventListener("blur", verberg);
+  veld.addEventListener("keydown", (e) => {
+    if (faLijst.style.display === "none") { if (e.key === "ArrowDown") { toon(); e.preventDefault(); } return; }
+    if (e.key === "ArrowDown") { actief = Math.min(actief + 1, treffers.length - 1); markeer(); e.preventDefault(); }
+    else if (e.key === "ArrowUp") { actief = Math.max(actief - 1, 0); markeer(); e.preventDefault(); }
+    else if (e.key === "Enter") { if (treffers[actief]) { kies(treffers[actief]); e.preventDefault(); } }
+    else if (e.key === "Escape") { verberg(); e.preventDefault(); }
+  });
+}
+// Lijst sluiten als het rechterdeel of de lijst links schuift (anders zweeft hij los).
+document.addEventListener("scroll", (e) => { if (!faLijst.contains(e.target)) faLijst.style.display = "none"; }, true);
+/* Rekeningnummers en crediteurcodes in de tekst van Shai aanvullen met hun naam ("4152" →
+   "4152 (Onderhoud koelkasten/vriezers)"). Niet in datums of factuurnummers (2026-10-01,
+   TECH/2026/03842), en niet als de naam er al achter staat. Geeft veilige HTML terug. */
+function faMetNamen(tekst) {
+  const t = String(tekst ?? "");
+  const naamVan = (code) => (/^C\d{4}$/i.test(code) ? faStam.CRD : faStam.BAS).find(x => x.code.toUpperCase() === code.toUpperCase())?.naam;
+  let uit = "", vanaf = 0;
+  for (const m of t.matchAll(/(?<![\w\/.,:-])(C\d{4}|\d{4})(?![\w\/.,:-]\w)/gi)) {
+    const code = m[0], naam = naamVan(code);
+    if (!naam) continue;
+    const erna = t.slice(m.index + code.length, m.index + code.length + naam.length + 4).toLowerCase();
+    if (erna.replace(/^[\s(-]+/, "").startsWith(naam.toLowerCase().slice(0, 12))) continue;   // staat er al
+    uit += escapeHtml(t.slice(vanaf, m.index + code.length)) + ` <span class="fa-naam">(${escapeHtml(naam)})</span>`;
+    vanaf = m.index + code.length;
+  }
+  return uit + escapeHtml(t.slice(vanaf));
+}
+/* Naam van de crediteur in het veld, achter de code. */
+function faCrediteurNaam() {
+  const code = document.getElementById("fa-crediteur").value.trim().toUpperCase();
+  const vak = document.getElementById("fa-crediteur-naam");
+  const c = faStam.CRD.find(x => x.code === code);
+  vak.textContent = !code ? "" : c ? c.naam : (faStam.CRD.length ? "onbekende crediteur" : "");
+  vak.classList.toggle("onbekend", !!code && !c && faStam.CRD.length > 0);
+  document.getElementById("fa-crediteur").title = c ? `${c.code} ${c.naam}` : "";
+}
+async function faCrediteurenVerversen() {
+  const d = faGekozen; if (!d) return;
+  const knop = document.getElementById("btn-fa-crd-ververs"); knop.disabled = true;
+  toonMelding("melding-fa-detail", "ok", "Crediteuren ophalen uit Twinfield…");
+  try {
+    const lijst = await liveDimensies(d.office, "CRD");
+    if (!lijst.length) throw new Error("Twinfield gaf geen crediteuren terug.");
+    const oud = new Set(faStam.CRD.map(x => x.code));
+    const { error } = await sb.from("twinfield_stamdata").upsert({ office: d.office, soort: "CRD", data: lijst, opgehaald_op: new Date().toISOString() });
+    if (error) throw error;
+    await laadFaStam(d.office);
+    faCrediteurNaam();
+    const nieuw = lijst.filter(x => !oud.has(x.code));
+    toonMelding("melding-fa-detail", "ok", `${lijst.length} crediteuren opgehaald${nieuw.length ? " — nieuw: " + nieuw.map(x => escapeHtml(x.code + " " + x.naam)).join(", ") : " (geen nieuwe)"}.`);
+  } catch (e) {
+    toonMelding("melding-fa-detail", "fout", "Crediteuren ophalen mislukt: " + escapeHtml(e.message));
+  }
+  knop.disabled = false;
+}
+async function openFactuur(id) {
+  const { data: d, error } = await sb.from("basecone_documenten").select("*").eq("id", id).maybeSingle();
+  if (error || !d) { toonMelding("melding-facturen", "fout", "Document niet gevonden."); return; }
+  faGekozen = d;
+  vernieuwFaTabel();
+  await laadFaStam(d.office);
+  const kaart = document.getElementById("kaart-fa-detail");
+  document.getElementById("fa-leeg").style.display = "none";
+  document.getElementById("fa-inhoud").style.display = "";
+  kaart.scrollTop = 0;
+  document.getElementById("fa-titel").textContent = `${d.bestandsnaam || d.id} · ${d.office}`;
+  document.getElementById("melding-fa-detail").innerHTML = "";
+  document.getElementById("fa-reden").value = "";
+
+  // Scan(s)
+  const scan = document.getElementById("fa-scan");
+  scan.innerHTML = "";
+  for (const pad of d.scan_paden || []) {
+    const { data: s } = await sb.storage.from("basecone-scans").createSignedUrl(pad, 3600);
+    if (!s) continue;
+    if (/\.pdf$/i.test(pad)) scan.insertAdjacentHTML("beforeend", `<iframe src="${s.signedUrl}"></iframe>`);
+    else scan.insertAdjacentHTML("beforeend", `<img src="${s.signedUrl}" alt="scan" title="Klik om te vergroten">`);
+  }
+  if (!scan.innerHTML) scan.innerHTML = `<p class="fa-uitleg">Geen scan opgeslagen.</p>`;
+
+  // Formulier
+  const v = d.goedgekeurd || d.voorstel || {};
+  const zet = (veld, w) => { document.getElementById(veld).value = w ?? ""; };
+  zet("fa-crediteur", v.crediteur); zet("fa-factuurnummer", v.factuurnummer);
+  faCrediteurNaam();
+  zet("fa-bedrag", faBedrag(v.bedrag)); zet("fa-valuta", v.valuta || "AWG");
+  zet("fa-datum", v.datum); zet("fa-vervaldatum", v.vervaldatum);
+  zet("fa-omschrijving", v.omschrijving);
+  document.getElementById("fa-credit").checked = !!v.credit;
+  document.getElementById("fa-betaalbatch").checked = !!v.niet_in_betaalbatch;
+  const aiRegels = (d.ai && d.ai.regels) || [];
+  vernieuwFaRegels((v.regels || []).map((r, i) => ({ ...r, inhoud: aiRegels[i] ? aiRegels[i].inhoud : "" })));
+  faOmsTeller();
+
+  const opm = [];
+  if (d.opmerking) opm.push(`<div class="melding ${d.status === "fout" ? "fout" : "ok"}" style="${d.status === "fout" ? "" : "background:#fff4e0;color:var(--tekst)"}">${faMetNamen(d.opmerking)}</div>`);
+  for (const w of v.waarschuwingen || []) opm.push(`<div class="fa-let">⚠ ${faMetNamen(w)}</div>`);
+  document.getElementById("fa-opmerking").innerHTML = opm.join("");
+  document.getElementById("fa-opmerking-kop").style.display = opm.length ? "" : "none";
+
+  // Wat de robot las
+  const a = d.ai || {};
+  document.getElementById("fa-ai").innerHTML = d.ai ? `<dl>
+    <dt>Soort</dt><dd>${escapeHtml(a.soort || "")}${a.betaald ? " · betaald (" + escapeHtml(a.betaalwijze_op_bon || "") + ")" : ""}</dd>
+    <dt>Leverancier op de scan</dt><dd>${escapeHtml(a.leverancier_naam || "")}</dd>
+    <dt>Datum zoals op de scan</dt><dd>${escapeHtml(a.datum_zoals_op_scan || "")} → ${escapeHtml(a.datum || "")}</dd>
+    <dt>Waarom die datum</dt><dd>${escapeHtml(a.datum_redenering || "")}</dd>
+    ${a.handgeschreven ? `<dt>Handgeschreven</dt><dd>${escapeHtml(a.handgeschreven)}</dd>` : ""}
+    <dt>Per regel</dt><dd>${(a.regels || []).map(r => `${faMetNamen(r.grootboek)} ${faBedrag(r.bedrag)} — ${faMetNamen(r.inhoud)} (${faMetNamen(r.reden)})`).join("<br>")}</dd>
+    ${(a.handschrift || []).length ? `<dt>Aantekeningen</dt><dd>${a.handschrift.map(h => `"${escapeHtml(h.tekst)}" → ${escapeHtml(h.grootboek)}`).join("<br>")}</dd>` : ""}
+    ${a.kennis ? `<dt>Uit het geheugen</dt><dd>${a.kennis.leveranciers.length ? "Leverancier bekend: " + escapeHtml(a.kennis.leveranciers.join(", ")) : "Leverancier nog niet bekend"} · ${a.kennis.artikelen_bekend} van ${a.kennis.artikelen_totaal} artikelen al eerder gezien</dd>` : ""}
+    <dt>Model</dt><dd>${escapeHtml(a.model || "")}</dd></dl>` : `<p>Nog niet gelezen.</p>`;
+
+  // Knoppen per status
+  const beoordelen = ["voorstel", "voorleggen", "fout"].includes(d.status);
+  document.getElementById("btn-fa-goedkeuren").style.display = beoordelen ? "" : "none";
+  document.getElementById("btn-fa-opnieuw").style.display = beoordelen ? "" : "none";
+  document.getElementById("btn-fa-overslaan").style.display = beoordelen ? "" : "none";
+  document.getElementById("btn-fa-terug").style.display = d.status === "goedgekeurd" ? "" : "none";
+  for (const el of document.querySelectorAll("#kaart-fa-detail .fa-form input, #kaart-fa-detail .fa-form select")) el.disabled = !beoordelen;
+}
+function vernieuwFaRegels(regels) {
+  const tbody = document.querySelector("#tabel-fa-regels tbody");
+  tbody.innerHTML = "";
+  for (const r of regels) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td><div class="fa-crd-vak" style="min-width:260px"><input type="text" class="fa-gl" autocomplete="off" placeholder="code of naam" value="${escapeHtml(r.grootboek || "")}"><span class="fa-crd-naam fa-gl-naam"></span></div></td>
+      <td class="num"><input type="text" class="fa-rb" value="${escapeHtml(faBedrag(r.bedrag))}" style="width:100px; text-align:right"></td>
+      <td><input type="text" class="fa-ro" maxlength="40" value="${escapeHtml(r.omschrijving ?? document.getElementById("fa-omschrijving").value)}" style="min-width:220px"></td>
+      <td style="font-size:12px">${escapeHtml(r.inhoud || "")}</td>
+      <td><button class="knop stil fa-weg" style="padding:3px 8px; font-size:12px">✕</button></td>`;
+    tr.dataset.inhoud = r.inhoud || "";
+    tr.querySelector(".fa-weg").addEventListener("click", () => { tr.remove(); faSom(); });
+    tr.querySelector(".fa-rb").addEventListener("input", faSom);
+    const gl = tr.querySelector(".fa-gl");
+    const glNaam = () => {
+      const c = faStam.BAS.find(x => x.code === gl.value.trim());
+      const vak = tr.querySelector(".fa-gl-naam");
+      vak.textContent = !gl.value.trim() ? "" : c ? c.naam : (faStam.BAS.length ? "onbekende rekening" : "");
+      vak.classList.toggle("onbekend", !!gl.value.trim() && !c && faStam.BAS.length > 0);
+      gl.title = c ? `${c.code} ${c.naam}` : "";
+    };
+    gl.addEventListener("input", () => { glNaam(); faSom(); });
+    faKeuzelijst(gl, () => faStam.BAS);
+    glNaam();
+    tbody.appendChild(tr);
+  }
+  faSom();
+}
+function leesFaRegels() {
+  return [...document.querySelectorAll("#tabel-fa-regels tbody tr")].map(tr => ({
+    grootboek: tr.querySelector(".fa-gl").value.trim(), bedrag: faGetal(tr.querySelector(".fa-rb").value), inhoud: tr.dataset.inhoud || "",
+    omschrijving: tr.querySelector(".fa-ro").value.trim(),
+  }));
+}
+function faSom() {
+  const regels = leesFaRegels();
+  const som = Math.round(regels.reduce((s, r) => s + r.bedrag, 0) * 100);
+  const totaal = Math.round(faGetal(document.getElementById("fa-bedrag").value) * 100);
+  const onbekend = faStam.BAS.length ? regels.filter(r => r.grootboek && !faStam.BAS.some(x => x.code === r.grootboek)).map(r => r.grootboek) : [];
+  document.getElementById("fa-som").innerHTML = (som === totaal
+    ? `<span style="color:var(--groen); font-weight:600">Regels tellen op tot het totaal ✓</span>`
+    : `<span class="fa-fout">Regels ${faBedrag(som / 100)} ≠ totaal ${faBedrag(totaal / 100)}</span>`) +
+    (onbekend.length ? ` <span class="fa-fout">Onbekende rekening: ${escapeHtml(onbekend.join(", "))}</span>` : "");
+}
+function faOmsTeller() {
+  const n = document.getElementById("fa-omschrijving").value.length;
+  document.getElementById("fa-oms-teller").textContent = `(${n}/40)`;
+}
+function leesFaFormulier() {
+  const oms = document.getElementById("fa-omschrijving").value.trim();
+  return {
+    crediteur: document.getElementById("fa-crediteur").value.trim().toUpperCase(),
+    factuurnummer: document.getElementById("fa-factuurnummer").value.trim(),
+    bedrag: faGetal(document.getElementById("fa-bedrag").value),
+    valuta: document.getElementById("fa-valuta").value,
+    datum: document.getElementById("fa-datum").value,
+    vervaldatum: document.getElementById("fa-vervaldatum").value || null,
+    credit: document.getElementById("fa-credit").checked,
+    niet_in_betaalbatch: document.getElementById("fa-betaalbatch").checked,
+    omschrijving: oms,
+    regels: leesFaRegels().map(r => ({ grootboek: r.grootboek, bedrag: r.bedrag, omschrijving: r.omschrijving || oms })),
+  };
+}
+async function faGoedkeuren() {
+  const d = faGekozen; if (!d) return;
+  const g = leesFaFormulier();
+  const fouten = [];
+  if (!g.crediteur) fouten.push("crediteur ontbreekt");
+  else if (faStam.CRD.length && !faStam.CRD.some(x => x.code === g.crediteur)) fouten.push(`crediteur ${g.crediteur} bestaat niet`);
+  if (!g.factuurnummer) fouten.push("factuurnummer ontbreekt");
+  if (!g.datum) fouten.push("datum ontbreekt");
+  if (!g.omschrijving) fouten.push("omschrijving ontbreekt");
+  if (!g.regels.length) fouten.push("geen boekingsregels");
+  if (g.regels.some(r => !r.grootboek)) fouten.push("een regel heeft geen rekening");
+  if (faStam.BAS.length) for (const r of g.regels) if (r.grootboek && !faStam.BAS.some(x => x.code === r.grootboek)) fouten.push(`rekening ${r.grootboek} bestaat niet`);
+  if (Math.round(g.regels.reduce((s, r) => s + r.bedrag, 0) * 100) !== Math.round(g.bedrag * 100)) fouten.push("regels tellen niet op tot het totaal");
+  if (fouten.length) { toonMelding("melding-fa-detail", "fout", "Nog niet goed: " + escapeHtml(fouten.join("; ")) + "."); return; }
+
+  // Leveranciers, artikelen en aantekeningen leert de database zelf bij het goedkeuren
+  // (trigger basecone_leer, database-update 3). Alleen een uitleg in gewone taal wordt een regel.
+  const leverancier = (d.ai && d.ai.leverancier_naam) || d.bestandsnaam || "";
+  const nieuweRegels = [];
+  const wie = gebruiker ? gebruiker.email : null;
+  const reden = document.getElementById("fa-reden").value.trim();
+  if (reden) nieuweRegels.push({ office: d.office, soort: "leverancier", sleutel: leverancier, bron: "geleerd", created_by: wie, toelichting: reden });
+
+  const knop = document.getElementById("btn-fa-goedkeuren"); knop.disabled = true;
+  try {
+    const { error } = await sb.from("basecone_documenten").update({
+      status: "goedgekeurd", goedgekeurd: g, goedgekeurd_door: wie, goedgekeurd_op: new Date().toISOString(), updated_by: wie,
+    }).eq("id", d.id);
+    if (error) throw error;
+    // Eén voor één: een regel die er al precies zo staat (unieke index) mag de rest niet tegenhouden.
+    for (const r of nieuweRegels) await sb.from("basecone_regels").insert(r);
+    await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "goedgekeurd", details: { verbeteringen: nieuweRegels.length }, door: wie });
+    toonMelding("melding-fa-detail", "ok", `Goedgekeurd en onthouden${nieuweRegels.length ? `, plus je uitleg als regel` : ""}. De robot vult het bij de volgende ronde in Basecone in.`);
+    await laadFacturen();
+    // Door naar het volgende document dat beoordeeld moet worden.
+    const volgende = faDocs.find(x => x.office === d.office && ["voorstel", "voorleggen"].includes(x.status));
+    if (volgende) setTimeout(() => openFactuur(volgende.id), 900);
+  } catch (e) {
+    toonMelding("melding-fa-detail", "fout", "Goedkeuren mislukt: " + escapeHtml(e.message));
+  }
+  knop.disabled = false;
+}
+async function faOpnieuwLezen() {
+  const d = faGekozen; if (!d) return;
+  const knop = document.getElementById("btn-fa-opnieuw"); knop.disabled = true;
+  toonMelding("melding-fa-detail", "ok", "Bezig met lezen… (kan een minuut duren)");
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(`${CFG.SUPABASE_URL}/functions/v1/factuur-lezen`, {
+      method: "POST", headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: d.id }),
+    });
+    const r = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(r.fout || `HTTP ${resp.status}`);
+    await laadFacturen(); await openFactuur(d.id);
+    toonMelding("melding-fa-detail", "ok", `Opnieuw gelezen: ${escapeHtml(r.status)}.`);
+  } catch (e) { toonMelding("melding-fa-detail", "fout", "Lezen mislukt: " + escapeHtml(e.message)); }
+  knop.disabled = false;
+}
+async function faZetStatus(status, logActie) {
+  const d = faGekozen; if (!d) return;
+  const wie = gebruiker ? gebruiker.email : null;
+  const { error } = await sb.from("basecone_documenten").update({ status, updated_by: wie }).eq("id", d.id);
+  if (error) { toonMelding("melding-fa-detail", "fout", escapeHtml(error.message)); return; }
+  await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: logActie, door: wie });
+  await laadFacturen(); await openFactuur(d.id);
+}
+async function laadFaRegels() {
+  const office = document.getElementById("kb-office").value;
+  document.getElementById("fa-regels-office").textContent = office ? `· ${office}` : "";
+  let q = sb.from("basecone_regels").select("*").eq("actief", true).order("office").order("soort").order("id");
+  if (office) q = q.in("office", [office, "*"]);
+  const { data } = await q;
+  const tbody = document.querySelector("#tabel-fa-robotregels tbody");
+  tbody.innerHTML = (data || []).length ? "" : `<tr><td colspan="5" class="fa-uitleg">Nog geen regels.</td></tr>`;
+  for (const r of data || []) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.office === "*" ? "Alle" : escapeHtml(r.office)}</td><td>${escapeHtml(r.soort)}${r.sleutel ? ": " + escapeHtml(r.sleutel) : ""}</td>
+      <td>${escapeHtml(r.toelichting)}${r.crediteur ? ` <b>${escapeHtml(r.crediteur)}</b>` : ""}${r.grootboek ? ` <b>${escapeHtml(r.grootboek)}</b>` : ""}</td>
+      <td>${escapeHtml(r.bron)}</td><td></td>`;
+    const b = document.createElement("button");
+    b.className = "knop stil"; b.textContent = "Uitzetten"; b.style.cssText = "padding:4px 9px; font-size:12px";
+    metTweedeKlik(b, "Zeker?", async () => { await sb.from("basecone_regels").update({ actief: false }).eq("id", r.id); laadFaRegels(); });
+    tr.lastElementChild.appendChild(b);
+    tbody.appendChild(tr);
+  }
+}
+
+/* Tab Knowledgebase Shai: administratiekeuze vullen, dan kennis en regels laden. */
+async function laadKennisTab() {
+  if (!CLOUD) { document.querySelector("#tabel-fa-kennis tbody").innerHTML = `<tr><td class="fa-uitleg">Alleen in cloud-modus (met inlog).</td></tr>`; return; }
+  const kies = document.getElementById("kb-office");
+  const vorige = kies.value;
+  const { data: a } = await sb.from("basecone_kennis").select("office").eq("soort", "leverancier").limit(5000);
+  const { data: b } = await sb.from("basecone_regels").select("office").neq("office", "*");
+  const offices = [...new Set([...(a || []), ...(b || [])].map(x => x.office))].sort();
+  kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
+  laadFaRegels();
+  laadFaKennis();
+}
+/* Kennisbank (database-update 3): wat de robot uit goedgekeurde documenten onthield. */
+let faKennis = [], faKennisSoort = "leverancier", faKennisNamen = {};
+const FA_KENNIS_SOORTEN = { leverancier: "Leveranciers", artikel: "Artikelen", handschrift: "Handgeschreven" };
+async function laadFaKennis() {
+  const office = document.getElementById("kb-office").value;
+  document.getElementById("fa-kennis-office").textContent = office ? `· ${office}` : "";
+  let q = sb.from("basecone_kennis").select("*").eq("actief", true).order("laatst_gezien", { ascending: false }).limit(5000);
+  if (office) q = q.eq("office", office);
+  const { data, error } = await q;
+  if (error) {
+    document.querySelector("#tabel-fa-kennis tbody").innerHTML = `<tr><td class="fa-uitleg">${/does not exist|schema cache|could not find/i.test(error.message)
+      ? "De kennisbank bestaat nog niet: database-update 3 moet nog gedraaid worden." : escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+  faKennis = data || [];
+  // Namen van de rekeningen, voor wie de codes niet uit het hoofd kent.
+  const offices = [...new Set(faKennis.map(k => k.office))];
+  faKennisNamen = {};
+  if (offices.length) {
+    const { data: st } = await sb.from("twinfield_stamdata").select("office, data").eq("soort", "BAS").in("office", offices);
+    for (const r of st || []) for (const x of r.data || []) faKennisNamen[`${r.office}|${x.code}`] = x.naam;
+  }
+  vernieuwFaKennis();
+}
+function vernieuwFaKennis() {
+  const tabs = document.getElementById("fa-kennis-tabs");
+  tabs.innerHTML = "";
+  for (const [soort, tekst] of Object.entries(FA_KENNIS_SOORTEN)) {
+    const b = document.createElement("button");
+    b.className = "fa-filter" + (soort === faKennisSoort ? " actief" : "");
+    b.textContent = `${tekst} (${faKennis.filter(k => k.soort === soort).length})`;
+    b.addEventListener("click", () => { faKennisSoort = soort; vernieuwFaKennis(); });
+    tabs.appendChild(b);
+  }
+  const zoek = document.getElementById("fa-kennis-zoek").value.trim().toLowerCase();
+  const levNaam = {};
+  for (const k of faKennis) if (k.soort === "leverancier") levNaam[`${k.office}|${k.leverancier}`] = k.voorbeeld;
+  const rek = (k) => k.grootboek ? `<b>${escapeHtml(k.grootboek)}</b> ${escapeHtml(faKennisNamen[`${k.office}|${k.grootboek}`] || "")}` : "";
+  const datum = (t) => t ? new Date(t).toLocaleDateString("nl-NL") : "";
+  const lijst = faKennis.filter(k => k.soort === faKennisSoort &&
+    (!zoek || [k.voorbeeld, k.crediteur, k.grootboek, levNaam[`${k.office}|${k.leverancier}`], k.gegevens?.twinfield?.naam]
+      .some(w => (w || "").toLowerCase().includes(zoek))));
+  const kop = {
+    leverancier: ["Leverancier", "Crediteur", "In Twinfield geboekt op", "Goedgekeurd: rekening", "Soort", "Goed / verbeterd", "Op rij goed", "Basecone klopte", "Laatst", ""],
+    artikel: ["Leverancier", "Artikel", "Rekening", "Keer", "Gewisseld", "Laatst", ""],
+    handschrift: ["Aantekening", "Rekening", "Keer", "Gewisseld", "Laatst gezien bij", "Laatst", ""],
+  }[faKennisSoort];
+  document.querySelector("#tabel-fa-kennis thead").innerHTML = `<tr>${kop.map(h => `<th>${h}</th>`).join("")}</tr>`;
+  const tbody = document.querySelector("#tabel-fa-kennis tbody");
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${kop.length}" class="fa-uitleg">${faKennis.length ? "Niets gevonden." : "Nog niets onthouden — dat begint bij de eerste goedkeuring."}</td></tr>`;
+  for (const k of lijst.slice(0, 500)) {
+    const g = k.gegevens || {};
+    const off = document.getElementById("kb-office").value ? "" : ` <span class="fa-uitleg">${escapeHtml(k.office)}</span>`;
+    const tr = document.createElement("tr");
+    if (k.soort === "leverancier") {
+      const bcTotaal = k.basecone_goed + k.basecone_fout;
+      const goedgekeurd = k.bevestigd + k.verbeterd > 0;
+      const tw = g.twinfield;
+      tr.innerHTML = `<td>${escapeHtml(k.voorbeeld || k.leverancier)}${off}</td><td>${escapeHtml(k.crediteur || "")}</td>
+        <td style="font-size:12px">${tw ? `${tw.facturen} facturen${tw.creditnotas ? `, ${tw.creditnotas} credit` : ""}<br>` +
+          (tw.rekeningen || []).slice(0, 3).map(r => `<b>${escapeHtml(r.code)}</b> ${escapeHtml(r.naam || "")} ${r.keer}×`).join("<br>") : "—"}</td>
+        <td>${!goedgekeurd ? "—" : k.grootboek ? rek(k) : escapeHtml((g.rekeningen || []).join(" / "))}</td>
+        <td>${!goedgekeurd ? "" : (g.betaald ? "betaalde bon" : "op rekening") + (g.datumformaat ? ` · datums ${escapeHtml(g.datumformaat)}` : "")}</td>
+        <td>${goedgekeurd ? `${k.bevestigd} / ${k.verbeterd}` : "—"}</td><td>${goedgekeurd ? k.reeks_goed : ""}</td>
+        <td>${bcTotaal ? `${k.basecone_goed} van ${bcTotaal}` : "—"}</td><td>${datum(k.laatst_gezien)}</td><td></td>`;
+    } else if (k.soort === "artikel") {
+      tr.innerHTML = `<td>${escapeHtml(levNaam[`${k.office}|${k.leverancier}`] || k.leverancier)}${off}</td><td>${escapeHtml(k.voorbeeld || "")}</td>
+        <td>${rek(k)}</td><td>${k.bevestigd}</td><td>${k.verbeterd || ""}</td><td>${datum(k.laatst_gezien)}</td><td></td>`;
+    } else {
+      tr.innerHTML = `<td>${escapeHtml(k.voorbeeld || "")}${off}</td><td>${rek(k)}</td><td>${k.bevestigd}</td><td>${k.verbeterd || ""}</td>
+        <td>${escapeHtml(g.leverancier || "")}</td><td>${datum(k.laatst_gezien)}</td><td></td>`;
+    }
+    const b = document.createElement("button");
+    b.className = "knop stil"; b.textContent = "Vergeten"; b.style.cssText = "padding:4px 9px; font-size:12px";
+    metTweedeKlik(b, "Zeker?", async () => {
+      const { error } = await sb.from("basecone_kennis").update({ actief: false }).eq("id", k.id);
+      if (error) { toonMelding("melding-facturen", "fout", "Vergeten mislukt: " + escapeHtml(error.message)); return; }
+      laadFaKennis();
+    });
+    tr.lastElementChild.appendChild(b);
+    tbody.appendChild(tr);
+  }
+  if (lijst.length > 500) tbody.insertAdjacentHTML("beforeend", `<tr><td colspan="${kop.length}" class="fa-uitleg">Eerste 500 van ${lijst.length} — zoek om te verfijnen.</td></tr>`);
+}
+
 function kiesTab(naam) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === naam));
-  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal"])
+  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
   if (naam === "herhaal") laadHerhaal();
+  document.querySelector("main").classList.toggle("breed", naam === "facturen");
+  if (naam === "facturen") { laadFacturen(); requestAnimationFrame(faHoogte); }
+  if (naam === "kennis") laadKennisTab();
 }
 function koppelDropzone(zoneId, fileId, meldingId, verwerk) {
   const zone = document.getElementById(zoneId), file = document.getElementById(fileId);
@@ -3286,6 +3973,65 @@ document.getElementById("btn-hh-nieuw").addEventListener("click", () => {
   openHerhaalForm(null);
 });
 document.getElementById("btn-hh-ronde").addEventListener("click", herhaalRondeNu);
+document.getElementById("btn-fa-ververs").addEventListener("click", laadFacturen);
+/* Scan vergroten in het scherm zelf (niet in een nieuw tabblad zonder weg terug). */
+(function () {
+  const vg = document.getElementById("fa-vergroting"), img = document.getElementById("fa-vergroting-img"), zoom = document.getElementById("btn-vg-zoom");
+  const zet = (echt) => { img.classList.toggle("echt", echt); zoom.textContent = echt ? "🔍 Passend" : "🔍 Ware grootte"; };
+  const sluit = () => { vg.style.display = "none"; img.src = ""; };
+  document.getElementById("fa-scan").addEventListener("click", (e) => {
+    if (e.target.tagName !== "IMG") return;
+    img.src = e.target.src; zet(false); vg.style.display = "";
+  });
+  document.getElementById("btn-vg-sluit").addEventListener("click", sluit);
+  zoom.addEventListener("click", () => zet(!img.classList.contains("echt")));
+  img.addEventListener("click", () => zet(!img.classList.contains("echt")));
+  document.getElementById("fa-vergroting-vak").addEventListener("click", (e) => { if (e.target.id === "fa-vergroting-vak") sluit(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && vg.style.display !== "none") sluit(); });
+})();
+/* Lijst en document lopen precies tot de onderkant van het scherm (geen pagina-schuiven). */
+function faHoogte() {
+  const sp = document.getElementById("fa-split");
+  if (!sp.offsetParent) return;
+  if (innerWidth <= 900) { sp.style.height = ""; return; }
+  const boven = sp.getBoundingClientRect().top + window.scrollY;
+  sp.style.height = Math.max(480, innerHeight - boven - 12) + "px";
+}
+addEventListener("resize", faHoogte);
+/* Scheiding tussen lijst en document verslepen; de breedte onthoudt deze browser. */
+(function () {
+  const split = document.getElementById("fa-split"), sch = document.getElementById("fa-scheiding");
+  const SLEUTEL = "bankboeker.basecone.lijstbreedte";
+  try { const w = localStorage.getItem(SLEUTEL); if (w) split.style.setProperty("--fa-links", w); } catch (e) {}
+  sch.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    sch.setPointerCapture(e.pointerId);
+    sch.classList.add("sleept");
+    const vak = split.getBoundingClientRect();
+    const beweeg = (ev) => split.style.setProperty("--fa-links", Math.min(75, Math.max(20, (ev.clientX - vak.left) / vak.width * 100)).toFixed(1) + "%");
+    const los = () => {
+      sch.classList.remove("sleept");
+      sch.removeEventListener("pointermove", beweeg); sch.removeEventListener("pointerup", los);
+      try { localStorage.setItem(SLEUTEL, split.style.getPropertyValue("--fa-links")); } catch (e) {}
+    };
+    sch.addEventListener("pointermove", beweeg); sch.addEventListener("pointerup", los);
+  });
+  sch.addEventListener("dblclick", () => { split.style.removeProperty("--fa-links"); try { localStorage.removeItem(SLEUTEL); } catch (e) {} });
+})();
+document.getElementById("fa-office").addEventListener("change", () => { vernieuwFaFilters(); vernieuwFaTabel(); });
+document.getElementById("kb-office").addEventListener("change", () => { laadFaRegels(); laadFaKennis(); });
+document.getElementById("btn-kb-ververs").addEventListener("click", laadKennisTab);
+document.getElementById("fa-kennis-zoek").addEventListener("input", vernieuwFaKennis);
+document.getElementById("btn-fa-goedkeuren").addEventListener("click", faGoedkeuren);
+document.getElementById("btn-fa-crd-ververs").addEventListener("click", faCrediteurenVerversen);
+document.getElementById("fa-crediteur").addEventListener("input", faCrediteurNaam);
+faKeuzelijst(document.getElementById("fa-crediteur"), () => faStam.CRD);
+document.getElementById("btn-fa-opnieuw").addEventListener("click", faOpnieuwLezen);
+metTweedeKlik(document.getElementById("btn-fa-overslaan"), "Zeker? Klik nog eens", () => faZetStatus("overgeslagen", "overgeslagen"));
+document.getElementById("btn-fa-terug").addEventListener("click", () => faZetStatus("voorstel", "terug naar beoordelen"));
+document.getElementById("btn-fa-regel").addEventListener("click", () => vernieuwFaRegels([...leesFaRegels(), { grootboek: "", bedrag: 0, inhoud: "", omschrijving: document.getElementById("fa-omschrijving").value }]));
+document.getElementById("fa-omschrijving").addEventListener("input", faOmsTeller);
+document.getElementById("fa-bedrag").addEventListener("input", faSom);
 document.getElementById("btn-hh-regel").addEventListener("click", () => {
   vernieuwHhRegels([...leesRegelRijen(), { rekening: "", kpl: "", omschrijving: "", bedrag: "", zijde: "credit" }]);
 });

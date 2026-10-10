@@ -57,6 +57,9 @@
   .fa-filter.actief { background: var(--blauw); border-color: var(--blauw); color: #fff; }
   #tabel-facturen tbody tr { cursor: pointer; } #tabel-facturen tbody tr:hover { background: #eef5fb; }
   #tabel-facturen tbody tr.gekozen { background: #dcebf8; }
+  #tabel-facturen .fa-vink { width: 34px; text-align: center; cursor: default; }
+  #tabel-facturen .fa-vink input { width: 17px; height: 17px; cursor: pointer; }
+  .fa-bulk { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--tekst); }
   .fa-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #fff; background: #4b5563; }
   .fa-status.voorstel { background: var(--blauw); } .fa-status.voorleggen { background: var(--oranje); }
   .fa-status.goedgekeurd { background: var(--paars); } .fa-status.ingevuld, .fa-status.geboekt { background: var(--groen); }
@@ -84,6 +87,9 @@
   .fa-crd-naam.onbekend { color: var(--rood, #b42318); font-weight: 600; }
   .fa-crd-naam.nieuw { color: var(--paars); font-weight: 600; }
   .fa-nieuw-crd { border: 1px solid var(--paars); border-radius: 6px; background: #f6f1fc; padding: 10px 12px; margin: 8px 0; font-size: 13px; color: var(--tekst); }
+  .fa-nc-raster { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 12px; }
+  .fa-nc-raster label { margin-top: 0; }
+  .fa-nc-raster .breed { grid-column: span 2; }
   .fa-keuzelijst { position: fixed; z-index: 150; background: #fff; border: 1px solid var(--rand); border-radius: 6px;
     box-shadow: 0 6px 18px rgba(0,0,0,.15); overflow-y: auto; font-size: 14px; color: var(--tekst); }
   .fa-keuzelijst div { padding: 6px 10px; cursor: pointer; display: flex; gap: 10px; }
@@ -521,11 +527,15 @@
   <div class="kaart">
     <h2>Basecone — inkoopfacturen</h2>
     <div id="fa-robot" class="fa-robot"></div>
-    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed — pas dán vult de robot het in Basecone in en drukt op <b>Opslaan</b>. Op <b>Boek</b> drukt hij nooit (fase 1). Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</details>
+    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</details>
     <div class="fa-balk">
       <select id="fa-office" style="width:auto"></select>
       <span id="fa-filters"></span>
       <button class="knop stil" id="btn-fa-ververs" style="padding:6px 12px">↻ Verversen</button>
+    </div>
+    <div class="fa-bulk" id="fa-bulk" style="display:none">
+      <button class="knop" id="btn-fa-bulk-goedkeuren">✓ Aangevinkte goedkeuren</button>
+      <span id="fa-bulk-tekst"></span>
     </div>
     <div id="melding-facturen"></div>
   </div>
@@ -533,7 +543,7 @@
   <div class="fa-split" id="fa-split">
     <div class="kaart">
       <table id="tabel-facturen">
-        <thead><tr><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th>Zekerheid</th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th>Zekerheid</th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -563,19 +573,9 @@
           <div id="fa-nc-stand"></div>
           <div id="fa-nc-velden">
             <b>Nieuwe crediteur — Shai maakt hem aan in Basecone</b>
-            <p class="fa-uitleg" style="margin:4px 0 8px">Het nummer kiest Basecone zelf (het eerstvolgende vrije C-nummer). Je kunt het document daarna meteen goedkeuren: Shai maakt eerst de crediteur aan en vult dan het document in.</p>
-            <div class="rij">
-              <div style="flex:2"><label>Naam *</label><input type="text" id="fa-nc-naam" maxlength="80"></div>
-              <div style="flex:1"><label>Vervaldagen *</label><input type="text" id="fa-nc-dagen" value="30" inputmode="numeric"></div>
-            </div>
-            <div class="rij">
-              <div style="flex:2"><label>Adres</label><input type="text" id="fa-nc-adres"></div>
-              <div style="flex:1"><label>Plaats</label><input type="text" id="fa-nc-plaats"></div>
-            </div>
-            <div class="rij">
-              <div><label>Telefoon</label><input type="text" id="fa-nc-telefoon"></div>
-              <div><label>E-mail</label><input type="text" id="fa-nc-email"></div>
-            </div>
+            <p class="fa-uitleg" style="margin:4px 0 8px">Het nummer kiest Basecone zelf (het eerstvolgende vrije C-nummer, dat ook in Twinfield komt). Shai vult alle velden van Basecone in die hieronder ingevuld zijn — wat hij op de factuur las staat er al; kijk het na en vul aan. Je kunt het document daarna meteen goedkeuren: Shai maakt eerst de crediteur aan en vult dan het document in.</p>
+            <div id="fa-nc-lezen"></div>
+            <div class="fa-nc-raster" id="fa-nc-raster"></div>
             <p style="margin:8px 0 0">
               <button type="button" class="knop" id="btn-fa-nc-aanvragen">Aanvragen bij Shai</button>
               <button type="button" class="knop stil" id="btn-fa-nc-sluiten">Annuleren</button>
@@ -3305,7 +3305,7 @@ const FA_FILTERS = {
   beoordelen: { tekst: "Te beoordelen", statussen: ["voorstel", "voorleggen"] },
   voorleggen: { tekst: "Alleen voorleggen", statussen: ["voorleggen"] },
   robot: { tekst: "Wacht op robot", statussen: ["goedgekeurd"] },
-  ingevuld: { tekst: "Ingevuld", statussen: ["ingevuld", "geboekt"] },
+  ingevuld: { tekst: "Ingevuld / geboekt", statussen: ["ingevuld", "geboekt"] },
   fout: { tekst: "Fout", statussen: ["fout"] },
   alles: { tekst: "Alles", statussen: null },
 };
@@ -3321,7 +3321,7 @@ async function laadFacturen() {
   if (!CLOUD) { toonMelding("melding-facturen", "fout", "Het tabblad Basecone werkt alleen in cloud-modus (met inlog)."); return; }
   laadRobotStatus();
   const { data, error } = await sb.from("basecone_documenten")
-    .select("id, office, bestandsnaam, status, voorstel, goedgekeurd, opmerking, geupload_op, updated_at")
+    .select("id, office, bestandsnaam, status, voorstel, goedgekeurd, opmerking, geupload_op, updated_at, nieuwe_crediteur")
     .order("updated_at", { ascending: false }).limit(500);
   if (error) {
     toonMelding("melding-facturen", "fout", /does not exist|relation|could not find the table|schema cache/i.test(error.message)
@@ -3376,15 +3376,16 @@ function vernieuwFaTabel() {
   const office = document.getElementById("fa-office").value;
   const f = FA_FILTERS[faFilter];
   const lijst = faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status)));
-  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="8" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
   for (const d of lijst) {
     const v = d.goedgekeurd || d.voorstel || {};
     const let_ = (v.waarschuwingen || []).length;
     const tr = document.createElement("tr");
     if (faGekozen && faGekozen.id === d.id) tr.classList.add("gekozen");
     tr.title = `${d.bestandsnaam || d.id} · ${d.office}`;
-    tr.innerHTML = `<td><span class="fa-status ${escapeHtml(d.status)}">${escapeHtml(FA_STATUS_TEKST[d.status] || d.status)}</span></td>
-      <td style="font-size:13px"><b>${escapeHtml(v.crediteur || "")}</b> ${escapeHtml(faCrdNamen[`${d.office}|${v.crediteur}`] || "")}</td>
+    const kanVink = FA_BEOORDELEN.includes(d.status);
+    tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="fa-vink-rij"${faVink.has(d.id) ? " checked" : ""}>` : ""}</td><td><span class="fa-status ${escapeHtml(d.status)}">${escapeHtml(FA_STATUS_TEKST[d.status] || d.status)}</span></td>
+      <td style="font-size:13px"><b>${escapeHtml(v.crediteur || "")}</b> ${escapeHtml(faCrdNamen[`${d.office}|${v.crediteur}`] || (d.nieuwe_crediteur && (v.crediteur === "NIEUW" || v.crediteur === d.nieuwe_crediteur.code) ? d.nieuwe_crediteur.naam + " (nieuw)" : ""))}</td>
       <td style="font-size:13px">${[...new Set((v.regels || []).map(r => r.grootboek))]
         .map(g => `<b>${escapeHtml(g)}</b> ${escapeHtml(faRekNamen[`${d.office}|${g}`] || "")}`).join("<br>")}</td>
       <td style="font-size:13px">${escapeHtml(v.omschrijving || "")}</td>
@@ -3392,9 +3393,87 @@ function vernieuwFaTabel() {
       <td class="num">${v.credit ? "−" : ""}${faBedrag(v.bedrag)}</td>
       <td>${escapeHtml(v.zekerheid || "")}</td>
       <td>${let_ ? `<span class="fa-let" title="${escapeHtml((v.waarschuwingen || []).map(w => "• " + w).join("\n"))}">${let_}</span>` : ""}${d.status === "fout" ? `<span class="fa-fout">${escapeHtml((d.opmerking || "").slice(0, 60))}</span>` : ""}</td>`;
-    tr.addEventListener("click", () => openFactuur(d.id));
+    tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink")) openFactuur(d.id); });
+    const vink = tr.querySelector(".fa-vink-rij");
+    if (vink) vink.addEventListener("change", () => { vink.checked ? faVink.add(d.id) : faVink.delete(d.id); faBulkStand(); });
     tbody.appendChild(tr);
   }
+  faBulkStand();
+}
+/* Vinkjes + "alles selecteren" + in één keer goedkeuren (Shereen 10 okt). Alles aanvinken pakt alleen
+   de voorstellen in de huidige lijst; een document op "voorleggen" vink je bewust los aan. */
+const FA_BEOORDELEN = ["voorstel", "voorleggen"];
+const faVink = new Set();
+function faZichtbaar() {
+  const office = document.getElementById("fa-office").value;
+  const f = FA_FILTERS[faFilter];
+  return faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status)));
+}
+function faBulkStand() {
+  for (const id of [...faVink]) if (!faDocs.some(d => d.id === id && FA_BEOORDELEN.includes(d.status))) faVink.delete(id);
+  const voorstellen = faZichtbaar().filter(d => d.status === "voorstel");
+  const alles = document.getElementById("fa-vink-alles");
+  const aan = voorstellen.filter(d => faVink.has(d.id)).length;
+  alles.checked = voorstellen.length > 0 && aan === voorstellen.length;
+  alles.indeterminate = faVink.size > 0 && !alles.checked;
+  document.getElementById("fa-bulk").style.display = faVink.size ? "" : "none";
+  const voorleggen = faDocs.filter(d => faVink.has(d.id) && d.status === "voorleggen").length;
+  document.getElementById("fa-bulk-tekst").textContent = `${faVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Shai vult ze daarna in Basecone in en boekt ze door naar Twinfield.`;
+  requestAnimationFrame(faHoogte);
+}
+function faVinkAlles() {
+  const aan = document.getElementById("fa-vink-alles").checked;
+  for (const d of faZichtbaar().filter(d => d.status === "voorstel")) aan ? faVink.add(d.id) : faVink.delete(d.id);
+  vernieuwFaTabel();
+}
+/* Dezelfde controles als bij één document goedkeuren, maar op het voorstel zoals Shai het maakte. */
+function faControleer(d, g) {
+  const fouten = [];
+  const nc = d.nieuwe_crediteur;
+  const crdBekend = (c) => !!faCrdNamen[`${d.office}|${c}`] || (nc && nc.code === c);
+  const heeftCrd = Object.keys(faCrdNamen).some(k => k.startsWith(d.office + "|"));
+  const heeftBas = Object.keys(faRekNamen).some(k => k.startsWith(d.office + "|"));
+  if (!g.crediteur) fouten.push("crediteur ontbreekt");
+  else if (g.crediteur === "NIEUW") { if (!nc || nc.status === "aangemaakt") fouten.push("crediteur NIEUW zonder aanvraag"); }
+  else if (heeftCrd && !crdBekend(g.crediteur)) fouten.push(`crediteur ${g.crediteur} bestaat niet`);
+  if (!g.factuurnummer) fouten.push("factuurnummer ontbreekt");
+  if (!g.datum) fouten.push("datum ontbreekt");
+  if (!g.omschrijving) fouten.push("omschrijving ontbreekt");
+  if (!g.regels.length) fouten.push("geen boekingsregels");
+  if (g.regels.some(r => !r.grootboek)) fouten.push("een regel heeft geen rekening");
+  if (heeftBas) for (const r of g.regels) if (r.grootboek && !faRekNamen[`${d.office}|${r.grootboek}`]) fouten.push(`rekening ${r.grootboek} bestaat niet`);
+  if (Math.round(g.regels.reduce((s, r) => s + Number(r.bedrag || 0), 0) * 100) !== Math.round(Number(g.bedrag || 0) * 100)) fouten.push("regels tellen niet op tot het totaal");
+  return fouten;
+}
+async function faBulkGoedkeuren() {
+  const docs = faDocs.filter(d => faVink.has(d.id) && FA_BEOORDELEN.includes(d.status));
+  if (!docs.length) return;
+  const knop = document.getElementById("btn-fa-bulk-goedkeuren"); knop.disabled = true;
+  const wie = gebruiker ? gebruiker.email : null;
+  let goed = 0; const overgeslagen = [];
+  for (const d of docs) {
+    const v = d.voorstel || {};
+    const oms = (v.omschrijving || "").trim();
+    const g = {
+      crediteur: (v.crediteur || (d.nieuwe_crediteur && d.nieuwe_crediteur.status !== "aangemaakt" ? "NIEUW" : "")).toUpperCase(),
+      factuurnummer: (v.factuurnummer || "").trim(), bedrag: Number(v.bedrag || 0), valuta: v.valuta || "AWG",
+      datum: v.datum || "", vervaldatum: v.vervaldatum || null, credit: !!v.credit, niet_in_betaalbatch: !!v.niet_in_betaalbatch,
+      omschrijving: oms, regels: (v.regels || []).map(r => ({ grootboek: (r.grootboek || "").trim(), bedrag: Number(r.bedrag || 0), omschrijving: (r.omschrijving || oms).trim() })),
+    };
+    const fouten = faControleer(d, g);
+    if (fouten.length) { overgeslagen.push(`${d.bestandsnaam || d.id}: ${fouten.join(", ")}`); continue; }
+    const { error } = await sb.from("basecone_documenten").update({
+      status: "goedgekeurd", goedgekeurd: g, goedgekeurd_door: wie, goedgekeurd_op: new Date().toISOString(), updated_by: wie,
+    }).eq("id", d.id).in("status", FA_BEOORDELEN);
+    if (error) { overgeslagen.push(`${d.bestandsnaam || d.id}: ${error.message}`); continue; }
+    await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "goedgekeurd", details: { in_een_keer: true }, door: wie });
+    faVink.delete(d.id); goed++;
+  }
+  knop.disabled = false;
+  await laadFacturen();
+  toonMelding("melding-facturen", overgeslagen.length ? "fout" : "ok",
+    `${goed} goedgekeurd — Shai vult ze bij zijn volgende ronde in en boekt ze door.` +
+    (overgeslagen.length ? `<br>Niet goedgekeurd (open ze en verbeter ze eerst):<br>${overgeslagen.map(escapeHtml).join("<br>")}` : ""));
 }
 async function laadFaStam(office) {
   const { data } = await sb.from("twinfield_stamdata").select("soort, data").eq("office", office);
@@ -3492,7 +3571,9 @@ function faNieuwCrdToon() {
   stand.innerHTML = "";
   paneel.style.display = nc ? "" : "none";
   if (!nc) return;
-  const wat = `<b>${escapeHtml(nc.naam)}</b> (vervaldagen ${escapeHtml(String(nc.vervaldagen))}${nc.adres ? ", " + escapeHtml(nc.adres) : ""}${nc.plaats ? ", " + escapeHtml(nc.plaats) : ""})`;
+  const extra = FA_NC_VELDEN.filter(([k]) => k !== "naam" && nc[k] != null && nc[k] !== "")
+    .map(([k, label]) => `${escapeHtml(label.replace(" *", ""))}: ${escapeHtml(String(nc[k]))}`);
+  const wat = `<b>${escapeHtml(nc.naam)}</b> (${extra.join(" · ")})`;
   if (nc.status === "aangemaakt") {
     stand.innerHTML = `✓ Nieuwe crediteur ${wat} is door Shai aangemaakt in Basecone als <b>${escapeHtml(nc.code)}</b>${nc.aangemaakt_op ? " op " + escapeHtml(new Date(nc.aangemaakt_op).toLocaleString("nl-NL", { timeZone: "America/Aruba" })) : ""}. Staat hij nog niet in de lijst? Klik op ↻ Crediteuren uit Twinfield.`;
     return;
@@ -3515,17 +3596,55 @@ function faNieuwCrdToon() {
   knoppen.appendChild(weg);
   stand.appendChild(knoppen);
 }
-function faNieuwCrdOpen() {
+/* De velden van Basecone's formulier "Nieuwe leverancier aanmaken", in Basecone's volgorde.
+   De sleutels zijn gelijk aan ai.leverancier_gegevens van de leesfunctie. */
+const FA_NC_VELDEN = [
+  ["naam", "Leveranciersnaam *", true], ["klantreferentie", "Klantreferentie"], ["adres", "Adres", true],
+  ["postcode", "Postcode"], ["plaats", "Plaatsnaam"], ["land", "Land"], ["telefoon", "Telefoonnummer"], ["email", "E-mail", true],
+  ["btw_nummer", "Btw-nummer"], ["kvk_nummer", "KVK-nummer"], ["iban", "IBAN", true], ["bic", "BIC"],
+  ["bankrekeningnummer", "Bankrekeningnummer"], ["banknaam", "Banknaam"], ["bankland", "Bankland"],
+  ["nationale_bankcode", "Nationale bankcode"], ["vervaldagen", "Vervaldagen *"],
+];
+function faNcVul(g) {
+  for (const [k] of FA_NC_VELDEN) {
+    const veld = document.getElementById("fa-nc-" + k);
+    const w = g && g[k] != null ? String(g[k]).trim() : "";
+    if (w && !veld.value.trim()) veld.value = w;   // wat de medewerker al typte niet overschrijven
+  }
+  if (!document.getElementById("fa-nc-vervaldagen").value.trim()) document.getElementById("fa-nc-vervaldagen").value = "30";
+}
+async function faNieuwCrdOpen() {
   const d = faGekozen; if (!d) return;
   const a = d.ai || {};
   document.getElementById("fa-nieuw-crd").style.display = "";
   document.getElementById("fa-nc-velden").style.display = "";
   document.getElementById("btn-fa-crd-nieuw").style.display = "none";
-  const naam = document.getElementById("fa-nc-naam");
-  naam.value = (a.leverancier_naam || (d.bestandsnaam || "").replace(/[0-9 ,./-]+$/, "")).trim();
-  for (const id of ["fa-nc-adres", "fa-nc-plaats", "fa-nc-telefoon", "fa-nc-email"]) document.getElementById(id).value = "";
-  document.getElementById("fa-nc-dagen").value = "30";
-  naam.focus(); naam.select();
+  document.getElementById("fa-nc-raster").innerHTML = FA_NC_VELDEN.map(([k, label, breed]) =>
+    `<div${breed ? ' class="breed"' : ""}><label for="fa-nc-${k}">${escapeHtml(label)}</label><input type="text" id="fa-nc-${k}" autocomplete="off"${k === "vervaldagen" ? ' inputmode="numeric"' : ""}></div>`).join("");
+  // Naam: de volledige bedrijfsnaam van de factuur; anders de korte naam die Shai las of de bestandsnaam.
+  const reserveNaam = () => { const n = document.getElementById("fa-nc-naam"); if (!n.value.trim()) n.value = (a.leverancier_naam || (d.bestandsnaam || "").replace(/[0-9 ,./-]+$/, "")).trim(); };
+  const lezen = document.getElementById("fa-nc-lezen");
+  lezen.innerHTML = "";
+  if (a.leverancier_gegevens) { faNcVul(a.leverancier_gegevens); reserveNaam(); return; }
+  // Gelezen vóór de leesfunctie leveranciersgegevens meenam: nu even los laten lezen (±2 cent).
+  faNcVul(null); reserveNaam();
+  lezen.innerHTML = `<div class="melding ok">Shai leest de gegevens van de leverancier op de factuur… (± 10 tellen)</div>`;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(`${CFG.SUPABASE_URL}/functions/v1/factuur-lezen`, {
+      method: "POST", headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: d.id, alleen: "leverancier" }),
+    });
+    const r = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(r.fout || `HTTP ${resp.status}`);
+    if (faGekozen !== d) return;   // intussen een ander document geopend
+    d.ai = { ...(d.ai || {}), leverancier_gegevens: r.leverancier_gegevens };
+    document.getElementById("fa-nc-naam").value = "";   // de volledige naam van de factuur wint
+    faNcVul(r.leverancier_gegevens); reserveNaam();
+    lezen.innerHTML = `<div class="melding ok">Gegevens van de factuur overgenomen — kijk ze na.</div>`;
+  } catch (e) {
+    lezen.innerHTML = `<div class="melding fout">Gegevens lezen lukte niet (${escapeHtml(e.message)}). Vul ze zelf in.</div>`;
+  }
 }
 function faNieuwCrdSluiten() {
   document.getElementById("fa-nc-velden").style.display = "none";
@@ -3533,19 +3652,20 @@ function faNieuwCrdSluiten() {
 }
 async function faNieuwCrdAanvragen() {
   const d = faGekozen; if (!d) return;
-  const waarde = (id) => document.getElementById(id).value.trim();
-  const naam = waarde("fa-nc-naam"), dagen = waarde("fa-nc-dagen");
+  const waarde = (k) => document.getElementById("fa-nc-" + k).value.trim();
+  const naam = waarde("naam"), dagen = waarde("vervaldagen");
   const fouten = [];
-  if (!naam) fouten.push("naam ontbreekt");
+  if (!naam) fouten.push("leveranciersnaam ontbreekt");
   if (!/^\d{1,3}$/.test(dagen)) fouten.push("vervaldagen moet een getal zijn (bv. 30)");
   const bestaat = naam && faStam.CRD.find(x => faNorm(x.naam) === faNorm(naam));
   if (bestaat) fouten.push(`deze crediteur bestaat al: ${bestaat.code} ${bestaat.naam} — kies die in het crediteurveld`);
   if (fouten.length) { toonMelding("melding-fa-detail", "fout", "Nog niet goed: " + escapeHtml(fouten.join("; ")) + "."); return; }
-  const nc = {
-    naam, vervaldagen: Number(dagen), adres: waarde("fa-nc-adres") || null, plaats: waarde("fa-nc-plaats") || null,
-    telefoon: waarde("fa-nc-telefoon") || null, email: waarde("fa-nc-email") || null,
+  const nc = {};
+  for (const [k] of FA_NC_VELDEN) nc[k] = waarde(k) || null;
+  Object.assign(nc, {
+    vervaldagen: Number(dagen),
     status: "aangevraagd", code: null, aangevraagd_door: gebruiker ? gebruiker.email : null, aangevraagd_op: new Date().toISOString(),
-  };
+  });
   document.getElementById("fa-crediteur").value = "NIEUW";
   await faNieuwCrdOpslaan(nc, "crediteur aangevraagd");
 }
@@ -3609,6 +3729,10 @@ async function openFactuur(id) {
   const v = d.goedgekeurd || d.voorstel || {};
   const zet = (veld, w) => { document.getElementById(veld).value = w ?? ""; };
   zet("fa-crediteur", v.crediteur); zet("fa-factuurnummer", v.factuurnummer);
+  // Nieuwe crediteur aangevraagd maar nog niet goedgekeurd: het veld toont NIEUW tot Shai het nummer heeft.
+  const nc = d.nieuwe_crediteur;
+  if (nc && !d.goedgekeurd) zet("fa-crediteur", nc.status === "aangemaakt" ? nc.code : "NIEUW");
+  faNieuwCrdToon();
   faCrediteurNaam();
   zet("fa-bedrag", faBedrag(v.bedrag)); zet("fa-valuta", v.valuta || "AWG");
   zet("fa-datum", v.datum); zet("fa-vervaldatum", v.vervaldatum);
@@ -3620,6 +3744,8 @@ async function openFactuur(id) {
   faOmsTeller();
 
   const opm = [];
+  const tw = d.invul_resultaat && d.invul_resultaat.twinfield;
+  if (d.status === "geboekt" && tw) opm.push(`<div class="melding ok">✓ Geboekt in Twinfield — dagboek <b>${escapeHtml(tw.dagboek || "")}</b>, boekstuk <b>${escapeHtml(String(tw.boekstuk || ""))}</b>${tw.geboekt_op ? " · " + escapeHtml(new Date(tw.geboekt_op).toLocaleString("nl-NL", { timeZone: "America/Aruba" })) : ""}</div>`);
   if (d.opmerking) opm.push(`<div class="melding ${d.status === "fout" ? "fout" : "ok"}" style="${d.status === "fout" ? "" : "background:#fff4e0;color:var(--tekst)"}">${faMetNamen(d.opmerking)}</div>`);
   for (const w of v.waarschuwingen || []) opm.push(`<div class="fa-let">⚠ ${faMetNamen(w)}</div>`);
   document.getElementById("fa-opmerking").innerHTML = opm.join("");
@@ -3714,7 +3840,8 @@ async function faGoedkeuren() {
   const g = leesFaFormulier();
   const fouten = [];
   if (!g.crediteur) fouten.push("crediteur ontbreekt");
-  else if (faStam.CRD.length && !faStam.CRD.some(x => x.code === g.crediteur)) fouten.push(`crediteur ${g.crediteur} bestaat niet`);
+  else if (g.crediteur === "NIEUW") { if (!d.nieuwe_crediteur || d.nieuwe_crediteur.status === "aangemaakt") fouten.push("crediteur NIEUW zonder openstaande aanvraag — klik op ＋ Nieuwe crediteur"); }
+  else if (faStam.CRD.length && !faStam.CRD.some(x => x.code === g.crediteur) && !(d.nieuwe_crediteur && d.nieuwe_crediteur.code === g.crediteur)) fouten.push(`crediteur ${g.crediteur} bestaat niet`);
   if (!g.factuurnummer) fouten.push("factuurnummer ontbreekt");
   if (!g.datum) fouten.push("datum ontbreekt");
   if (!g.omschrijving) fouten.push("omschrijving ontbreekt");
@@ -4179,6 +4306,11 @@ document.getElementById("btn-kb-ververs").addEventListener("click", laadKennisTa
 document.getElementById("fa-kennis-zoek").addEventListener("input", vernieuwFaKennis);
 document.getElementById("btn-fa-goedkeuren").addEventListener("click", faGoedkeuren);
 document.getElementById("btn-fa-crd-ververs").addEventListener("click", faCrediteurenVerversen);
+document.getElementById("btn-fa-crd-nieuw").addEventListener("click", faNieuwCrdOpen);
+document.getElementById("fa-vink-alles").addEventListener("change", faVinkAlles);
+document.getElementById("btn-fa-bulk-goedkeuren").addEventListener("click", faBulkGoedkeuren);
+document.getElementById("btn-fa-nc-aanvragen").addEventListener("click", faNieuwCrdAanvragen);
+document.getElementById("btn-fa-nc-sluiten").addEventListener("click", faNieuwCrdSluiten);
 document.getElementById("fa-crediteur").addEventListener("input", faCrediteurNaam);
 faKeuzelijst(document.getElementById("fa-crediteur"), () => faStam.CRD);
 document.getElementById("btn-fa-opnieuw").addEventListener("click", faOpnieuwLezen);

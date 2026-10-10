@@ -688,8 +688,13 @@ async function initAuth() {
     if (event === "SIGNED_IN" && document.getElementById("login-overlay").style.display !== "none") location.reload();
     if (event === "SIGNED_OUT") location.reload();
   });
+  const doorgeefFout = await doorgeefbriefjeInwisselen();
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { toonLogin(); return false; }
+  if (!session) {
+    toonLogin();
+    if (doorgeefFout) toonMelding("melding-login", "fout", escapeHtml(doorgeefFout));
+    return false;
+  }
   gebruiker = session.user;
   const domein = (CFG.TOEGESTAAN_DOMEIN || "").toLowerCase();
   if (domein && !(gebruiker.email || "").toLowerCase().endsWith("@" + domein)) {
@@ -710,6 +715,27 @@ async function initAuth() {
 }
 function toonLogin() {
   document.getElementById("login-overlay").style.display = "flex";
+}
+/* Geopend vanuit E-Board (update 5 / E-Board update 145): het adres eindigt op
+   #doorgeven=<code>. Die eenmalige code (60 s) ruilen we bij edge function `doorgeven` in
+   voor een inlog — er gaat nooit een wachtwoord mee. De code gaat meteen uit de adresbalk.
+   Lukt het niet, dan gewoon het inlogscherm (met de reden). */
+async function doorgeefbriefjeInwisselen() {
+  const m = location.hash.match(/doorgeven=([^&]+)/);
+  if (!m) return null;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/doorgeven`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actie: "inwisselen", code: decodeURIComponent(m[1]) }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.token_hash) return j.fout || `Inloggen via E-Board lukte niet (HTTP ${r.status}).`;
+    const { error } = await sb.auth.verifyOtp({ token_hash: j.token_hash, type: "magiclink" });
+    return error ? "Inloggen via E-Board lukte niet: " + error.message : null;
+  } catch (e) {
+    return "Inloggen via E-Board lukte niet: " + e.message;
+  }
 }
 async function laadProfielen() {
   if (CLOUD) {

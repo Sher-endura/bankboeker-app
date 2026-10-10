@@ -658,6 +658,7 @@
     <div class="fa-balk">
       <span id="fa-kennis-tabs"></span>
       <input type="search" id="fa-kennis-zoek" placeholder="Zoeken…" style="width:200px">
+      <button class="knop stil" id="btn-kb-opruimen" style="padding:6px 12px; display:none" title="Regels die op Vergeten zijn gezet of als rommel zijn uitgezet, definitief verwijderen"></button>
     </div>
     <div style="overflow-x:auto"><table id="tabel-fa-kennis"><thead></thead><tbody></tbody></table></div>
   </div>
@@ -4129,76 +4130,149 @@ const FA_KENNIS_SOORTEN = { leverancier: "Leveranciers", artikel: "Artikelen", h
 async function laadFaKennis() {
   const office = document.getElementById("kb-office").value;
   document.getElementById("fa-kennis-office").textContent = office ? `· ${office}` : "";
-  let q = sb.from("basecone_kennis").select("*").eq("actief", true).order("laatst_gezien", { ascending: false }).limit(5000);
-  if (office) q = q.eq("office", office);
-  const { data, error } = await q;
-  if (error) {
-    document.querySelector("#tabel-fa-kennis tbody").innerHTML = `<tr><td class="fa-uitleg">${/does not exist|schema cache|could not find/i.test(error.message)
-      ? "De kennisbank bestaat nog niet: database-update 3 moet nog gedraaid worden." : escapeHtml(error.message)}</td></tr>`;
-    return;
+  // Alles ophalen, in delen van 1000: de database geeft er per keer hooguit 1000 terug en met alle
+  // klanten zijn het er duizenden (10 okt: daardoor stond er "Leveranciers (0)").
+  faKennis = [];
+  for (let van = 0; van < 100000; van += 1000) {
+    let q = sb.from("basecone_kennis").select("*").eq("actief", true).order("id").range(van, van + 999);
+    if (office) q = q.eq("office", office);
+    const { data, error } = await q;
+    if (error) {
+      document.querySelector("#tabel-fa-kennis tbody").innerHTML = `<tr><td class="fa-uitleg">${/does not exist|schema cache|could not find/i.test(error.message)
+        ? "De kennisbank bestaat nog niet: database-update 3 moet nog gedraaid worden." : escapeHtml(error.message)}</td></tr>`;
+      return;
+    }
+    faKennis.push(...(data || []));
+    if (!data || data.length < 1000) break;
   }
-  faKennis = data || [];
-  // Namen van de rekeningen, voor wie de codes niet uit het hoofd kent.
+  // Namen van de rekeningen per klant. Ontbreekt het rekeningschema van een klant in de Bankboeker,
+  // dan één keer uit Twinfield halen en bewaren (op de achtergrond; de tabel ververst als het er is).
   const offices = [...new Set(faKennis.map(k => k.office))];
   faKennisNamen = {};
   if (offices.length) {
     const { data: st } = await sb.from("twinfield_stamdata").select("office, data").eq("soort", "BAS").in("office", offices);
     for (const r of st || []) for (const x of r.data || []) faKennisNamen[`${r.office}|${x.code}`] = x.naam;
+    const zonder = offices.filter(o => !(st || []).some(r => r.office === o));
+    if (zonder.length) faKennisSchemaOphalen(zonder);
+  }
+  let q2 = sb.from("basecone_kennis").select("id", { count: "exact", head: true }).eq("actief", false);
+  if (office) q2 = q2.eq("office", office);
+  const { count } = await q2;
+  faKennisUit = count || 0;
+  vernieuwFaKennis();
+}
+let faKennisUit = 0;
+async function faKennisSchemaOphalen(offices) {
+  for (const o of offices) {
+    try {
+      const lijst = [...await liveDimensies(o, "BAS"), ...await liveDimensies(o, "PNL")];
+      if (!lijst.length) continue;
+      await sb.from("twinfield_stamdata").upsert({ office: o, soort: "BAS", data: lijst, opgehaald_op: new Date().toISOString() });
+      for (const x of lijst) faKennisNamen[`${o}|${x.code}`] = x.naam;
+    } catch (e) { console.warn("Rekeningschema", o, e.message); }
   }
   vernieuwFaKennis();
 }
+/* Uitgezette regels (Vergeten, of door Shereen afgekeurde krabbels) definitief verwijderen — dat doet
+   de medewerker zelf met deze knop. */
+async function faKennisOpruimen() {
+  const office = document.getElementById("kb-office").value;
+  let q = sb.from("basecone_kennis").delete().eq("actief", false);
+  if (office) q = q.eq("office", office);
+  const { error } = await q;
+  if (error) { toonMelding("melding-facturen", "fout", "Opruimen mislukt: " + escapeHtml(error.message)); return; }
+  laadFaKennis();
+}
+
+/* Eén leverancier, kennis gedeeld (Shereen 10 okt): veel leveranciers leveren aan meerdere klanten.
+   De kennisbank bewaart per klant (crediteurnummers verschillen), maar toont elke leverancier één keer
+   met de klanten erin; artikelen worden per leverancier samengevoegd. */
+const faKennisRek = (office, code) => code ? `<b>${escapeHtml(code)}</b> ${escapeHtml(faKennisNamen[`${office}|${code}`] || "")}` : "";
+function faKennisGroepen() {
+  const levNaam = {}, levGroep = {};
+  for (const k of faKennis) if (k.soort === "leverancier") {
+    const naam = (k.gegevens && k.gegevens.twinfield && k.gegevens.twinfield.naam) || k.voorbeeld || k.leverancier;
+    levNaam[`${k.office}|${k.leverancier}`] = naam;
+    levGroep[`${k.office}|${k.leverancier}`] = faNorm(naam) || k.leverancier;
+  }
+  const groepVan = (k) => levGroep[`${k.office}|${k.leverancier}`] || faNorm(k.leverancier) || k.leverancier;
+  return { levNaam, groepVan };
+}
 function vernieuwFaKennis() {
   const tabs = document.getElementById("fa-kennis-tabs");
+  const { levNaam, groepVan } = faKennisGroepen();
+  // Leveranciers en artikelen samenvoegen over de klanten heen.
+  const groepen = { leverancier: new Map(), artikel: new Map(), handschrift: new Map() };
+  for (const k of faKennis) {
+    const sleutel = k.soort === "leverancier" ? groepVan(k)
+      : k.soort === "artikel" ? `${groepVan(k)}|${faNorm(k.voorbeeld) || k.sleutel}`
+      : `${k.office}|${k.id}`;
+    const m = groepen[k.soort]; if (!m) continue;
+    if (!m.has(sleutel)) m.set(sleutel, []);
+    m.get(sleutel).push(k);
+  }
   tabs.innerHTML = "";
   for (const [soort, tekst] of Object.entries(FA_KENNIS_SOORTEN)) {
     const b = document.createElement("button");
     b.className = "fa-filter" + (soort === faKennisSoort ? " actief" : "");
-    b.textContent = `${tekst} (${faKennis.filter(k => k.soort === soort).length})`;
+    b.textContent = `${tekst} (${groepen[soort].size})`;
     b.addEventListener("click", () => { faKennisSoort = soort; vernieuwFaKennis(); });
     tabs.appendChild(b);
   }
+  const opruim = document.getElementById("btn-kb-opruimen");
+  opruim.style.display = faKennisUit ? "" : "none";
+  opruim.textContent = `🗑 Uitgezette regels verwijderen (${faKennisUit})`;
+
   const zoek = document.getElementById("fa-kennis-zoek").value.trim().toLowerCase();
-  const levNaam = {};
-  for (const k of faKennis) if (k.soort === "leverancier") levNaam[`${k.office}|${k.leverancier}`] = k.voorbeeld;
-  const rek = (k) => k.grootboek ? `<b>${escapeHtml(k.grootboek)}</b> ${escapeHtml(faKennisNamen[`${k.office}|${k.grootboek}`] || "")}` : "";
   const datum = (t) => t ? new Date(t).toLocaleDateString("nl-NL") : "";
-  const lijst = faKennis.filter(k => k.soort === faKennisSoort &&
-    (!zoek || [k.voorbeeld, k.crediteur, k.grootboek, levNaam[`${k.office}|${k.leverancier}`], k.gegevens?.twinfield?.naam]
-      .some(w => (w || "").toLowerCase().includes(zoek))));
+  const laatst = (rijen) => rijen.reduce((m, k) => (k.laatst_gezien > m ? k.laatst_gezien : m), "");
   const kop = {
-    leverancier: ["Leverancier", "Crediteur", "In Twinfield geboekt op", "Goedgekeurd: rekening", "Soort", "Goed / verbeterd", "Op rij goed", "Basecone klopte", "Laatst", ""],
-    artikel: ["Leverancier", "Artikel", "Rekening", "Keer", "Gewisseld", "Laatst", ""],
-    handschrift: ["Aantekening", "Rekening", "Keer", "Gewisseld", "Laatst gezien bij", "Laatst", ""],
+    leverancier: ["Leverancier", "Klanten (crediteur)", "In Twinfield geboekt op", "Goedgekeurd: rekening", "Goed / verbeterd", "Basecone klopte", "Laatst", ""],
+    artikel: ["Leverancier", "Artikel", "Rekening (per klant)", "Keer", "Gewisseld", "Laatst", ""],
+    handschrift: ["Aantekening", "Klant", "Rekening", "Keer", "Gewisseld", "Laatst gezien bij", "Laatst", ""],
   }[faKennisSoort];
   document.querySelector("#tabel-fa-kennis thead").innerHTML = `<tr>${kop.map(h => `<th>${h}</th>`).join("")}</tr>`;
   const tbody = document.querySelector("#tabel-fa-kennis tbody");
+  const alle = [...groepen[faKennisSoort].values()];
+  const tekstVan = (rijen) => rijen.flatMap(k => [k.voorbeeld, k.crediteur, k.grootboek, k.office, levNaam[`${k.office}|${k.leverancier}`],
+    k.gegevens && k.gegevens.twinfield && k.gegevens.twinfield.naam, faKennisNamen[`${k.office}|${k.grootboek}`]]).join(" ").toLowerCase();
+  const lijst = alle.filter(rijen => !zoek || tekstVan(rijen).includes(zoek))
+    .sort((a, b) => (laatst(b) > laatst(a) ? 1 : -1));
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${kop.length}" class="fa-uitleg">${faKennis.length ? "Niets gevonden." : "Nog niets onthouden — dat begint bij de eerste goedkeuring."}</td></tr>`;
-  for (const k of lijst.slice(0, 500)) {
-    const g = k.gegevens || {};
-    const off = document.getElementById("kb-office").value ? "" : ` <span class="fa-uitleg">${escapeHtml(k.office)}</span>`;
+  for (const rijen of lijst.slice(0, 500)) {
+    const k0 = rijen[0];
     const tr = document.createElement("tr");
-    if (k.soort === "leverancier") {
-      const bcTotaal = k.basecone_goed + k.basecone_fout;
-      const goedgekeurd = k.bevestigd + k.verbeterd > 0;
-      const tw = g.twinfield;
-      tr.innerHTML = `<td>${escapeHtml(k.voorbeeld || k.leverancier)}${off}</td><td>${escapeHtml(k.crediteur || "")}</td>
-        <td style="font-size:12px">${tw ? `${tw.facturen} facturen${tw.creditnotas ? `, ${tw.creditnotas} credit` : ""}<br>` +
-          (tw.rekeningen || []).slice(0, 3).map(r => `<b>${escapeHtml(r.code)}</b> ${escapeHtml(r.naam || "")} ${r.keer}×`).join("<br>") : "—"}</td>
-        <td>${!goedgekeurd ? "—" : k.grootboek ? rek(k) : escapeHtml((g.rekeningen || []).join(" / "))}</td>
-        <td>${!goedgekeurd ? "" : (g.betaald ? "betaalde bon" : "op rekening") + (g.datumformaat ? ` · datums ${escapeHtml(g.datumformaat)}` : "")}</td>
-        <td>${goedgekeurd ? `${k.bevestigd} / ${k.verbeterd}` : "—"}</td><td>${goedgekeurd ? k.reeks_goed : ""}</td>
-        <td>${bcTotaal ? `${k.basecone_goed} van ${bcTotaal}` : "—"}</td><td>${datum(k.laatst_gezien)}</td><td></td>`;
-    } else if (k.soort === "artikel") {
-      tr.innerHTML = `<td>${escapeHtml(levNaam[`${k.office}|${k.leverancier}`] || k.leverancier)}${off}</td><td>${escapeHtml(k.voorbeeld || "")}</td>
-        <td>${rek(k)}</td><td>${k.bevestigd}</td><td>${k.verbeterd || ""}</td><td>${datum(k.laatst_gezien)}</td><td></td>`;
+    if (faKennisSoort === "leverancier") {
+      const naam = rijen.map(k => (k.gegevens && k.gegevens.twinfield && k.gegevens.twinfield.naam) || k.voorbeeld || k.leverancier).sort((a, b) => b.length - a.length)[0];
+      const klanten = rijen.map(k => `${escapeHtml(k.office)} <b>${escapeHtml(k.crediteur || (k.leverancier.startsWith("C") ? k.leverancier : ""))}</b>`).join("<br>");
+      const twin = rijen.map(k => { const t = k.gegevens && k.gegevens.twinfield; return t ? `<span style="white-space:nowrap">${escapeHtml(k.office)}: ` +
+        (t.rekeningen || []).slice(0, 2).map(r => `<b>${escapeHtml(r.code)}</b> ${escapeHtml(r.naam || faKennisNamen[`${k.office}|${r.code}`] || "")} ${r.keer}×`).join(", ") + `</span>` : ""; }).filter(Boolean).join("<br>");
+      const gk = rijen.filter(k => k.bevestigd + k.verbeterd > 0);
+      const goedRek = gk.map(k => `${escapeHtml(k.office)}: ${k.grootboek ? faKennisRek(k.office, k.grootboek) : escapeHtml(((k.gegevens || {}).rekeningen || []).join(" / "))}`).join("<br>");
+      const bev = gk.reduce((s, k) => s + k.bevestigd, 0), verb = gk.reduce((s, k) => s + k.verbeterd, 0);
+      const bcG = rijen.reduce((s, k) => s + k.basecone_goed, 0), bcT = rijen.reduce((s, k) => s + k.basecone_goed + k.basecone_fout, 0);
+      tr.innerHTML = `<td>${escapeHtml(naam)}</td><td style="font-size:13px">${klanten}</td><td style="font-size:12px">${twin || "—"}</td>
+        <td style="font-size:13px">${goedRek || "—"}</td><td>${gk.length ? `${bev} / ${verb}` : "—"}</td><td>${bcT ? `${bcG} van ${bcT}` : "—"}</td><td>${datum(laatst(rijen))}</td><td></td>`;
+    } else if (faKennisSoort === "artikel") {
+      // Rekening per klant; dezelfde code + naam bij meerdere klanten maar één keer.
+      const perRek = new Map();
+      for (const k of rijen) {
+        const s = `${k.grootboek}|${faKennisNamen[`${k.office}|${k.grootboek}`] || ""}`;
+        if (!perRek.has(s)) perRek.set(s, { k, klanten: [] });
+        perRek.get(s).klanten.push(k.office);
+      }
+      const rek = [...perRek.values()].map(({ k, klanten }) => `${faKennisRek(k.office, k.grootboek)} <span style="font-size:12px">(${escapeHtml([...new Set(klanten)].join(", "))})</span>`).join("<br>");
+      tr.innerHTML = `<td>${escapeHtml(levNaam[`${k0.office}|${k0.leverancier}`] || k0.leverancier)}</td><td>${escapeHtml(k0.voorbeeld || "")}</td>
+        <td style="font-size:13px">${rek}</td><td>${rijen.reduce((s, k) => s + k.bevestigd, 0)}</td><td>${rijen.reduce((s, k) => s + (k.verbeterd || 0), 0) || ""}</td><td>${datum(laatst(rijen))}</td><td></td>`;
     } else {
-      tr.innerHTML = `<td>${escapeHtml(k.voorbeeld || "")}${off}</td><td>${rek(k)}</td><td>${k.bevestigd}</td><td>${k.verbeterd || ""}</td>
-        <td>${escapeHtml(g.leverancier || "")}</td><td>${datum(k.laatst_gezien)}</td><td></td>`;
+      const g = k0.gegevens || {};
+      tr.innerHTML = `<td>${escapeHtml(k0.voorbeeld || "")}</td><td>${escapeHtml(k0.office)}</td><td>${faKennisRek(k0.office, k0.grootboek)}</td><td>${k0.bevestigd}</td><td>${k0.verbeterd || ""}</td>
+        <td>${escapeHtml(g.leverancier || "")}</td><td>${datum(k0.laatst_gezien)}</td><td></td>`;
     }
     const b = document.createElement("button");
     b.className = "knop stil"; b.textContent = "Vergeten"; b.style.cssText = "padding:4px 9px; font-size:12px";
     metTweedeKlik(b, "Zeker?", async () => {
-      const { error } = await sb.from("basecone_kennis").update({ actief: false }).eq("id", k.id);
+      const { error } = await sb.from("basecone_kennis").update({ actief: false }).in("id", rijen.map(k => k.id));
       if (error) { toonMelding("melding-facturen", "fout", "Vergeten mislukt: " + escapeHtml(error.message)); return; }
       laadFaKennis();
     });
@@ -4207,6 +4281,7 @@ function vernieuwFaKennis() {
   }
   if (lijst.length > 500) tbody.insertAdjacentHTML("beforeend", `<tr><td colspan="${kop.length}" class="fa-uitleg">Eerste 500 van ${lijst.length} — zoek om te verfijnen.</td></tr>`);
 }
+
 
 function kiesTab(naam) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === naam));
@@ -4496,6 +4571,7 @@ document.getElementById("fa-sorteer-zekerheid").addEventListener("click", faSort
 document.getElementById("kb-office").addEventListener("change", () => { laadFaRegels(); laadFaKennis(); });
 document.getElementById("btn-kb-ververs").addEventListener("click", laadKennisTab);
 document.getElementById("fa-kennis-zoek").addEventListener("input", vernieuwFaKennis);
+metTweedeKlik(document.getElementById("btn-kb-opruimen"), "Zeker? Klik nog eens om definitief te verwijderen", faKennisOpruimen);
 document.getElementById("btn-fa-goedkeuren").addEventListener("click", faGoedkeuren);
 document.getElementById("btn-fa-crd-ververs").addEventListener("click", faCrediteurenVerversen);
 document.getElementById("btn-fa-crd-nieuw").addEventListener("click", faNieuwCrdOpen);

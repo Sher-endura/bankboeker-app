@@ -3644,9 +3644,19 @@ function faOpmerkingen(voorleg, waarschuwingen) {
     const gedeeldD = [...x.d].some(v => y.d.has(v)), gedeeldK = [...x.k].some(v => y.k.has(v));
     return gedeeldD && gedeeldK;
   };
+  // Meldingen die Shereen nergens meer wil zien (10 okt): datumformaat / door Basecone verwisselde datum,
+  // btw-code, vervangen omschrijving, berekende of lege vervaldatum. Ook voor documenten die eerder zijn gelezen.
+  const ruis = (t) => {
+    const s = String(t || "");
+    return /MM\/DD|DD[-\/]MM|amerikaans|datumformaat|dag en maand|maand en dag|verwisseld|omgedraaid|(las|herkende|lees)\b[^.]{0,40}\b(datum|als \d)|basecone las/i.test(s) && !/(ligt|is) na de uploaddatum/i.test(s)
+      || /btw-?code|no vat/i.test(s)
+      || /omschrijving/i.test(s) && /basecone|vervang|sjabloon|opgeslagen|boekingsregel/i.test(s)
+      || /vervaldatum/i.test(s) && /leeg|berekent|uit de termijn|net ?30|days? nett?|end of (next )?month|due ?date van basecone|niet overgenomen/i.test(s);
+  };
+  if (voorleg && ruis(voorleg)) voorleg = null;
   const lijst = [];
   for (const w of waarschuwingen) {
-    if (!w || (voorleg && zelfde(w, voorleg))) continue;
+    if (!w || ruis(w) || (voorleg && zelfde(w, voorleg))) continue;
     const i = lijst.findIndex(x => zelfde(x, w));
     if (i < 0) lijst.push(w); else if (w.length > lijst[i].length) lijst[i] = w;
   }

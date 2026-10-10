@@ -536,7 +536,12 @@
   <div class="kaart">
     <h2>Basecone — inkoopfacturen</h2>
     <div id="fa-robot" class="fa-robot"></div>
-    <p style="margin:0 0 10px"><button class="knop stil" id="btn-fa-nu" style="padding:6px 12px" title="Shai wacht anders tot zijn volgende ronde (elk uur). Hij begint binnen een halve minuut.">▶ Shai nu laten draaien</button> <span id="fa-nu-melding" style="font-size:13px"></span></p>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 10px">
+      <button class="knop stil" id="btn-fa-nu" style="padding:6px 12px" title="Shai wacht anders tot zijn volgende ronde (elk uur). Hij begint binnen een halve minuut.">▶ Shai nu laten draaien</button>
+      <input type="search" id="fa-zoek" placeholder="🔍 Zoek: leverancier, factuurnr, bedrag, datum, rekening…" style="width:380px; max-width:100%" autocomplete="off" title="Zoekt in álle documenten (los van het tabje). Meerdere woorden mag: bv. compra 516">
+      <span id="fa-zoek-tal" style="font-size:13px"></span>
+      <span id="fa-nu-melding" style="font-size:13px"></span>
+    </div>
     <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</details>
     <div class="fa-balk">
       <select id="fa-office" style="width:auto"></select>
@@ -3340,7 +3345,7 @@ async function laadFacturen() {
   if (!CLOUD) { toonMelding("melding-facturen", "fout", "Het tabblad Basecone werkt alleen in cloud-modus (met inlog)."); return; }
   laadRobotStatus();
   const { data, error } = await sb.from("basecone_documenten")
-    .select("id, office, bestandsnaam, status, voorstel, goedgekeurd, opmerking, geupload_op, updated_at, nieuwe_crediteur")
+    .select("id, office, bestandsnaam, status, voorstel, goedgekeurd, opmerking, geupload_op, updated_at, nieuwe_crediteur, invul_resultaat")
     .order("updated_at", { ascending: false }).limit(500);
   if (error) {
     toonMelding("melding-facturen", "fout", /does not exist|relation|could not find the table|schema cache/i.test(error.message)
@@ -3447,7 +3452,9 @@ function vernieuwFaTabel() {
   const tbody = document.querySelector("#tabel-facturen tbody");
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
-  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
+  const zoekt = document.getElementById("fa-zoek").value.trim();
+  document.getElementById("fa-zoek-tal").textContent = zoekt ? `${lijst.length} gevonden (in alle statussen)` : "";
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
   for (const d of lijst) {
     const v = d.goedgekeurd || d.voorstel || {};
     const pnt = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
@@ -3481,13 +3488,28 @@ const faVink = new Set();
    zekerheid (Shereen 10 okt). Zonder sortering blijft de volgorde van de database (laatst bijgewerkt eerst). */
 let faSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const FA_ZEKER = { hoog: 3, middel: 2, laag: 1 };
+/* Zoeken (Shereen 10 okt): op naam, crediteur, factuurnr, bedrag, datum, omschrijving, rekening, boekstuk.
+   Alle woorden moeten voorkomen. Zoekt in álle statussen, los van het gekozen tabje. */
+function faZoektekst(d) {
+  const v = d.goedgekeurd || d.voorstel || {};
+  const b = Number(v.bedrag);
+  const bedragen = isFinite(b) && v.bedrag !== undefined && v.bedrag !== null
+    ? [faBedrag(b), b.toFixed(2), b.toFixed(2).replace(".", ","), b.toFixed(2).replace(".", "")] : [];
+  const datum = (iso) => { const x = faDatumVoluit(iso); return x ? [iso, datumNlKort(iso), x.tekst] : []; };
+  const regels = (v.regels || []).flatMap(r => [r.grootboek, faRekNamen[`${d.office}|${r.grootboek}`], r.omschrijving]);
+  const tw = d.invul_resultaat && d.invul_resultaat.twinfield;
+  return [d.bestandsnaam, d.office, d.status, v.crediteur, faCrdNamen[`${d.office}|${v.crediteur}`], d.nieuwe_crediteur && d.nieuwe_crediteur.naam,
+    v.factuurnummer, v.omschrijving, ...bedragen, ...datum(v.datum), ...datum(v.vervaldatum), ...regels, tw && tw.boekstuk, d.opmerking]
+    .filter(Boolean).join(" ").toLowerCase();
+}
 function faZichtbaar() {
   const office = document.getElementById("fa-office").value;
   const zeker = document.getElementById("fa-zekerheid").value;
+  const zoek = document.getElementById("fa-zoek").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const f = FA_FILTERS[faFilter];
   const zekerVan = (d) => ((d.goedgekeurd || d.voorstel || {}).zekerheid || "");
-  const lijst = faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status)) &&
-    (!zeker || zekerVan(d) === zeker));
+  const lijst = faDocs.filter(d => (!office || d.office === office) && (zoek.length || !f.statussen || f.statussen.includes(d.status)) &&
+    (!zeker || zekerVan(d) === zeker) && (!zoek.length || (t => zoek.every(w => /^\d{1,2}$/.test(w) ? new RegExp(`(^|\\D)${w}(\\D|$)`).test(t) : t.includes(w)))(faZoektekst(d))));
   if (faSorteer) lijst.sort((a, b) => ((FA_ZEKER[zekerVan(a)] || 0) - (FA_ZEKER[zekerVan(b)] || 0)) * (faSorteer === "af" ? -1 : 1));
   return lijst;
 }
@@ -4467,6 +4489,8 @@ addEventListener("resize", faHoogte);
 })();
 document.getElementById("fa-office").addEventListener("change", () => { vernieuwFaFilters(); vernieuwFaTabel(); });
 document.getElementById("fa-zekerheid").addEventListener("change", vernieuwFaTabel);
+let faZoekKlok = null;
+document.getElementById("fa-zoek").addEventListener("input", () => { clearTimeout(faZoekKlok); faZoekKlok = setTimeout(vernieuwFaTabel, 200); });
 document.getElementById("btn-fa-nu").addEventListener("click", faNuDraaien);
 document.getElementById("fa-sorteer-zekerheid").addEventListener("click", faSorteerZekerheid);
 document.getElementById("kb-office").addEventListener("change", () => { laadFaRegels(); laadFaKennis(); });

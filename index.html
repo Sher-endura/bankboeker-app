@@ -58,6 +58,8 @@
   #tabel-facturen tbody tr { cursor: pointer; } #tabel-facturen tbody tr:hover { background: #eef5fb; }
   #tabel-facturen tbody tr.gekozen { background: #dcebf8; }
   #tabel-facturen .fa-vink { width: 34px; text-align: center; cursor: default; }
+  #tabel-facturen th.fa-sorteer { cursor: pointer; user-select: none; white-space: nowrap; }
+  #tabel-facturen th.fa-sorteer:hover { color: var(--blauw); }
   #tabel-facturen .fa-vink input { width: 17px; height: 17px; cursor: pointer; }
   .fa-bulk { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--tekst); }
   .fa-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #fff; background: #4b5563; }
@@ -530,6 +532,9 @@
     <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</details>
     <div class="fa-balk">
       <select id="fa-office" style="width:auto"></select>
+      <select id="fa-zekerheid" style="width:auto" title="Alleen documenten met deze zekerheid tonen">
+        <option value="">Alle zekerheden</option><option value="hoog">Zekerheid hoog</option><option value="middel">Zekerheid middel</option><option value="laag">Zekerheid laag</option>
+      </select>
       <span id="fa-filters"></span>
       <button class="knop stil" id="btn-fa-ververs" style="padding:6px 12px">↻ Verversen</button>
     </div>
@@ -543,7 +548,7 @@
   <div class="fa-split" id="fa-split">
     <div class="kaart">
       <table id="tabel-facturen">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th>Zekerheid</th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th id="fa-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde">Zekerheid <span id="fa-sorteer-pijl"></span></th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -3373,9 +3378,8 @@ function vernieuwFaFilters() {
 }
 function vernieuwFaTabel() {
   const tbody = document.querySelector("#tabel-facturen tbody");
-  const office = document.getElementById("fa-office").value;
-  const f = FA_FILTERS[faFilter];
-  const lijst = faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status)));
+  const lijst = faZichtbaar();
+  document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
   for (const d of lijst) {
     const v = d.goedgekeurd || d.voorstel || {};
@@ -3404,10 +3408,23 @@ function vernieuwFaTabel() {
    de voorstellen in de huidige lijst; een document op "voorleggen" vink je bewust los aan. */
 const FA_BEOORDELEN = ["voorstel", "voorleggen"];
 const faVink = new Set();
+/* Wat de lijst links toont: administratie + statusfilter + zekerheidsfilter, eventueel gesorteerd op
+   zekerheid (Shereen 10 okt). Zonder sortering blijft de volgorde van de database (laatst bijgewerkt eerst). */
+let faSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
+const FA_ZEKER = { hoog: 3, middel: 2, laag: 1 };
 function faZichtbaar() {
   const office = document.getElementById("fa-office").value;
+  const zeker = document.getElementById("fa-zekerheid").value;
   const f = FA_FILTERS[faFilter];
-  return faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status)));
+  const zekerVan = (d) => ((d.goedgekeurd || d.voorstel || {}).zekerheid || "");
+  const lijst = faDocs.filter(d => (!office || d.office === office) && (!f.statussen || f.statussen.includes(d.status)) &&
+    (!zeker || zekerVan(d) === zeker));
+  if (faSorteer) lijst.sort((a, b) => ((FA_ZEKER[zekerVan(a)] || 0) - (FA_ZEKER[zekerVan(b)] || 0)) * (faSorteer === "af" ? -1 : 1));
+  return lijst;
+}
+function faSorteerZekerheid() {
+  faSorteer = faSorteer === null ? "af" : faSorteer === "af" ? "op" : null;
+  vernieuwFaTabel();
 }
 function faBulkStand() {
   for (const id of [...faVink]) if (!faDocs.some(d => d.id === id && FA_BEOORDELEN.includes(d.status))) faVink.delete(id);
@@ -4301,6 +4318,8 @@ addEventListener("resize", faHoogte);
   sch.addEventListener("dblclick", () => { split.style.removeProperty("--fa-links"); try { localStorage.removeItem(SLEUTEL); } catch (e) {} });
 })();
 document.getElementById("fa-office").addEventListener("change", () => { vernieuwFaFilters(); vernieuwFaTabel(); });
+document.getElementById("fa-zekerheid").addEventListener("change", vernieuwFaTabel);
+document.getElementById("fa-sorteer-zekerheid").addEventListener("click", faSorteerZekerheid);
 document.getElementById("kb-office").addEventListener("change", () => { laadFaRegels(); laadFaKennis(); });
 document.getElementById("btn-kb-ververs").addEventListener("click", laadKennisTab);
 document.getElementById("fa-kennis-zoek").addEventListener("input", vernieuwFaKennis);

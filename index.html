@@ -82,6 +82,8 @@
   .fa-crd-naam { position: absolute; left: 5.2em; right: 2.2em; top: 50%; transform: translateY(-50%); pointer-events: none;
     font-size: 14px; color: var(--tekst); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .fa-crd-naam.onbekend { color: var(--rood, #b42318); font-weight: 600; }
+  .fa-crd-naam.nieuw { color: var(--paars); font-weight: 600; }
+  .fa-nieuw-crd { border: 1px solid var(--paars); border-radius: 6px; background: #f6f1fc; padding: 10px 12px; margin: 8px 0; font-size: 13px; color: var(--tekst); }
   .fa-keuzelijst { position: fixed; z-index: 150; background: #fff; border: 1px solid var(--rand); border-radius: 6px;
     box-shadow: 0 6px 18px rgba(0,0,0,.15); overflow-y: auto; font-size: 14px; color: var(--tekst); }
   .fa-keuzelijst div { padding: 6px 10px; cursor: pointer; display: flex; gap: 10px; }
@@ -554,8 +556,31 @@
         </p>
         <div id="melding-fa-detail"></div>
         <div class="rij">
-          <div><label>Crediteur * <button type="button" class="knop stil" id="btn-fa-crd-ververs" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Net een crediteur aangemaakt in Twinfield? Haal de lijst opnieuw op.">↻ Crediteuren uit Twinfield</button></label><div class="fa-crd-vak"><input type="text" id="fa-crediteur" placeholder="bv. C0197 of een naam" autocomplete="off"><span id="fa-crediteur-naam" class="fa-crd-naam"></span></div></div>
+          <div><label>Crediteur * <button type="button" class="knop stil" id="btn-fa-crd-ververs" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Net een crediteur aangemaakt in Twinfield? Haal de lijst opnieuw op.">↻ Crediteuren uit Twinfield</button><button type="button" class="knop stil" id="btn-fa-crd-nieuw" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Staat de leverancier er nog niet in? Shai maakt hem aan in Basecone.">＋ Nieuwe crediteur</button></label><div class="fa-crd-vak"><input type="text" id="fa-crediteur" placeholder="bv. C0197 of een naam" autocomplete="off"><span id="fa-crediteur-naam" class="fa-crd-naam"></span></div></div>
           <div><label>Factuurnummer *</label><input type="text" id="fa-factuurnummer"></div>
+        </div>
+        <div id="fa-nieuw-crd" class="fa-nieuw-crd" style="display:none">
+          <div id="fa-nc-stand"></div>
+          <div id="fa-nc-velden">
+            <b>Nieuwe crediteur — Shai maakt hem aan in Basecone</b>
+            <p class="fa-uitleg" style="margin:4px 0 8px">Het nummer kiest Basecone zelf (het eerstvolgende vrije C-nummer). Je kunt het document daarna meteen goedkeuren: Shai maakt eerst de crediteur aan en vult dan het document in.</p>
+            <div class="rij">
+              <div style="flex:2"><label>Naam *</label><input type="text" id="fa-nc-naam" maxlength="80"></div>
+              <div style="flex:1"><label>Vervaldagen *</label><input type="text" id="fa-nc-dagen" value="30" inputmode="numeric"></div>
+            </div>
+            <div class="rij">
+              <div style="flex:2"><label>Adres</label><input type="text" id="fa-nc-adres"></div>
+              <div style="flex:1"><label>Plaats</label><input type="text" id="fa-nc-plaats"></div>
+            </div>
+            <div class="rij">
+              <div><label>Telefoon</label><input type="text" id="fa-nc-telefoon"></div>
+              <div><label>E-mail</label><input type="text" id="fa-nc-email"></div>
+            </div>
+            <p style="margin:8px 0 0">
+              <button type="button" class="knop" id="btn-fa-nc-aanvragen">Aanvragen bij Shai</button>
+              <button type="button" class="knop stil" id="btn-fa-nc-sluiten">Annuleren</button>
+            </p>
+          </div>
         </div>
         <datalist id="fa-crediteuren"></datalist>
         <div class="rij">
@@ -692,7 +717,8 @@ async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     toonLogin();
-    if (doorgeefFout) toonMelding("melding-login", "fout", escapeHtml(doorgeefFout));
+    if (doorgeefFout === "BEZIG") toonMelding("melding-login", "ok", "Bezig met inloggen via E-Board…");
+    else if (doorgeefFout) toonMelding("melding-login", "fout", escapeHtml(doorgeefFout));
     return false;
   }
   gebruiker = session.user;
@@ -724,18 +750,35 @@ async function doorgeefbriefjeInwisselen() {
   const m = location.hash.match(/doorgeven=([^&]+)/);
   if (!m) return null;
   history.replaceState(null, "", location.pathname + location.search);
-  try {
-    const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/doorgeven`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ actie: "inwisselen", code: decodeURIComponent(m[1]) }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.token_hash) return j.fout || `Inloggen via E-Board lukte niet (HTTP ${r.status}).`;
-    const { error } = await sb.auth.verifyOtp({ token_hash: j.token_hash, type: "magiclink" });
-    return error ? "Inloggen via E-Board lukte niet: " + error.message : null;
-  } catch (e) {
-    return "Inloggen via E-Board lukte niet: " + e.message;
-  }
+  const code = decodeURIComponent(m[1]);
+  // E-Board meldt de code aan op het moment van klikken; dat kan een paar tellen duren.
+  // 410 = (nog) onbekend → opnieuw proberen. Klaar = ingelogd of een echte weigering.
+  const poging = async () => {
+    try {
+      const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/doorgeven`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actie: "inwisselen", code }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.status === 410) return { klaar: false };
+      if (!r.ok || !j.token_hash) return { klaar: true, fout: j.fout || `Inloggen via E-Board lukte niet (HTTP ${r.status}).` };
+      const { error } = await sb.auth.verifyOtp({ token_hash: j.token_hash, type: "magiclink" });
+      return { klaar: true, fout: error ? "Inloggen via E-Board lukte niet: " + error.message : null };
+    } catch (e) { return { klaar: false }; }
+  };
+  const eerste = await poging();
+  if (eerste.klaar) return eerste.fout;
+  // Nog niet binnen: inlogscherm tonen met "bezig", en op de achtergrond doorproberen (±12 s).
+  // Lukt het, dan herlaadt de pagina vanzelf (SIGNED_IN terwijl het inlogscherm open staat).
+  (async () => {
+    for (let i = 0; i < 16; i++) {
+      await new Promise(ok => setTimeout(ok, 750));
+      const p = await poging();
+      if (p.klaar) { if (p.fout) toonMelding("melding-login", "fout", escapeHtml(p.fout)); return; }
+    }
+    toonMelding("melding-login", "fout", "Automatisch inloggen via E-Board lukte niet (staat tweestapsverificatie aan in E-Board?). Log hier gewoon in.");
+  })();
+  return "BEZIG";
 }
 async function laadProfielen() {
   if (CLOUD) {
@@ -3428,9 +3471,95 @@ function faCrediteurNaam() {
   const code = document.getElementById("fa-crediteur").value.trim().toUpperCase();
   const vak = document.getElementById("fa-crediteur-naam");
   const c = faStam.CRD.find(x => x.code === code);
-  vak.textContent = !code ? "" : c ? c.naam : (faStam.CRD.length ? "onbekende crediteur" : "");
-  vak.classList.toggle("onbekend", !!code && !c && faStam.CRD.length > 0);
+  const nc = faGekozen && faGekozen.nieuwe_crediteur;
+  // Aangevraagde of net door Shai aangemaakte crediteur (staat nog niet in de Twinfield-lijst).
+  const nieuw = !c && nc && ((code === "NIEUW" && nc.status !== "aangemaakt") || (nc.code && code === nc.code));
+  vak.textContent = !code ? "" : c ? c.naam : nieuw ? (code === "NIEUW" ? `nieuw: ${nc.naam}` : `${nc.naam} (nieuw)`) : (faStam.CRD.length ? "onbekende crediteur" : "");
+  vak.classList.toggle("onbekend", !!code && !c && !nieuw && faStam.CRD.length > 0);
+  vak.classList.toggle("nieuw", !!nieuw);
   document.getElementById("fa-crediteur").title = c ? `${c.code} ${c.naam}` : "";
+}
+/* Nieuwe crediteur (database-update 6): de aanvraag staat in basecone_documenten.nieuwe_crediteur;
+   Shai maakt hem in zijn ronde aan in Basecone (nummer kiest Basecone) en zet het nummer terug. */
+const faNorm = (t) => String(t || "").toLowerCase().replace(/[^a-z]+/g, " ").replace(/\b(bv|b v|nv|n v|vba|inc|ltd|llc|corp)\b/g, " ").replace(/\s+/g, "");
+function faNieuwCrdToon() {
+  const d = faGekozen; if (!d) return;
+  const nc = d.nieuwe_crediteur;
+  const paneel = document.getElementById("fa-nieuw-crd"), stand = document.getElementById("fa-nc-stand");
+  const beoordelen = ["voorstel", "voorleggen", "fout"].includes(d.status);
+  document.getElementById("btn-fa-crd-nieuw").style.display = beoordelen && !nc ? "" : "none";
+  document.getElementById("fa-nc-velden").style.display = "none";
+  stand.innerHTML = "";
+  paneel.style.display = nc ? "" : "none";
+  if (!nc) return;
+  const wat = `<b>${escapeHtml(nc.naam)}</b> (vervaldagen ${escapeHtml(String(nc.vervaldagen))}${nc.adres ? ", " + escapeHtml(nc.adres) : ""}${nc.plaats ? ", " + escapeHtml(nc.plaats) : ""})`;
+  if (nc.status === "aangemaakt") {
+    stand.innerHTML = `✓ Nieuwe crediteur ${wat} is door Shai aangemaakt in Basecone als <b>${escapeHtml(nc.code)}</b>${nc.aangemaakt_op ? " op " + escapeHtml(new Date(nc.aangemaakt_op).toLocaleString("nl-NL", { timeZone: "America/Aruba" })) : ""}. Staat hij nog niet in de lijst? Klik op ↻ Crediteuren uit Twinfield.`;
+    return;
+  }
+  stand.innerHTML = nc.status === "fout"
+    ? `<span class="fa-fout">Aanmaken van nieuwe crediteur ${wat} mislukt: ${escapeHtml(nc.fout || "onbekende fout")}</span>`
+    : `Nieuwe crediteur ${wat} aangevraagd${nc.aangevraagd_door ? " door " + escapeHtml(nc.aangevraagd_door) : ""}. Shai maakt hem aan bij zijn volgende ronde. In het crediteurveld staat zolang <b>NIEUW</b>; je kunt het document gewoon goedkeuren.`;
+  if (!beoordelen) return;
+  const knoppen = document.createElement("p"); knoppen.style.margin = "8px 0 0";
+  if (nc.status === "fout") {
+    const b = document.createElement("button"); b.className = "knop"; b.textContent = "Opnieuw proberen";
+    b.addEventListener("click", () => faNieuwCrdOpslaan({ ...nc, status: "aangevraagd", fout: null }, "crediteur opnieuw aangevraagd"));
+    knoppen.appendChild(b);
+  }
+  const weg = document.createElement("button"); weg.className = "knop stil"; weg.textContent = "Aanvraag intrekken"; weg.style.marginLeft = "6px";
+  metTweedeKlik(weg, "Zeker? Klik nog eens", async () => {
+    if (document.getElementById("fa-crediteur").value.trim().toUpperCase() === "NIEUW") document.getElementById("fa-crediteur").value = "";
+    await faNieuwCrdOpslaan(null, "crediteur-aanvraag ingetrokken");
+  });
+  knoppen.appendChild(weg);
+  stand.appendChild(knoppen);
+}
+function faNieuwCrdOpen() {
+  const d = faGekozen; if (!d) return;
+  const a = d.ai || {};
+  document.getElementById("fa-nieuw-crd").style.display = "";
+  document.getElementById("fa-nc-velden").style.display = "";
+  document.getElementById("btn-fa-crd-nieuw").style.display = "none";
+  const naam = document.getElementById("fa-nc-naam");
+  naam.value = (a.leverancier_naam || (d.bestandsnaam || "").replace(/[0-9 ,./-]+$/, "")).trim();
+  for (const id of ["fa-nc-adres", "fa-nc-plaats", "fa-nc-telefoon", "fa-nc-email"]) document.getElementById(id).value = "";
+  document.getElementById("fa-nc-dagen").value = "30";
+  naam.focus(); naam.select();
+}
+function faNieuwCrdSluiten() {
+  document.getElementById("fa-nc-velden").style.display = "none";
+  faNieuwCrdToon();
+}
+async function faNieuwCrdAanvragen() {
+  const d = faGekozen; if (!d) return;
+  const waarde = (id) => document.getElementById(id).value.trim();
+  const naam = waarde("fa-nc-naam"), dagen = waarde("fa-nc-dagen");
+  const fouten = [];
+  if (!naam) fouten.push("naam ontbreekt");
+  if (!/^\d{1,3}$/.test(dagen)) fouten.push("vervaldagen moet een getal zijn (bv. 30)");
+  const bestaat = naam && faStam.CRD.find(x => faNorm(x.naam) === faNorm(naam));
+  if (bestaat) fouten.push(`deze crediteur bestaat al: ${bestaat.code} ${bestaat.naam} — kies die in het crediteurveld`);
+  if (fouten.length) { toonMelding("melding-fa-detail", "fout", "Nog niet goed: " + escapeHtml(fouten.join("; ")) + "."); return; }
+  const nc = {
+    naam, vervaldagen: Number(dagen), adres: waarde("fa-nc-adres") || null, plaats: waarde("fa-nc-plaats") || null,
+    telefoon: waarde("fa-nc-telefoon") || null, email: waarde("fa-nc-email") || null,
+    status: "aangevraagd", code: null, aangevraagd_door: gebruiker ? gebruiker.email : null, aangevraagd_op: new Date().toISOString(),
+  };
+  document.getElementById("fa-crediteur").value = "NIEUW";
+  await faNieuwCrdOpslaan(nc, "crediteur aangevraagd");
+}
+async function faNieuwCrdOpslaan(nc, logActie) {
+  const d = faGekozen; if (!d) return;
+  const wie = gebruiker ? gebruiker.email : null;
+  const { error } = await sb.from("basecone_documenten").update({ nieuwe_crediteur: nc, updated_by: wie }).eq("id", d.id);
+  if (error) { toonMelding("melding-fa-detail", "fout", "Opslaan mislukt: " + escapeHtml(error.message)); return; }
+  await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: logActie, details: nc ? { naam: nc.naam } : {}, door: wie });
+  d.nieuwe_crediteur = nc;
+  faNieuwCrdToon();
+  faCrediteurNaam();
+  toonMelding("melding-fa-detail", "ok", nc ? "Aangevraagd. Shai maakt de crediteur aan bij zijn volgende ronde — je kunt het document nu al goedkeuren." : "Aanvraag ingetrokken.");
+  const rij = faDocs.find(x => x.id === d.id); if (rij) { rij.nieuwe_crediteur = nc; vernieuwFaTabel(); }
 }
 async function faCrediteurenVerversen() {
   const d = faGekozen; if (!d) return;

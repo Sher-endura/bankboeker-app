@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Bankboeker — Endura Accounting &amp; Advisory</title>
+<title>Shai Booking — Endura Accounting &amp; Advisory</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
     --blauw: #1c6fb8; --blauw-d: #145089; --grijs: #f4f6f8; --rand: #d9dee3;
@@ -11,9 +14,11 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: var(--tekst); background: var(--grijs); }
-  header { background: var(--blauw); color: #fff; padding: 10px 20px; display: flex; align-items: center; gap: 16px; }
-  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
-  header .sub { font-size: 12px; opacity: .85; }
+  /* Rebranding Shai Booking (Shereen 11 okt): witte kopbalk met het logo. */
+  header { background: #fff; color: var(--tekst); padding: 6px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--rand); }
+  header h1 { margin: 0; line-height: 0; }
+  header h1 img { height: 44px; width: auto; }
+  header .sub { font-size: 12px; color: var(--tekst); }
   nav { background: #fff; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
   nav button { border: none; background: none; padding: 12px 16px; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; color: var(--tekst); }
   .subnav { background: #f3f6fa; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
@@ -171,7 +176,7 @@
 </head>
 <body>
 <header>
-  <h1>Bankboeker</h1>
+  <h1><img src="shai-logo.png" alt="Shai Booking by Endura"></h1>
   <span class="sub">vraagposten → grootboek · via DirectLink Data Link · v4.1-web</span>
   <span style="flex:1"></span>
   <span class="sub" id="kop-klant"></span>
@@ -757,12 +762,12 @@
   </div>
   <div class="fa-vergroting-vak" id="fa-vergroting-vak"><img id="fa-vergroting-img" alt="scan"></div>
 </div>
-<footer>Bankboeker <b>v4.1-web</b> (10-10-2026) · <span id="voet-modus">lokale modus</span> · Endura Accounting &amp; Advisory</footer>
+<footer>Shai Booking <b>v4.1-web</b> (10-10-2026) · <span id="voet-modus">lokale modus</span> · Endura Accounting &amp; Advisory</footer>
 
 <!-- ============ LOGIN-OVERLAY (alleen in cloud-modus) ============ -->
 <div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--grijs); z-index:100; align-items:center; justify-content:center;">
   <div class="kaart" style="max-width:380px; text-align:left; padding:32px;">
-    <h2 style="margin-bottom:6px; text-align:center">Bankboeker</h2>
+    <h2 style="margin-bottom:6px; text-align:center"><img src="shai-logo.png" alt="Shai Booking by Endura" style="height:72px; width:auto"></h2>
     <p class="hint" style="margin-bottom:22px; text-align:center">Endura Accounting &amp; Advisory — log in met je werkaccount.</p>
     <form id="login-form">
       <label>E-mailadres</label>

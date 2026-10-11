@@ -110,6 +110,16 @@
   .fa-form label { display: block; font-size: 12px; font-weight: 600; color: var(--tekst); margin: 8px 0 3px; }
   .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
   .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
+  .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
+  #tabel-bank td { vertical-align: top; font-size: 13px; }
+  #tabel-bank tr.bk-kop td { background: var(--grijs); font-weight: 600; font-size: 13px; }
+  #tabel-bank tr.bk-rij { cursor: pointer; } #tabel-bank tr.bk-rij:hover td { background: #f3f6fa; }
+  #tabel-bank tr.gekozen td { background: #eaf1fb; }
+  #tabel-bank .bk-oms { max-width: 360px; }
+  #tabel-bank .bk-uitleg { max-width: 380px; line-height: 1.4; }
+  .bk-detail td { background: #fbfcfe; border-bottom: 2px solid var(--blauw); }
+  .bk-detail .rij > div { min-width: 200px; }
+  .bk-zeker.hoog { color: var(--groen); font-weight: 600; } .bk-zeker.middel { color: var(--oranje); font-weight: 600; } .bk-zeker.laag { color: var(--rood); font-weight: 600; }
   .fa-voorleg { background: #fff4e0; border-left: 4px solid var(--oranje); border-radius: 6px; padding: 10px 14px; margin: 8px 0; font-size: 14px; color: var(--tekst); line-height: 1.5; }
   .fa-punten { margin: 8px 0; padding-left: 0; list-style: none; font-size: 14px; color: var(--tekst); line-height: 1.5; }
   .fa-punten li { position: relative; padding: 7px 0 7px 22px; border-bottom: 1px solid var(--rand); }
@@ -147,6 +157,7 @@
   <button data-tab="regels">Boekingsregels</button>
   <button data-tab="herhaal">📅 Herhaal</button>
   <button data-tab="facturen">🧾 Basecone</button>
+  <button data-tab="bank">🏦 Bank</button>
   <button data-tab="kennis">🧠 Knowledgebase Shai</button>
 </nav>
 <main>
@@ -642,6 +653,35 @@
 </section>
 
 <!-- ============ TAB: KNOWLEDGEBASE SHAI (wat de Basecone-robot weet) ============ -->
+<section id="tab-bank" style="display:none">
+  <div class="kaart">
+    <h2>Bank — Shai in de Twinfield-bankmodule</h2>
+    <div id="bk-robot" class="fa-robot"></div>
+    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 10px">
+      <button class="knop stil" id="btn-bk-nu" style="padding:6px 12px" title="Shai begint binnen een halve minuut aan een ronde in Twinfield.">▶ Shai nu laten draaien</button>
+      <input type="search" id="bk-zoek" placeholder="🔍 Zoek: omschrijving, bedrag, rekening, afschrift…" style="width:380px; max-width:100%" autocomplete="off">
+      <span id="bk-nu-melding" style="font-size:13px"></span>
+    </div>
+    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Shai leest in Twinfield (Kas &amp; Banken → Bankafschriftverwerking) de uitstaande afschriften. Per bankregel zie je hier wat <b>Twinfield</b> zelf voorstelt en wat Shai in de <b>historie</b> van de bankdagboeken vond (de recentste boeking telt). Zijn die het eens, dan is de zekerheid hoog; spreken ze elkaar tegen, dan legt Shai de regel aan je voor. Jij keurt goed (één voor één of met de vinkjes) — pas dán wijst Shai de regel in Twinfield toe. Is een afschrift helemaal toegewezen, dan drukt hij op <b>Verwerken</b>; het boekstuk blijft <b>concept</b>. Regels die via een klant of leverancier moeten (zonder voorstel van Twinfield) wijs je zelf in Twinfield toe.</details>
+    <div class="fa-balk">
+      <select id="bk-office" style="width:auto"></select>
+      <span id="bk-filters"></span>
+      <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px">↻ Verversen</button>
+    </div>
+    <div class="fa-bulk" id="bk-bulk" style="display:none">
+      <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
+      <span id="bk-bulk-tekst"></span>
+    </div>
+    <div id="melding-bank"></div>
+    <div style="overflow-x:auto">
+      <table id="tabel-bank">
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Datum</th><th>Bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th>Bron</th><th>Zekerheid</th><th>Uitleg</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
 <section id="tab-kennis" style="display:none">
   <div class="kaart">
     <h2>Knowledgebase Shai</h2>
@@ -963,7 +1003,7 @@ function naamWoorden(omschrijving) {
   let d = (omschrijving || "").toUpperCase();
   d = d.replace(/\bI\.?\s*F\.?\s*O\.?/g, " ");            // "in favor of" = ten gunste van
   const soort = soortVan(d);
-  if (soort) d = d.replace(soort.her, " ");
+  if (soort) d = d.replace(new RegExp(`(?:${soort.her.source})[A-Z]*`, "g"), " ");   // heel woord: "SALARIS", niet "SALAR" + "IS"
   d = d.replace(/[0-9]+/g, " ").replace(/[^A-Z ]/g, " ").replace(/ +/g, " ").trim();
   return d.split(" ").filter(w => w.length > 1 && !OMS_RUIS.has(w));
 }
@@ -4295,12 +4335,238 @@ function vernieuwFaKennis() {
 }
 
 
+/* ================= 🏦 Bank — Shai in de Twinfield-bankmodule =================
+   Besluit Shereen 10 okt 2026: Shai werkt in Kas & Banken → Bankafschriftverwerking (niet vanuit
+   2999), als Endura_AI, start VLINDER. Hij leest de uitstaande afschriften (robot/bank.mjs) en zet
+   per regel een voorstel in public.bank_regels (database-update 7). Hier keurt een medewerker goed;
+   daarna wijst Shai toe in Twinfield en verwerkt het afschrift als het helemaal toegewezen is
+   (concept). goedgekeurd = {soort: "twinfield"} (Twinfields voorstel accepteren) of
+   {soort: "grootboek", regels: [{rekening, bedrag}], omschrijving}. */
+const BK_FILTERS = {
+  beoordelen: { tekst: "Te beoordelen", statussen: ["voorstel", "voorleggen"] },
+  voorleggen: { tekst: "Alleen voorleggen", statussen: ["voorleggen"] },
+  robot: { tekst: "Wacht op Shai", statussen: ["goedgekeurd"] },
+  klaar: { tekst: "Toegewezen / verwerkt", statussen: ["toegewezen", "verwerkt"] },
+  fout: { tekst: "Fout", statussen: ["fout"] },
+  overgeslagen: { tekst: "Overgeslagen", statussen: ["overgeslagen"] },
+  alles: { tekst: "Alles", statussen: null },
+};
+const BK_STATUS_TEKST = { voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "wacht op Shai", toegewezen: "toegewezen",
+  verwerkt: "verwerkt (concept)", fout: "fout", overgeslagen: "overgeslagen" };
+const BK_BEOORDELEN = ["voorstel", "voorleggen"];
+let bkRegels = [], bkFilter = "beoordelen", bkGekozen = null, bkRekNamen = {};
+const bkVink = new Set();
+const bkZeker = (z) => (z >= 85 ? "hoog" : z >= 60 ? "middel" : "laag");
+const bkRekTekst = (office, r) => `<b>${escapeHtml(r.rekening || "")}</b> ${escapeHtml(r.naam || bkRekNamen[`${office}|${r.rekening}`] || "")}` +
+  (r.relatie ? ` <span>· ${escapeHtml(r.relatie)} ${escapeHtml(r.relatienaam || "")}</span>` : "") +
+  (r.factuur ? ` <span>· factuur ${escapeHtml(r.factuur)}</span>` : "");
+
+async function laadBank() {
+  if (!CLOUD) { toonMelding("melding-bank", "fout", "Het tabblad Bank werkt alleen in cloud-modus (met inlog)."); return; }
+  laadBankStatus();
+  const { data, error } = await sb.from("bank_regels")
+    .select("id, office, bank_code, afschrift, sub_id, regel, datum, bedrag, valuta, omschrijving, twinfield_bak, status, voorstel, goedgekeurd, goedgekeurd_door, opmerking, boekstuk, updated_at")
+    .order("afschrift", { ascending: true }).order("regel", { ascending: true }).limit(2000);
+  if (error) {
+    toonMelding("melding-bank", "fout", /does not exist|could not find the table|schema cache/i.test(error.message)
+      ? "De database is nog niet klaar: database-update 7 moet nog gedraaid worden." : "Kan de bankregels niet laden: " + escapeHtml(error.message));
+    return;
+  }
+  document.getElementById("melding-bank").innerHTML = "";
+  bkRegels = data || [];
+  const offices = [...new Set(bkRegels.map(r => r.office))].sort();
+  if (offices.length) {
+    const { data: st } = await sb.from("twinfield_stamdata").select("office, data").eq("soort", "BAS").in("office", offices);
+    bkRekNamen = {};
+    for (const rij of st || []) for (const x of rij.data || []) bkRekNamen[`${rij.office}|${x.code}`] = x.naam;
+  }
+  const kies = document.getElementById("bk-office"), vorige = kies.value;
+  kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
+  vernieuwBkFilters();
+  vernieuwBkTabel();
+}
+async function laadBankStatus() {
+  const vak = document.getElementById("bk-robot");
+  const { data } = await sb.from("robot_status").select("*").eq("id", "bank").maybeSingle();
+  if (!data) { vak.className = "fa-robot"; vak.textContent = "Shai heeft zich in de bankmodule nog niet gemeld."; return; }
+  const minuten = Math.round((Date.now() - new Date(data.laatste_hartslag).getTime()) / 60000);
+  const soort = ["inloggen_nodig", "fout", "gestopt"].includes(data.status) ? "slecht" : minuten > 75 ? "let" : "goed";
+  const tekst = { werkt: "aan het werk", wacht: "wacht op de volgende ronde", inloggen_nodig: "moet inloggen op Twinfield", fout: "fout", gestopt: "gestopt" }[data.status] || data.status;
+  vak.className = "fa-robot " + soort;
+  vak.innerHTML = `<b>Shai (bank): ${escapeHtml(tekst)}</b>${data.bericht ? " — " + escapeHtml(data.bericht) : ""} · laatst gemeld ${minuten < 1 ? "net" : minuten + " min geleden"}`;
+}
+async function bkNuDraaien() {
+  const knop = document.getElementById("btn-bk-nu"), m = document.getElementById("bk-nu-melding");
+  knop.disabled = true;
+  const { error } = await sb.from("bank_log").insert({ actie: "nu draaien", door: gebruiker ? gebruiker.email : null });
+  m.textContent = error ? "Lukte niet: " + error.message : "Gevraagd — Shai begint binnen een halve minuut (als zijn Twinfield-venster open en ingelogd is).";
+  setTimeout(() => { knop.disabled = false; laadBankStatus(); }, 30000);
+}
+function bkZichtbaar() {
+  const office = document.getElementById("bk-office").value;
+  const zoek = document.getElementById("bk-zoek").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const f = BK_FILTERS[bkFilter];
+  const tekst = (r) => { const v = r.goedgekeurd && r.goedgekeurd.regels ? r.goedgekeurd : r.voorstel || {};
+    return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
+      ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam])].filter(Boolean).join(" ").toLowerCase(); };
+  return bkRegels.filter(r => (!office || r.office === office) && (zoek.length || !f.statussen || f.statussen.includes(r.status)) &&
+    (!zoek.length || zoek.every(w => tekst(r).includes(w))));
+}
+function vernieuwBkFilters() {
+  const vak = document.getElementById("bk-filters"), office = document.getElementById("bk-office").value;
+  vak.innerHTML = "";
+  for (const [sleutel, f] of Object.entries(BK_FILTERS)) {
+    const aantal = bkRegels.filter(r => (!office || r.office === office) && (!f.statussen || f.statussen.includes(r.status))).length;
+    const b = document.createElement("button");
+    b.className = "fa-filter" + (sleutel === bkFilter ? " actief" : "");
+    b.textContent = `${f.tekst} (${aantal})`;
+    b.addEventListener("click", () => { bkFilter = sleutel; bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel(); });
+    vak.appendChild(b);
+  }
+}
+/* Wat goedgekeurd zou worden als je het voorstel ongewijzigd overneemt (ook bij de vinkjes). */
+function bkStandaardGoedkeuring(r) {
+  const v = r.voorstel || {};
+  if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield" };
+  if (v.soort === "grootboek" && v.regels && v.regels.length === 1 && v.regels[0].rekening)
+    return { soort: "grootboek", regels: [{ rekening: v.regels[0].rekening, bedrag: Number(r.bedrag) }], omschrijving: v.omschrijving || "" };
+  return null;
+}
+function vernieuwBkTabel() {
+  const tbody = document.querySelector("#tabel-bank tbody");
+  const lijst = bkZichtbaar();
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
+  let vorigAfschrift = "";
+  for (const r of lijst) {
+    const afs = `${r.office} · ${r.bank_code} ${r.afschrift}${r.sub_id > 1 ? "/" + r.sub_id : ""}`;
+    if (afs !== vorigAfschrift) {
+      vorigAfschrift = afs;
+      const n = bkRegels.filter(x => x.office === r.office && x.bank_code === r.bank_code && x.afschrift === r.afschrift && x.sub_id === r.sub_id);
+      const klaar = n.filter(x => ["goedgekeurd", "toegewezen", "verwerkt"].includes(x.status)).length;
+      tbody.insertAdjacentHTML("beforeend", `<tr class="bk-kop"><td colspan="9">Afschrift ${escapeHtml(afs)} — ${klaar} van ${n.length} regels goedgekeurd of toegewezen${n.find(x => x.boekstuk) ? ` · boekstuk ${escapeHtml(n.find(x => x.boekstuk).boekstuk)}` : ""}</td></tr>`);
+    }
+    const v = r.goedgekeurd && r.goedgekeurd.regels ? { ...r.voorstel, ...r.goedgekeurd } : r.voorstel || {};
+    const z = Number((r.voorstel || {}).zekerheid || 0);
+    const kanVink = BK_BEOORDELEN.includes(r.status) && bkStandaardGoedkeuring(r);
+    const tr = document.createElement("tr");
+    tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
+    tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>
+      <td><span class="fa-status ${escapeHtml(r.status)}">${escapeHtml(BK_STATUS_TEKST[r.status] || r.status)}</span></td>
+      <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
+      <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
+      <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}</td>
+      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
+      <td>${escapeHtml({ twinfield: "Twinfield", historie: "historie", geen: "—" }[(r.voorstel || {}).bron] || "")}</td>
+      <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
+      <td class="bk-uitleg">${escapeHtml(r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "")}${escapeHtml((r.voorstel || {}).uitleg || "")}</td>`;
+    tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink")) { bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel(); } });
+    const vink = tr.querySelector(".bk-vink-rij");
+    if (vink) vink.addEventListener("change", () => { vink.checked ? bkVink.add(r.id) : bkVink.delete(r.id); bkBulkStand(); });
+    tbody.appendChild(tr);
+    if (bkGekozen === r.id) tbody.appendChild(bkDetailRij(r));
+  }
+  bkBulkStand();
+}
+/* Het uitklapvak onder een regel: Twinfields voorstel accepteren, of zelf een grootboekrekening kiezen. */
+function bkDetailRij(r) {
+  const v = r.voorstel || {};
+  const g = r.goedgekeurd || {};
+  const tr = document.createElement("tr");
+  tr.className = "bk-detail";
+  const rekeningen = Object.keys(bkRekNamen).filter(k => k.startsWith(r.office + "|")).map(k => k.split("|")[1]).sort();
+  const twVoorstel = r.twinfield_bak === "Proposed" && v.bron === "twinfield";
+  // Eigen rekening: wat al goedgekeurd is, anders Shai's voorstel, anders wat de historie zegt (zo staat
+  // bij "Twinfield zegt 4832, eerder 9070" de 9070 al klaar).
+  const eigen = g.soort === "grootboek" ? g.regels[0].rekening
+    : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : ((v.historie || [])[0] || {}).rekening || "");
+  const eigenOms = g.omschrijving || (v.soort === "grootboek" ? v.omschrijving : "") || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`]);
+  const keuzeTw = twVoorstel && g.soort !== "grootboek";
+  const beoordelen = BK_BEOORDELEN.includes(r.status);
+  tr.innerHTML = `<td></td><td colspan="8">
+    ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
+    ${twVoorstel ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="twinfield"${keuzeTw ? " checked" : ""}${beoordelen ? "" : " disabled"}> Twinfields voorstel accepteren: ${(v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + ")}</label>` : ""}
+    <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
+    <div class="rij">
+      <div><label>Rekening</label><input type="text" id="bk-rekening" list="bk-rek-lijst" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off"><span id="bk-rek-naam" style="font-size:13px"></span>
+        <datalist id="bk-rek-lijst">${rekeningen.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(bkRekNamen[`${r.office}|${c}`] || "")}</option>`).join("")}</datalist></div>
+      <div style="flex:2"><label>Omschrijving in Twinfield (max 40)</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
+    </div>
+    <p style="margin:10px 0 4px">
+      ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}
+      ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
+      ${r.goedgekeurd_door ? `<span style="font-size:13px">Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}</span>` : ""}
+    </p>
+    <div id="melding-bk-detail"></div></td>`;
+  const naam = () => { const c = tr.querySelector("#bk-rekening").value.trim(); const n = bkRekNamen[`${r.office}|${c}`];
+    const el = tr.querySelector("#bk-rek-naam"); el.textContent = c ? (n ? " " + n : " onbekende rekening") : ""; el.style.color = c && !n ? "var(--rood)" : ""; };
+  tr.querySelector("#bk-rekening").addEventListener("input", () => { naam(); const rg = tr.querySelector('input[value="grootboek"]'); if (rg) rg.checked = true; });
+  naam();
+  const knop = (id, fn) => { const b = tr.querySelector("#" + id); if (b) b.addEventListener("click", (e) => { e.stopPropagation(); fn(); }); };
+  knop("btn-bk-goedkeuren", () => {
+    const keuze = (tr.querySelector('input[name="bk-keuze"]:checked') || {}).value;
+    if (keuze === "twinfield") return bkGoedkeuren([r], () => ({ soort: "twinfield" }));
+    const rek = tr.querySelector("#bk-rekening").value.trim();
+    if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
+    bkGoedkeuren([r], () => ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40) }));
+  });
+  knop("btn-bk-overslaan", () => bkZetStatus(r, "overgeslagen", "overgeslagen"));
+  knop("btn-bk-terug", () => bkZetStatus(r, (r.voorstel || {}).zekerheid >= 85 ? "voorstel" : "voorleggen", "terug naar beoordelen"));
+  tr.addEventListener("click", (e) => e.stopPropagation());
+  return tr;
+}
+async function bkGoedkeuren(regels, goedkeuring) {
+  const door = gebruiker ? gebruiker.email : null, op = new Date().toISOString();
+  const mis = [];
+  for (const r of regels) {
+    const g = goedkeuring(r);
+    if (!g) { mis.push(`${r.afschrift}/${r.regel}: geen voorstel om goed te keuren`); continue; }
+    const { error } = await sb.from("bank_regels").update({ status: "goedgekeurd", goedgekeurd: g, goedgekeurd_door: door, goedgekeurd_op: op, opmerking: null, updated_by: door }).eq("id", r.id).in("status", BK_BEOORDELEN);
+    if (error) { mis.push(`${r.afschrift}/${r.regel}: ${error.message}`); continue; }
+    await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie: "goedgekeurd", details: g, door });
+    bkVink.delete(r.id);
+  }
+  bkGekozen = null;
+  await laadBank();
+  toonMelding("melding-bank", mis.length ? "fout" : "ok", `${regels.length - mis.length} regel(s) goedgekeurd — Shai wijst ze in zijn volgende ronde toe in Twinfield.` + (mis.length ? "<br>Niet gelukt:<br>" + mis.map(escapeHtml).join("<br>") : ""));
+}
+async function bkZetStatus(r, status, actie) {
+  const door = gebruiker ? gebruiker.email : null;
+  const wijzig = { status, updated_by: door };
+  if (status !== "goedgekeurd") Object.assign(wijzig, { goedgekeurd: null, goedgekeurd_door: null, goedgekeurd_op: null });
+  const { error } = await sb.from("bank_regels").update(wijzig).eq("id", r.id);
+  if (error) return toonMelding("melding-bk-detail", "fout", escapeHtml(error.message));
+  await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie, door });
+  bkGekozen = null;
+  laadBank();
+}
+function bkBulkStand() {
+  for (const id of [...bkVink]) if (!bkRegels.some(r => r.id === id && BK_BEOORDELEN.includes(r.status))) bkVink.delete(id);
+  const voorstellen = bkZichtbaar().filter(r => r.status === "voorstel" && bkStandaardGoedkeuring(r));
+  const alles = document.getElementById("bk-vink-alles");
+  const aan = voorstellen.filter(r => bkVink.has(r.id)).length;
+  alles.checked = voorstellen.length > 0 && aan === voorstellen.length;
+  alles.indeterminate = bkVink.size > 0 && !alles.checked;
+  document.getElementById("bk-bulk").style.display = bkVink.size ? "" : "none";
+  const voorleggen = bkRegels.filter(r => bkVink.has(r.id) && r.status === "voorleggen").length;
+  document.getElementById("bk-bulk-tekst").textContent = `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Shai wijst ze daarna toe in Twinfield, precies zoals voorgesteld.`;
+}
+document.getElementById("bk-vink-alles").addEventListener("change", (e) => {
+  for (const r of bkZichtbaar().filter(r => r.status === "voorstel" && bkStandaardGoedkeuring(r))) e.target.checked ? bkVink.add(r.id) : bkVink.delete(r.id);
+  vernieuwBkTabel();
+});
+document.getElementById("btn-bk-bulk").addEventListener("click", () => bkGoedkeuren(bkRegels.filter(r => bkVink.has(r.id)), bkStandaardGoedkeuring));
+document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);
+document.getElementById("btn-bk-ververs").addEventListener("click", laadBank);
+document.getElementById("bk-office").addEventListener("change", () => { vernieuwBkFilters(); vernieuwBkTabel(); });
+document.getElementById("bk-zoek").addEventListener("input", vernieuwBkTabel);
+
 function kiesTab(naam) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === naam));
-  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","kennis"])
+  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","bank","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
   if (naam === "herhaal") laadHerhaal();
-  document.querySelector("main").classList.toggle("breed", naam === "facturen");
+  document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank");
+  if (naam === "bank") laadBank();
   if (naam === "facturen") { laadFacturen(); requestAnimationFrame(faHoogte); }
   if (naam === "kennis") laadKennisTab();
 }

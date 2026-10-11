@@ -999,13 +999,36 @@ function soortVan(omschrijving) {
   const b = (omschrijving || "").toUpperCase();
   return SOORTEN.find(s => s.her.test(b)) || null;
 }
+/* Salaris en tips (Shereen 10 okt 2026, voor alle klanten): altijd eerst de naam, dan de maand:
+   "Nathan Joe Lacle - September salaris", "Alicia Noelia Yu - Oktober tip". De maand komt uit de
+   omschrijving (SEPTEMBER, SEPT, 09/2026, 2026-09); anders een weeknummer; anders de maand van de
+   bankdatum. Maandwoorden tellen niet als naam. */
+const MAANDEN_NL = ["Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
+const MAAND_WOORDEN = [/^JAN(UARY|UARI)?$|^ENERO$/, /^FEB(RUARY|RUARI)?$|^FEBRERO$/, /^MAR(CH)?$|^MAART$|^MRT$|^MARZO$/, /^APR(IL)?$|^ABRIL$/,
+  /^MAY$|^MEI$|^MAYO$/, /^JUN[EI]?$|^JUNIO$/, /^JUL[YI]?$|^JULIO$/, /^AUG(UST|USTUS)?$|^AGOSTO$/, /^SEPT?(EMBER)?$|^SEPTIEMBRE$/,
+  /^O[CK]T(OBER)?$|^OCTUBRE$/, /^NOV(EMBER)?$|^NOVIEMBRE$/, /^DEC(EMBER)?$|^DICIEMBRE$/];
+const maandVanWoord = (w) => MAAND_WOORDEN.findIndex(re => re.test(w));
+function maandUitTekst(boven) {
+  let m = boven.match(/\b(0?[1-9]|1[0-2])[\/-](20\d{2})\b/);
+  if (m) return MAANDEN_NL[Number(m[1]) - 1];
+  m = boven.match(/\b20\d{2}[\/-](0?[1-9]|1[0-2])\b/);
+  if (m) return MAANDEN_NL[Number(m[1]) - 1];
+  for (const w of boven.replace(/[^A-Z]/g, " ").split(/\s+/)) { const i = maandVanWoord(w); if (i >= 0) return MAANDEN_NL[i]; }
+  return null;
+}
+function maandUitDatum(datum) {
+  const s = String(datum || "");
+  let m = s.match(/^\d{4}-(\d{2})/);
+  if (!m) m = s.match(/^\d{1,2}[-\/](\d{1,2})[-\/]\d{4}/);
+  return m && Number(m[1]) >= 1 && Number(m[1]) <= 12 ? MAANDEN_NL[Number(m[1]) - 1] : null;
+}
 function naamWoorden(omschrijving) {
   let d = (omschrijving || "").toUpperCase();
   d = d.replace(/\bI\.?\s*F\.?\s*O\.?/g, " ");            // "in favor of" = ten gunste van
   const soort = soortVan(d);
   if (soort) d = d.replace(new RegExp(`(?:${soort.her.source})[A-Z]*`, "g"), " ");   // heel woord: "SALARIS", niet "SALAR" + "IS"
   d = d.replace(/[0-9]+/g, " ").replace(/[^A-Z ]/g, " ").replace(/ +/g, " ").trim();
-  return d.split(" ").filter(w => w.length > 1 && !OMS_RUIS.has(w));
+  return d.split(" ").filter(w => w.length > 1 && !OMS_RUIS.has(w) && maandVanWoord(w) < 0);
 }
 function sleutels(omschrijving) {
   const naam = naamWoorden(omschrijving);
@@ -1035,7 +1058,7 @@ const OMS_KAPITALEN = new Set(["ACH", "MBA", "POS", "ATM", "FX", "AMEX", "BAZV",
 /* rekeningNaam meegeven laat het soort ook uit het rekeningschema komen: een
    batchbetaling die alleen "I.F.O. CESAR" heet, wordt op rekening "Te betalen
    Tips" leesbaar als "Tips Cesar". */
-function netteOmschrijving(ruw, rekeningNaam) {
+function netteOmschrijving(ruw, rekeningNaam, datum) {
   const boven = (ruw || "").toUpperCase();
   const soort = soortVan(boven) || (rekeningNaam ? soortVan(rekeningNaam) : null);
   const periode = boven.match(/\b(0?[1-9]|1[0-2])\/(20\d{2})\b/);
@@ -1045,6 +1068,11 @@ function netteOmschrijving(ruw, rekeningNaam) {
   for (const w of naam) if (!gezien.has(w)) { gezien.add(w); uniek.push(w); }   // "ELIOMAR DANIA ELIOMAR DANIA"
   const titel = uniek.map(w => OMS_KAPITALEN.has(w) ? w
     : w.toLowerCase().replace(/(^|[\/\-])([a-zà-ſ])/g, (m, v, l) => v + l.toUpperCase())).join(" ");
+  if (titel && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) {
+    const wanneer = maandUitTekst(boven) || (week ? "week " + week[1] : null) || maandUitDatum(datum);
+    const staart = " - " + (wanneer ? wanneer + " " : "") + (soort.label === "SALARIS" ? "salaris" : "tip");
+    return titel.slice(0, 40 - staart.length).trim() + staart;
+  }
   const delen = [];
   if (soort) delen.push(soort.mooi);
   if (week) delen.push("week " + week[1]);
@@ -1517,7 +1545,7 @@ function verwerkVraagposten(regels, melding) {
     const rekNaam = (huidig.schema.find(s => s.gl === keuze) || {}).naam || "";
     const item = {
       ...r, nr: i + 1, rij: r.rij || null,
-      omschrijving: (r.storno ? "Storno " : "") + netteOmschrijving(r.omschrijving, rekNaam),
+      omschrijving: (r.storno ? "Storno " : "") + netteOmschrijving(r.omschrijving, rekNaam, r.datum),
       omsOrigineel: r.omschrijving, volledig: null,
       keuze,
       kplKeuze: "",
@@ -4479,7 +4507,7 @@ function bkDetailRij(r) {
   // bij "Twinfield zegt 4832, eerder 9070" de 9070 al klaar).
   const eigen = g.soort === "grootboek" ? g.regels[0].rekening
     : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : ((v.historie || [])[0] || {}).rekening || "");
-  const eigenOms = g.omschrijving || (v.soort === "grootboek" ? v.omschrijving : "") || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`]);
+  const eigenOms = g.omschrijving || (v.soort === "grootboek" ? v.omschrijving : "") || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
   const keuzeTw = twVoorstel && g.soort !== "grootboek";
   const beoordelen = BK_BEOORDELEN.includes(r.status);
   tr.innerHTML = `<td></td><td colspan="8">

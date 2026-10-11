@@ -116,14 +116,12 @@
   .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
   .fa-status.voorstel.shai { background: #40E0D0; color: #06302d; }   /* Shai = turquoise #40E0D0 (Shereen 10 okt), donkere tekst voor leesbaarheid; TF = blauw */
   #tabel-bank td { vertical-align: top; font-size: 13px; }
-  #tabel-bank tr.bk-kop td { background: var(--grijs); font-weight: 600; font-size: 13px; }
+  #tabel-bank tr.bk-kop td { background: #40E0D0; color: #06302d; font-weight: 700; font-size: 14px; }   /* afschriftbalk: fel turquoise (Shereen 11 okt) */
   #tabel-bank tr.bk-rij { cursor: pointer; } #tabel-bank tr.bk-rij:hover td { background: #f3f6fa; }
   #tabel-bank tr.gekozen td { background: #eaf1fb; }
   #tabel-bank .bk-oms { max-width: 360px; }
   #tabel-bank .bk-uitleg { max-width: 380px; line-height: 1.4; }
   #tabel-bank .bk-refined { max-width: 260px; font-weight: 600; }
-  #tabel-bank .bk-herkomst { margin-top: 4px; font-size: 12px; color: var(--tekst); background: #eef3f8; border-radius: 6px; padding: 2px 6px; display: inline-block; max-width: 320px; }
-  #tabel-bank .bk-herkomst span { font-style: italic; }
   #tabel-bank th.bk-klap { cursor: pointer; white-space: nowrap; color: var(--blauw); user-select: none; }
   #tabel-bank th.bk-klap:hover { text-decoration: underline; }
   #tabel-bank td.bk-info { text-align: center; font-size: 16px; color: var(--blauw); cursor: help; }
@@ -372,14 +370,20 @@
   </div>
 
   <div class="kaart">
-    <h2>Online opzoeken van onbekende omschrijvingen (Google, gratis)</h2>
-    <p class="hint">De app kan onbekende tegenpartijen automatisch opzoeken via Google (officiële API, <b>100 gratis zoekopdrachten per dag</b>, geen betaalgegevens nodig). Resultaten worden per klant gecachet — elke leverancier wordt maar één keer ooit opgezocht. Voorstellen verschijnen als suggestie in stap 2 en worden na jouw goedkeuring een vaste boekingsregel. Instellen: (1) maak op <b>programmablesearchengine.google.com</b> een zoekmachine aan met "hele web doorzoeken" en kopieer de <b>Zoekmachine-ID</b>; (2) zet in <b>console.cloud.google.com</b> de "Custom Search API" aan en maak een <b>API-sleutel</b>.</p>
-    <div class="rij">
+    <h2>Zoeken op internet</h2>
+    <p class="hint">Typ een naam, bijvoorbeeld een tegenpartij uit een bankregel, en druk op Enter. Google opent in een nieuw tabblad.</p>
+    <form id="google-zoek" style="display:flex; gap:8px; max-width:640px; margin:6px 0 4px">
+      <input type="search" id="google-q" placeholder="🔍 Zoek op Google…" autocomplete="off" style="flex:1; font-size:16px; padding:10px 14px; border-radius:22px">
+      <button class="knop" type="submit">Zoeken</button>
+    </form>
+    <!-- De oude automatische Google-koppeling (Custom Search API) is voor nieuwe gebruikers gesloten en stopt
+         op 1 jan 2027; de velden blijven onzichtbaar bestaan omdat de oude 2999-code ze nog leest. -->
+    <div class="rij" style="display:none">
       <div><label>Google API-sleutel</label><input type="password" id="zk-key" placeholder="AIza…"></div>
       <div><label>Zoekmachine-ID (cx)</label><input type="text" id="zk-cx" placeholder="a1b2c3…"></div>
       <div><label>Zoekcontext (locatie)</label><input type="text" id="zk-suffix" value="Aruba"></div>
     </div>
-    <p style="margin-top:10px"><label style="display:inline"><input type="checkbox" id="zk-auto" checked> Automatisch opzoeken bij het inlezen van vraagposten</label></p>
+    <p style="display:none"><label style="display:inline"><input type="checkbox" id="zk-auto"> Automatisch opzoeken bij het inlezen van vraagposten</label></p>
     <div id="melding-zoeken"></div>
   </div>
 
@@ -4434,7 +4438,7 @@ document.getElementById("bk-klap").addEventListener("click", () => {
   try { localStorage.setItem("bankboeker.bank.uitklap", bkUitklap ? "1" : "0"); } catch (e) { /* niet erg */ }
   vernieuwBkTabel();
 });
-/* Herkomst van het voorstel in één oogopslag, onder de rekening (Shereen 11 okt: "ik wil weten waar dat
+/* Herkomst van het voorstel — ALLEEN in de ⓘ en in de kolom Bron, niet onder de rekening (Shereen 11 okt: "ik wil weten waar dat
    voorstel vandaan komt"). Historie: datum + de omschrijving van toen. */
 function bkHerkomst(r) {
   const v = r.voorstel || {};
@@ -4455,7 +4459,7 @@ function bkHerkomst(r) {
   } else if (v.bron === "geen") {
     tekst = "— geen bron";
   }
-  return tekst ? `<div class="bk-herkomst" title="${escapeHtml(uitleg || v.uitleg || "")}">${escapeHtml(tekst)}${uitleg ? `<br><span>${escapeHtml(uitleg)}</span>` : ""}</div>` : "";
+  return tekst + (uitleg ? ` — ${uitleg}` : "");
 }
 const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.voorstel && r.voorstel.omschrijving) || "";
 /* Wie stelt voor? (Shereen 10 okt) "TF voorstel" = Twinfields eigen herkenning, "Shai voorstel" = historie of vaste regel. */
@@ -4558,7 +4562,7 @@ function vernieuwBkTabel() {
     const v = r.goedgekeurd && r.goedgekeurd.regels ? { ...r.voorstel, ...r.goedgekeurd } : r.voorstel || {};
     const z = Number((r.voorstel || {}).zekerheid || 0);
     const kanVink = BK_BEOORDELEN.includes(r.status) && bkStandaardGoedkeuring(r);
-    const bron = { twinfield: "Twinfield", historie: "historie", regel: "vaste regel", geen: "—" }[(r.voorstel || {}).bron] || "";
+    const bron = bkHerkomst(r);   // herkomst: alleen in de ⓘ en in de kolom Bron (Shereen 11 okt)
     const uitleg = (r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "");
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
@@ -4568,7 +4572,7 @@ function vernieuwBkTabel() {
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="bk-refined">${escapeHtml(bkOmsTekst(r))}</td>
       <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}</td>
-      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}${bkHerkomst(r)}</td>
+      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
       ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)}</td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
         : `<td colspan="2" class="bk-info">${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""}</td>`}`;
@@ -4892,6 +4896,12 @@ koppelWisKnop("btn-wis-schema", "schema", "Rekeningschema");
 koppelWisKnop("btn-wis-debiteuren", "debiteuren", "Debiteurenlijst");
 koppelWisKnop("btn-wis-zoekcache", "zoekCache", "Zoek-cache");
 ["zk-key","zk-cx","zk-suffix","zk-auto"].forEach(id => document.getElementById(id).addEventListener("change", bewaarZoekInstellingen));
+/* Zelf zoeken op internet (Shereen 11 okt): gewoon Google in een nieuw tabblad, niets automatisch. */
+document.getElementById("google-zoek").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const q = document.getElementById("google-q").value.trim();
+  if (q) window.open("https://www.google.com/search?q=" + encodeURIComponent(q), "_blank", "noopener");
+});
 laadZoekInstellingen();
 document.getElementById("btn-leer").addEventListener("click", leerVanCorrecties);
 document.getElementById("btn-klant-opslaan").addEventListener("click", klantOpslaan);

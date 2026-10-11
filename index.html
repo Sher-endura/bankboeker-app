@@ -124,7 +124,11 @@
   #tabel-bank .bk-refined { max-width: 260px; font-weight: 600; }
   #tabel-bank th.bk-klap { cursor: pointer; white-space: nowrap; color: var(--blauw); user-select: none; }
   #tabel-bank th.bk-klap:hover { text-decoration: underline; }
-  #tabel-bank td.bk-info { text-align: center; font-size: 16px; color: var(--blauw); cursor: help; }
+  #tabel-bank td.bk-info { text-align: center; font-size: 16px; color: var(--blauw); cursor: help; white-space: nowrap; }
+  #tabel-bank .bk-g { border: 1px solid var(--blauw); background: #fff; color: var(--blauw); font-weight: 700; font-size: 12px; border-radius: 50%; width: 22px; height: 22px; padding: 0; cursor: pointer; vertical-align: middle; }
+  #tabel-bank .bk-g:hover { background: var(--blauw); color: #fff; }
+  .bk-google-balk { position: absolute; z-index: 50; display: flex; gap: 8px; width: 460px; max-width: calc(100vw - 32px); background: #fff; padding: 10px; border: 1px solid var(--rand); border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.15); }
+  .bk-google-balk input { flex: 1; font-size: 16px; padding: 8px 14px; border-radius: 20px; }
   .bk-detail td { background: #fbfcfe; border-bottom: 2px solid var(--blauw); }
   .bk-detail .rij > div { min-width: 200px; }
   .bk-zeker.hoog { color: var(--groen); font-weight: 600; } .bk-zeker.middel { color: var(--oranje); font-weight: 600; } .bk-zeker.laag { color: var(--rood); font-weight: 600; }
@@ -4461,6 +4465,38 @@ function bkHerkomst(r) {
   }
   return tekst + (uitleg ? ` — ${uitleg}` : "");
 }
+/* G naast de ⓘ (Shereen 11 okt): zoekbalk bij de regel, al ingevuld met de naam uit de bankregel
+   (zonder betaalwoorden, datums en nummers) + "Aruba". Enter = Google in een nieuw tabblad. */
+const BK_GEEN_NAAM = new Set(["POS", "MAESTRO", "ACH", "TRANSFER", "PAYMENT", "PURCHASE", "MCDT", "EDC", "LC", "AW", "IFO", "I.F.O.", "B.O.O.", "TRF", "FEE"]);
+function bkZoekTekst(r) {
+  const woorden = (bkOmsTekst(r) || r.omschrijving || "").replace(/[\/\-–,]+/g, " ").split(/\s+/)
+    .filter(w => w && !/\d/.test(w) && !BK_GEEN_NAAM.has(w.toUpperCase()));
+  return (woorden.join(" ") + " Aruba").trim();
+}
+function bkGoogleBalk(knop, r) {
+  document.getElementById("bk-google-balk")?.remove();
+  const balk = document.createElement("form");
+  balk.id = "bk-google-balk";
+  balk.className = "bk-google-balk";
+  balk.innerHTML = `<input type="search" autocomplete="off"><button class="knop" type="submit">Zoeken</button>`;
+  const veld = balk.querySelector("input");
+  veld.value = bkZoekTekst(r);
+  const plek = knop.getBoundingClientRect();
+  balk.style.top = (window.scrollY + plek.bottom + 6) + "px";
+  balk.style.left = Math.max(16, window.scrollX + plek.right - 460) + "px";
+  balk.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = veld.value.trim();
+    if (q) window.open("https://www.google.com/search?q=" + encodeURIComponent(q), "_blank", "noopener");
+    balk.remove();
+  });
+  veld.addEventListener("keydown", (e) => { if (e.key === "Escape") balk.remove(); });
+  balk.addEventListener("click", (e) => e.stopPropagation());
+  document.body.appendChild(balk);
+  setTimeout(() => document.addEventListener("click", function weg(e) { if (!balk.contains(e.target)) { balk.remove(); document.removeEventListener("click", weg); } }), 0);
+  veld.focus();
+  veld.select();
+}
 const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.voorstel && r.voorstel.omschrijving) || "";
 /* Wie stelt voor? (Shereen 10 okt) "TF voorstel" = Twinfields eigen herkenning, "Shai voorstel" = historie of vaste regel. */
 const bkStatusTekst = (r) => BK_BEOORDELEN.includes(r.status) && r.voorstel
@@ -4574,9 +4610,10 @@ function vernieuwBkTabel() {
       <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}</td>
       <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
-      ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)}</td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
-        : `<td colspan="2" class="bk-info">${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""}</td>`}`;
-    tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink")) { bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel(); } });
+      ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)} <button type="button" class="bk-g" title="Zoek op Google">G</button></td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
+        : `<td colspan="2" class="bk-info">${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""} <button type="button" class="bk-g" title="Zoek op Google">G</button></td>`}`;
+    tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink") && !e.target.closest(".bk-g")) { bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel(); } });
+    tr.querySelector(".bk-g").addEventListener("click", (e) => { e.stopPropagation(); bkGoogleBalk(e.currentTarget, r); });
     const vink = tr.querySelector(".bk-vink-rij");
     if (vink) vink.addEventListener("change", () => { vink.checked ? bkVink.add(r.id) : bkVink.delete(r.id); bkBulkStand(); });
     tbody.appendChild(tr);

@@ -122,6 +122,8 @@
   #tabel-bank .bk-oms { max-width: 360px; }
   #tabel-bank .bk-uitleg { max-width: 380px; line-height: 1.4; }
   #tabel-bank .bk-refined { max-width: 260px; font-weight: 600; }
+  #tabel-bank .bk-herkomst { margin-top: 4px; font-size: 12px; color: var(--tekst); background: #eef3f8; border-radius: 6px; padding: 2px 6px; display: inline-block; max-width: 320px; }
+  #tabel-bank .bk-herkomst span { font-style: italic; }
   #tabel-bank th.bk-klap { cursor: pointer; white-space: nowrap; color: var(--blauw); user-select: none; }
   #tabel-bank th.bk-klap:hover { text-decoration: underline; }
   #tabel-bank td.bk-info { text-align: center; font-size: 16px; color: var(--blauw); cursor: help; }
@@ -999,7 +1001,9 @@ const SOORTEN = [
 ];
 /* Ruis die niets zegt over wie of wat: losse letters (uit I.F.O., V/D),
    aanspreektitels en betaalwijze-afkortingen. */
-const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND", "VAN", "DEN", "DER", "WEEK"]);
+const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND", "VAN", "DEN", "DER", "WEEK",
+  // Betaalwijze-woorden van de bank zijn geen naam: anders werd "POS BIX BRANDSIMPORT" herkend als "POS PONSON S" (11 okt).
+  "POS", "MAESTRO", "ACH", "TRANSFER", "PAYMENT", "PURCHASE", "MCDT", "EDC"]);
 function soortVan(omschrijving) {
   const b = (omschrijving || "").toUpperCase();
   return SOORTEN.find(s => s.her.test(b)) || null;
@@ -4430,6 +4434,29 @@ document.getElementById("bk-klap").addEventListener("click", () => {
   try { localStorage.setItem("bankboeker.bank.uitklap", bkUitklap ? "1" : "0"); } catch (e) { /* niet erg */ }
   vernieuwBkTabel();
 });
+/* Herkomst van het voorstel in één oogopslag, onder de rekening (Shereen 11 okt: "ik wil weten waar dat
+   voorstel vandaan komt"). Historie: datum + de omschrijving van toen. */
+function bkHerkomst(r) {
+  const v = r.voorstel || {};
+  const h = (v.historie || [])[0];
+  let tekst = "", uitleg = "";
+  if (v.bron === "twinfield") {
+    const factuur = (v.regels || []).some(x => x.factuur);
+    tekst = factuur ? "🏦 Twinfield · factuurkoppeling" : "🏦 Twinfield · herkenregel";
+    if (h) tekst += " · historie klopt";
+  } else if (v.bron === "historie" && h) {
+    tekst = `📚 historie · ${datumNlKort(h.datum)}`;
+    uitleg = `Eerder zo geboekt: "${h.omschrijving}"`;
+  } else if (v.bron === "regel") {
+    tekst = "📏 vaste regel";
+  } else if (v.bron === "internet") {
+    tekst = "🌐 internet";
+    uitleg = v.internet || "";
+  } else if (v.bron === "geen") {
+    tekst = "— geen bron";
+  }
+  return tekst ? `<div class="bk-herkomst" title="${escapeHtml(uitleg || v.uitleg || "")}">${escapeHtml(tekst)}${uitleg ? `<br><span>${escapeHtml(uitleg)}</span>` : ""}</div>` : "";
+}
 const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.voorstel && r.voorstel.omschrijving) || "";
 /* Wie stelt voor? (Shereen 10 okt) "TF voorstel" = Twinfields eigen herkenning, "Shai voorstel" = historie of vaste regel. */
 const bkStatusTekst = (r) => BK_BEOORDELEN.includes(r.status) && r.voorstel
@@ -4541,7 +4568,7 @@ function vernieuwBkTabel() {
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="bk-refined">${escapeHtml(bkOmsTekst(r))}</td>
       <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}</td>
-      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
+      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}${bkHerkomst(r)}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
       ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)}</td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
         : `<td colspan="2" class="bk-info">${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""}</td>`}`;

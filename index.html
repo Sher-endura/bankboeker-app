@@ -118,6 +118,10 @@
   #tabel-bank tr.gekozen td { background: #eaf1fb; }
   #tabel-bank .bk-oms { max-width: 360px; }
   #tabel-bank .bk-uitleg { max-width: 380px; line-height: 1.4; }
+  #tabel-bank .bk-refined { max-width: 260px; font-weight: 600; }
+  #tabel-bank th.bk-klap { cursor: pointer; white-space: nowrap; color: var(--blauw); user-select: none; }
+  #tabel-bank th.bk-klap:hover { text-decoration: underline; }
+  #tabel-bank td.bk-info { text-align: center; font-size: 16px; color: var(--blauw); cursor: help; }
   .bk-detail td { background: #fbfcfe; border-bottom: 2px solid var(--blauw); }
   .bk-detail .rij > div { min-width: 200px; }
   .bk-zeker.hoog { color: var(--groen); font-weight: 600; } .bk-zeker.middel { color: var(--oranje); font-weight: 600; } .bk-zeker.laag { color: var(--rood); font-weight: 600; }
@@ -676,7 +680,7 @@
     <div id="melding-bank"></div>
     <div style="overflow-x:auto">
       <table id="tabel-bank">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Datum</th><th>Bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th>Bron</th><th>Zekerheid</th><th>Uitleg</th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th>Zekerheid</th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -4416,6 +4420,16 @@ const BK_FILTERS = {
 const BK_STATUS_TEKST = { voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "wacht op Shai", toegewezen: "toegewezen",
   verwerkt: "verwerkt (concept)", fout: "fout", overgeslagen: "overgeslagen" };
 const BK_BEOORDELEN = ["voorstel", "voorleggen"];
+/* Bron en Uitleg klappen naar rechts open (Shereen 10 okt) — dicht nemen ze bijna geen ruimte in;
+   de keuze blijft per computer bewaard. */
+const BK_KOLOMMEN = 10;
+let bkUitklap = false;
+try { bkUitklap = localStorage.getItem("bankboeker.bank.uitklap") === "1"; } catch (e) { /* geen opslag: dicht */ }
+document.getElementById("bk-klap").addEventListener("click", () => {
+  bkUitklap = !bkUitklap;
+  try { localStorage.setItem("bankboeker.bank.uitklap", bkUitklap ? "1" : "0"); } catch (e) { /* niet erg */ }
+  vernieuwBkTabel();
+});
 const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.voorstel && r.voorstel.omschrijving) || "";
 /* Wie stelt voor? (Shereen 10 okt) "TF voorstel" = Twinfields eigen herkenning, "Shai voorstel" = historie of vaste regel. */
 const bkStatusTekst = (r) => BK_BEOORDELEN.includes(r.status) && r.voorstel
@@ -4501,7 +4515,10 @@ function bkStandaardGoedkeuring(r) {
 function vernieuwBkTabel() {
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
-  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
+  const klap = document.getElementById("bk-klap");
+  klap.textContent = bkUitklap ? "◂ Bron & uitleg" : "▸ Bron & uitleg";
+  klap.classList.toggle("open", bkUitklap);
   let vorigAfschrift = "";
   for (const r of lijst) {
     const afs = `${r.office} · ${r.bank_code} ${r.afschrift}${r.sub_id > 1 ? "/" + r.sub_id : ""}`;
@@ -4509,22 +4526,25 @@ function vernieuwBkTabel() {
       vorigAfschrift = afs;
       const n = bkRegels.filter(x => x.office === r.office && x.bank_code === r.bank_code && x.afschrift === r.afschrift && x.sub_id === r.sub_id);
       const klaar = n.filter(x => ["goedgekeurd", "toegewezen", "verwerkt"].includes(x.status)).length;
-      tbody.insertAdjacentHTML("beforeend", `<tr class="bk-kop"><td colspan="9">Afschrift ${escapeHtml(afs)} — ${klaar} van ${n.length} regels goedgekeurd of toegewezen${n.find(x => x.boekstuk) ? ` · boekstuk ${escapeHtml(n.find(x => x.boekstuk).boekstuk)}` : ""}</td></tr>`);
+      tbody.insertAdjacentHTML("beforeend", `<tr class="bk-kop"><td colspan="${BK_KOLOMMEN}">Afschrift ${escapeHtml(afs)} — ${klaar} van ${n.length} regels goedgekeurd of toegewezen${n.find(x => x.boekstuk) ? ` · boekstuk ${escapeHtml(n.find(x => x.boekstuk).boekstuk)}` : ""}</td></tr>`);
     }
     const v = r.goedgekeurd && r.goedgekeurd.regels ? { ...r.voorstel, ...r.goedgekeurd } : r.voorstel || {};
     const z = Number((r.voorstel || {}).zekerheid || 0);
     const kanVink = BK_BEOORDELEN.includes(r.status) && bkStandaardGoedkeuring(r);
+    const bron = { twinfield: "Twinfield", historie: "historie", regel: "vaste regel", geen: "—" }[(r.voorstel || {}).bron] || "";
+    const uitleg = (r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "");
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>
       <td><span class="fa-status ${escapeHtml(r.status)}${r.status === "voorstel" && r.voorstel && r.voorstel.bron !== "twinfield" ? " shai" : ""}">${escapeHtml(bkStatusTekst(r))}</span></td>
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
+      <td class="bk-refined">${escapeHtml(bkOmsTekst(r))}</td>
       <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}</td>
-      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}${bkOmsTekst(r) ? `<div style="margin-top:3px">“${escapeHtml(bkOmsTekst(r))}”</div>` : ""}</td>
-      <td>${escapeHtml({ twinfield: "Twinfield", historie: "historie", regel: "vaste regel", geen: "—" }[(r.voorstel || {}).bron] || "")}</td>
+      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
-      <td class="bk-uitleg">${escapeHtml(r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "")}${escapeHtml((r.voorstel || {}).uitleg || "")}</td>`;
+      ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)}</td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
+        : `<td colspan="2" class="bk-info">${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""}</td>`}`;
     tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink")) { bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel(); } });
     const vink = tr.querySelector(".bk-vink-rij");
     if (vink) vink.addEventListener("change", () => { vink.checked ? bkVink.add(r.id) : bkVink.delete(r.id); bkBulkStand(); });
@@ -4548,14 +4568,14 @@ function bkDetailRij(r) {
   const eigenOms = g.omschrijving || v.omschrijving || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
   const keuzeTw = twVoorstel && g.soort !== "grootboek";
   const beoordelen = BK_BEOORDELEN.includes(r.status);
-  tr.innerHTML = `<td></td><td colspan="8">
+  tr.innerHTML = `<td></td><td colspan="${BK_KOLOMMEN - 1}">
     ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
     ${twVoorstel ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="twinfield"${keuzeTw ? " checked" : ""}${beoordelen ? "" : " disabled"}> Twinfields voorstel accepteren: ${(v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + ")}</label>` : ""}
     <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
     <div class="rij">
       <div><label>Rekening</label><input type="text" id="bk-rekening" list="bk-rek-lijst" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off"><span id="bk-rek-naam" style="font-size:13px"></span>
         <datalist id="bk-rek-lijst">${rekeningen.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(bkRekNamen[`${r.office}|${c}`] || "")}</option>`).join("")}</datalist></div>
-      <div style="flex:2"><label>Omschrijving in Twinfield (max 40) — geldt voor beide keuzes</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
+      <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
     </div>
     <p style="margin:10px 0 4px">
       ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}

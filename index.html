@@ -114,7 +114,10 @@
   .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
   .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
   .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
-  .fa-status.voorstel.shai { background: #40E0D0; color: #06302d; }   /* Shai = turquoise #40E0D0 (Shereen 10 okt), donkere tekst voor leesbaarheid; TF = blauw */
+  /* Kleuren per bron (Shereen 11 okt): TF voorstel blauw, TF voorleggen lichtblauw, Shai voorstel paars, Shai voorleggen oranje. */
+  .fa-status.voorstel.shai { background: #9D00FF; color: #fff; }
+  .fa-status.voorleggen.shai { background: #FFA500; color: #1f2937; }
+  .fa-status.voorleggen.tf { background: #00BFFF; color: #06263a; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank tr.bk-kop td { background: var(--grijs); color: var(--tekst); font-weight: 600; font-size: 13px; }
   #tabel-bank tr.bk-klant td { background: #40E0D0; color: #06302d; font-weight: 700; font-size: 15px; padding-top: 10px; padding-bottom: 10px; }   /* één felle balk per administratie (Shereen 11 okt) */
@@ -4619,7 +4622,7 @@ function vernieuwBkTabel() {
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>
-      <td><span class="fa-status ${escapeHtml(r.status)}${r.status === "voorstel" && r.voorstel && r.voorstel.bron !== "twinfield" ? " shai" : ""}">${escapeHtml(bkStatusTekst(r))}</span></td>
+      <td><span class="fa-status ${escapeHtml(r.status)}${BK_BEOORDELEN.includes(r.status) && r.voorstel ? (r.voorstel.bron === "twinfield" ? " tf" : " shai") : ""}">${escapeHtml(bkStatusTekst(r))}</span></td>
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="bk-refined">${escapeHtml(bkOmsTekst(r))}</td>

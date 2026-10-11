@@ -4575,8 +4575,10 @@ async function laadBankStatus() {
 async function bkNuDraaien() {
   const knop = document.getElementById("btn-bk-nu"), m = document.getElementById("bk-nu-melding");
   knop.disabled = true;
-  const { error } = await sb.from("bank_log").insert({ actie: "nu draaien", door: gebruiker ? gebruiker.email : null });
-  m.textContent = error ? "Lukte niet: " + error.message : "Gevraagd — Shai begint binnen een halve minuut (als zijn Twinfield-venster open en ingelogd is).";
+  // Eén klant of iedereen: volgt de keuze in "Alle administraties" (Shereen 11 okt).
+  const office = document.getElementById("bk-office").value || null;
+  const { error } = await sb.from("bank_log").insert({ actie: "nu draaien", office, door: gebruiker ? gebruiker.email : null });
+  m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"} (als zijn Twinfield-venster open en ingelogd is).`;
   setTimeout(() => { knop.disabled = false; laadBankStatus(); }, 30000);
 }
 function bkZichtbaar() {
@@ -4612,6 +4614,7 @@ function vernieuwBkFilters() {
 }
 function bkStatusKnop() {
   const office = document.getElementById("bk-office").value;
+  document.getElementById("btn-bk-nu").textContent = `▶ Shai nu laten draaien (${office || "alle klanten"})`;
   const n = bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status)).length;
   const namen = BK_STATUSSEN.filter(([s]) => bkStatusSel.has(s)).map(([, t]) => t.replace(/ \(.*\)/, ""));
   document.getElementById("btn-bk-status").textContent =

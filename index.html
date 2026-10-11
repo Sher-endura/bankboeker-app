@@ -111,6 +111,7 @@
   .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
   .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
   .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
+  .fa-status.voorstel.shai { background: #0b8a8f; }   /* Shai = turquoise, TF = blauw (Shereen 10 okt) */
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank tr.bk-kop td { background: var(--grijs); font-weight: 600; font-size: 13px; }
   #tabel-bank tr.bk-rij { cursor: pointer; } #tabel-bank tr.bk-rij:hover td { background: #f3f6fa; }
@@ -4516,7 +4517,7 @@ function vernieuwBkTabel() {
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>
-      <td><span class="fa-status ${escapeHtml(r.status)}">${escapeHtml(bkStatusTekst(r))}</span></td>
+      <td><span class="fa-status ${escapeHtml(r.status)}${r.status === "voorstel" && r.voorstel && r.voorstel.bron !== "twinfield" ? " shai" : ""}">${escapeHtml(bkStatusTekst(r))}</span></td>
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}</td>

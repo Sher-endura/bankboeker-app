@@ -10,6 +10,7 @@
 <style>
   :root {
     --blauw: #1c6fb8; --blauw-d: #145089; --grijs: #f4f6f8; --rand: #d9dee3;
+    --zalm: #FB7974;   /* Shai-logo (Shereen 11 okt) */
     --groen: #1e8a4c; --oranje: #c77700; --paars: #7b4fb8; --rood: #c0392b; --tekst: #1f2937;
   }
   * { box-sizing: border-box; }
@@ -23,9 +24,10 @@
   nav button { border: none; background: none; padding: 12px 16px; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; color: var(--tekst); }
   .subnav { background: #f3f6fa; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
   .subnav button { border: none; background: none; padding: 8px 14px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--tekst); }
+  input.zoek-keuze { min-width: 280px; }
   .subnav .subnav-klant { margin-left: auto; align-self: center; font-size: 13px; font-weight: 600; color: var(--tekst); }
-  .subnav button.actief { color: var(--blauw); border-bottom-color: var(--blauw); font-weight: 600; }
-  nav button.actief { color: var(--blauw); border-bottom-color: var(--blauw); font-weight: 600; }
+  .subnav button.actief { color: var(--blauw); border-bottom-color: var(--zalm); font-weight: 600; }
+  nav button.actief { color: var(--blauw); border-bottom-color: var(--zalm); font-weight: 600; }
   main { padding: 20px; max-width: 1280px; margin: 0 auto; }
   .kaart { background: #fff; border: 1px solid var(--rand); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
   .kaart h2 { margin: 0 0 12px; font-size: 16px; }
@@ -4896,6 +4898,46 @@ document.addEventListener("dragover", e => e.preventDefault());
 document.addEventListener("drop", e => e.preventDefault());
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.tab)));
 kiesTab("inlezen");   // tot de inlog klaar is; daarna opent de app op Twinfield Bank
+/* Administratie kiezen door te typen (Shereen 11 okt): een zoekveld met keuzelijst boven op de
+   bestaande <select>, die onzichtbaar blijft en alles blijft doen (waarde, change-event). Typ een stukje
+   van de code of de naam; kies uit de lijst. De opties volgen de select vanzelf. */
+function maakZoekbaar(selectId, placeholder) {
+  const sel = document.getElementById(selectId);
+  if (!sel || sel.dataset.zoekbaar) return;
+  sel.dataset.zoekbaar = "1";
+  const lijst = document.createElement("datalist");
+  lijst.id = selectId + "-lijst";
+  const veld = document.createElement("input");
+  veld.type = "search";
+  veld.className = "zoek-keuze";
+  veld.setAttribute("list", lijst.id);
+  veld.placeholder = placeholder || "🔍 Typ code of naam…";
+  veld.autocomplete = "off";
+  sel.style.display = "none";
+  sel.after(veld, lijst);
+  const opties = () => [...sel.options];
+  const toon = () => { const o = sel.options[sel.selectedIndex]; veld.value = o && o.value ? o.textContent : ""; };
+  const vul = () => { lijst.innerHTML = opties().map(o => `<option value="${escapeHtml(o.textContent)}"></option>`).join(""); toon(); };
+  const kies = () => {
+    const t = veld.value.trim().toLowerCase();
+    let o = opties().find(x => x.textContent.trim().toLowerCase() === t);
+    if (!o && t) { const m = opties().filter(x => x.value && x.textContent.toLowerCase().includes(t)); if (m.length === 1) o = m[0]; }
+    if (!o && !t) o = opties().find(x => !x.value);   // leeg = "Alle administraties" (waar die bestaat)
+    if (o && sel.value !== o.value) { sel.value = o.value; sel.dispatchEvent(new Event("change")); }
+    if (o) toon();
+  };
+  veld.addEventListener("change", kies);
+  veld.addEventListener("focus", () => veld.select());
+  veld.addEventListener("keydown", (e) => { if (e.key === "Enter") kies(); if (e.key === "Escape") { toon(); veld.blur(); } });
+  veld.addEventListener("blur", () => setTimeout(toon, 150));
+  sel.addEventListener("change", toon);
+  new MutationObserver(vul).observe(sel, { childList: true, subtree: true, attributes: true });
+  vul();
+}
+maakZoekbaar("klant-select", "🔍 Typ code of naam van de administratie…");
+maakZoekbaar("bk-office", "🔍 Alle administraties — typ om te zoeken");
+maakZoekbaar("fa-office", "🔍 Alle administraties — typ om te zoeken");
+
 document.getElementById("klant-select").addEventListener("change", e => {
   huidig = profielen[+e.target.value]; regelsSessie = []; allesVernieuwen();
 });

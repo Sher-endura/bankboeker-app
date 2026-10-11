@@ -15,7 +15,10 @@
   header h1 { font-size: 18px; margin: 0; font-weight: 600; }
   header .sub { font-size: 12px; opacity: .85; }
   nav { background: #fff; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
-  nav button { border: none; background: none; padding: 12px 16px; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; color: #555; }
+  nav button { border: none; background: none; padding: 12px 16px; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; color: var(--tekst); }
+  .subnav { background: #f3f6fa; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
+  .subnav button { border: none; background: none; padding: 8px 14px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--tekst); }
+  .subnav button.actief { color: var(--blauw); border-bottom-color: var(--blauw); font-weight: 600; }
   nav button.actief { color: var(--blauw); border-bottom-color: var(--blauw); font-weight: 600; }
   main { padding: 20px; max-width: 1280px; margin: 0 auto; }
   .kaart { background: #fff; border: 1px solid var(--rand); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
@@ -111,7 +114,7 @@
   .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
   .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
   .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
-  .fa-status.voorstel.shai { background: #0b8a8f; }   /* Shai = turquoise, TF = blauw (Shereen 10 okt) */
+  .fa-status.voorstel.shai { background: #40E0D0; color: #06302d; }   /* Shai = turquoise #40E0D0 (Shereen 10 okt), donkere tekst voor leesbaarheid; TF = blauw */
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank tr.bk-kop td { background: var(--grijs); font-weight: 600; font-size: 13px; }
   #tabel-bank tr.bk-rij { cursor: pointer; } #tabel-bank tr.bk-rij:hover td { background: #f3f6fa; }
@@ -154,17 +157,14 @@
   <button class="knop stil" id="btn-uitloggen" style="display:none; padding:5px 10px; font-size:12px;">Uitloggen</button>
 </header>
 <nav>
-  <button data-tab="ronde">🔁 Ronde</button>
-  <button data-tab="inlezen" class="actief">1 · Inlezen</button>
-  <button data-tab="controleren">2 · Controleren</button>
-  <button data-tab="exporteren">3 · Doorvoeren</button>
-  <button data-tab="klanten">Klanten &amp; instellingen</button>
-  <button data-tab="regels">Boekingsregels</button>
-  <button data-tab="herhaal">📅 Herhaal</button>
-  <button data-tab="facturen">🧾 Basecone</button>
   <button data-tab="bank">🏦 Twinfield Bank</button>
-  <button data-tab="kennis">🧠 Knowledgebase Shai</button>
+  <button data-tab="facturen">🧾 Basecone</button>
+  <button data-tab="kennisbank">🧠 Knowledgebase Shai</button>
+  <button data-tab="herhaal">📅 Herhaal</button>
+  <button data-tab="vraagposten" class="actief">📋 Vraagposten (2999)</button>
+  <button data-tab="klanten">⚙️ Settings</button>
 </nav>
+<div class="subnav" id="subnav" style="display:none"></div>
 <main>
 
 <!-- ============ TAB: RONDE ============ -->
@@ -4663,8 +4663,23 @@ document.getElementById("btn-bk-ververs").addEventListener("click", laadBank);
 document.getElementById("bk-office").addEventListener("change", () => { vernieuwBkFilters(); vernieuwBkTabel(); });
 document.getElementById("bk-zoek").addEventListener("input", vernieuwBkTabel);
 
+/* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de
+   Boekingsregels onder de Knowledgebase. Een groep onthoudt welk sub-tabblad laatst open stond. */
+const TAB_GROEPEN = {
+  vraagposten: [["ronde", "🔁 Ronde"], ["inlezen", "1 · Inlezen"], ["controleren", "2 · Controleren"], ["exporteren", "3 · Doorvoeren"]],
+  kennisbank: [["kennis", "🧠 Knowledgebase Shai"], ["regels", "Boekingsregels (2999)"]],
+};
+const laatsteInGroep = { vraagposten: "inlezen", kennisbank: "kennis" };
+const groepVan = (naam) => Object.keys(TAB_GROEPEN).find(g => TAB_GROEPEN[g].some(t => t[0] === naam)) || null;
 function kiesTab(naam) {
-  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === naam));
+  if (TAB_GROEPEN[naam]) naam = laatsteInGroep[naam];
+  const groep = groepVan(naam);
+  if (groep) laatsteInGroep[groep] = naam;
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === (groep || naam)));
+  const sub = document.getElementById("subnav");
+  sub.style.display = groep ? "" : "none";
+  sub.innerHTML = groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "";
+  sub.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.sub)));
   for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","bank","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
   if (naam === "herhaal") laadHerhaal();
@@ -4714,6 +4729,7 @@ function allesVernieuwen() {
 document.addEventListener("dragover", e => e.preventDefault());
 document.addEventListener("drop", e => e.preventDefault());
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.tab)));
+kiesTab("inlezen");   // tot de inlog klaar is; daarna opent de app op Twinfield Bank
 document.getElementById("klant-select").addEventListener("change", e => {
   huidig = profielen[+e.target.value]; regelsSessie = []; allesVernieuwen();
 });
@@ -5027,6 +5043,7 @@ document.getElementById("wachtwoord-form").addEventListener("submit", async (e) 
   huidig = profielen[0] || null;
   allesVernieuwen();
   initGebruikersBlok();                  // toont het gebruikersblok alleen voor beheerders
+  kiesTab("bank");                       // Shereen 10 okt: Twinfield Bank is het hoofdscherm
 })();
 
 </script>

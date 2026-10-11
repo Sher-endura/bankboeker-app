@@ -23,6 +23,7 @@
   nav button { border: none; background: none; padding: 12px 16px; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; color: var(--tekst); }
   .subnav { background: #f3f6fa; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
   .subnav button { border: none; background: none; padding: 8px 14px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--tekst); }
+  .subnav .subnav-klant { margin-left: auto; align-self: center; font-size: 13px; font-weight: 600; color: var(--tekst); }
   .subnav button.actief { color: var(--blauw); border-bottom-color: var(--blauw); font-weight: 600; }
   nav button.actief { color: var(--blauw); border-bottom-color: var(--blauw); font-weight: 600; }
   main { padding: 20px; max-width: 1280px; margin: 0 auto; }
@@ -178,7 +179,6 @@
 <header>
   <h1><img src="shai-logo.png" alt="Shai Booking by Endura"></h1>
   <span style="flex:1"></span>
-  <span class="sub" id="kop-klant" style="display:none"></span>   <!-- verborgen op verzoek (11 okt); de 2999-code vult hem nog -->
   <span class="sub" id="kop-gebruiker" style="display:none"></span>
   <button class="knop stil" id="btn-uitloggen" style="display:none; padding:5px 10px; font-size:12px;">Uitloggen</button>
 </header>
@@ -2948,7 +2948,7 @@ function vernieuwKlantSelect() {
 }
 function vernieuwKlantInfo() {
   if (!huidig) return;
-  document.getElementById("kop-klant").textContent = `${huidig.code} · ${huidig.naam}`;
+  const kk = document.getElementById("kop-klant"); if (kk) kk.textContent = `Actieve klant: ${huidig.code} · ${huidig.naam}`;
   document.getElementById("info-vraagposten").value = huidig.vraagposten;
   document.getElementById("info-regels").value =
     Object.keys(huidig.rules).length + " regels · " + huidig.schema.length + " rekeningen · " + (huidig.debiteuren || []).length + " debiteuren";
@@ -4843,7 +4843,8 @@ function kiesTab(naam) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === (groep || naam)));
   const sub = document.getElementById("subnav");
   sub.style.display = groep ? "" : "none";
-  sub.innerHTML = groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "";
+  sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "") +
+    (groep === "vraagposten" ? `<span id="kop-klant" class="subnav-klant">${huidig ? escapeHtml(`Actieve klant: ${huidig.code} · ${huidig.naam}`) : ""}</span>` : "");
   sub.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.sub)));
   for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","bank","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";

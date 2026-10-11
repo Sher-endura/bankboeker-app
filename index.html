@@ -157,7 +157,7 @@
   <button data-tab="regels">Boekingsregels</button>
   <button data-tab="herhaal">📅 Herhaal</button>
   <button data-tab="facturen">🧾 Basecone</button>
-  <button data-tab="bank">🏦 Bank</button>
+  <button data-tab="bank">🏦 Twinfield Bank</button>
   <button data-tab="kennis">🧠 Knowledgebase Shai</button>
 </nav>
 <main>
@@ -655,7 +655,7 @@
 <!-- ============ TAB: KNOWLEDGEBASE SHAI (wat de Basecone-robot weet) ============ -->
 <section id="tab-bank" style="display:none">
   <div class="kaart">
-    <h2>Bank — Shai in de Twinfield-bankmodule</h2>
+    <h2>Twinfield Bank — Shai in de bankmodule</h2>
     <div id="bk-robot" class="fa-robot"></div>
     <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 10px">
       <button class="knop stil" id="btn-bk-nu" style="padding:6px 12px" title="Shai begint binnen een halve minuut aan een ronde in Twinfield.">▶ Shai nu laten draaien</button>
@@ -1058,28 +1058,61 @@ const OMS_KAPITALEN = new Set(["ACH", "MBA", "POS", "ATM", "FX", "AMEX", "BAZV",
 /* rekeningNaam meegeven laat het soort ook uit het rekeningschema komen: een
    batchbetaling die alleen "I.F.O. CESAR" heet, wordt op rekening "Te betalen
    Tips" leesbaar als "Tips Cesar". */
-function netteOmschrijving(ruw, rekeningNaam, datum) {
+function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   const boven = (ruw || "").toUpperCase();
   const soort = soortVan(boven) || (rekeningNaam ? soortVan(rekeningNaam) : null);
-  const periode = boven.match(/\b(0?[1-9]|1[0-2])\/(20\d{2})\b/);
   const week = boven.match(/\bWEEK\s*(\d{1,2})\b/);
-  const naam = naamWoorden(ruw);
-  const gezien = new Set(), uniek = [];
-  for (const w of naam) if (!gezien.has(w)) { gezien.add(w); uniek.push(w); }   // "ELIOMAR DANIA ELIOMAR DANIA"
-  const titel = uniek.map(w => OMS_KAPITALEN.has(w) ? w
-    : w.toLowerCase().replace(/(^|[\/\-])([a-zà-ſ])/g, (m, v, l) => v + l.toUpperCase())).join(" ");
-  if (titel && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) {
-    const wanneer = maandUitTekst(boven) || (week ? "week " + week[1] : null) || maandUitDatum(datum);
+  // Hoofdletters per stukje: "VS-MC", "Maestro/POS", "Aug-2026"; afkortingen van 1-2 letters blijven groot.
+  const kast = (w) => OMS_KAPITALEN.has(w) || /^[A-Z]{1,2}$/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase();
+  const titelKast = (w) => w.split(/([\/\-])/).map((x) => (x === "/" || x === "-" ? x : kast(x))).join("");
+  const naamKast = (w) => (OMS_KAPITALEN.has(w) ? w : w.charAt(0) + w.slice(1).toLowerCase());   // namen: "Yu", niet "YU"
+  // Salaris en tips (Shereen 10 okt): "<Naam> - <Maand> salaris" en "<Naam> - week <nr> tip";
+  // een tip gaat over de week vóór de betaling.
+  const naam = [...new Set(naamWoorden(ruw))];
+  if (naam.length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) {
+    const titel = naam.map(naamKast).join(" ");
+    const wanneer = soort.label === "SALARIS"
+      ? maandUitTekst(boven) || (week ? "week " + week[1] : null) || maandUitDatum(datum)
+      : (week ? "week " + week[1] : null) || maandUitTekst(boven) || weekVoorDatum(datum);
     const staart = " - " + (wanneer ? wanneer + " " : "") + (soort.label === "SALARIS" ? "salaris" : "tip");
     return titel.slice(0, 40 - staart.length).trim() + staart;
   }
-  const delen = [];
-  if (soort) delen.push(soort.mooi);
-  if (week) delen.push("week " + week[1]);
-  if (periode) delen.push(periode[0]);
-  if (titel) delen.push(titel);
-  const uit = delen.join(" ").replace(/\s{2,}/g, " ").trim();
-  return (uit || (ruw || "").trim()).slice(0, 40);
+  // Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste
+  // probleem): referenties, rekening-, kaart- en klantnummers, eigen bedrijfsnaam eruit.
+  let d = " " + boven + " ";
+  d = d.replace(/\bI\.?\s*F\.?\s*O\.?/g, " ")
+    .replace(/^\s*ACH\s+TRANSFER\b/, " ")
+    .replace(/\/\/\s*\d+/g, " ")
+    .replace(/\bCUST(OMER)?\s*[:#.]?\s*\S+/g, " ")
+    .replace(/\bON\s+TR\s+\d+/g, " ")
+    .replace(/\bON\s+\d{1,2}\/\d{1,2}\/\d{2,4}/g, " ")
+    .replace(/\bS\.?\s?AMT\b/g, " ")
+    .replace(/\bAUTHORIZAT\w*/g, " AUTHORIZATION ")
+    .replace(/\bREV\b/g, " REVERSAL ")
+    .replace(/\bMCDEBIT\b/g, " MC DEBIT ")
+    .replace(/[-\s]?\d{6,}/g, " ")
+    .replace(/(\bPOS\b)[\s\d]+/g, "$1 ");
+  if (bedrijf) {
+    const eerste = String(bedrijf).toUpperCase().split(/[^A-Z]+/).find((w) => w.length >= 4);
+    if (eerste) d = d.replace(new RegExp("(^|[^A-Z])" + eerste + "[A-Z0-9]*.*$"), " ");
+  }
+  // Referentiecodes met letters én cijfers (bv. "*DNTK38N7V4") zeggen de lezer niets.
+  d = d.replace(/\*/g, " ").split(" ").filter((w) => !(w.length >= 6 && /^[A-Z0-9]+$/.test(w) && /\d/.test(w) && /[A-Z]/.test(w))).join(" ");
+  const woorden = d.replace(/[^A-Z0-9\/\-.&]+/g, " ").split(" ")
+    .map((w) => w.replace(/^[-\/.]+|[-\/.]+$/g, "")).filter(Boolean);
+  while (woorden.length > 1 && /^[A-Z]$/.test(woorden[woorden.length - 1])) woorden.pop();   // "COMPANY N" (van N.V.)
+  const uit = woorden.map(titelKast).join(" ").replace(/\s{2,}/g, " ").trim();
+  return (uit || (ruw || "").trim()).slice(0, 40).trim();
+}
+/* ISO-weeknummer van de week vóór de datum (tip betaald in week 41 → "week 40"). */
+function weekVoorDatum(datum) {
+  const m = String(datum || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) - 7));
+  const dag = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dag);
+  const jan1 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return "week " + Math.ceil(((d - jan1) / 86400000 + 1) / 7);
 }
 function classificeer(omschrijving, profiel) {
   for (const k of sleutels(omschrijving)) {
@@ -4382,6 +4415,10 @@ const BK_FILTERS = {
 const BK_STATUS_TEKST = { voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "wacht op Shai", toegewezen: "toegewezen",
   verwerkt: "verwerkt (concept)", fout: "fout", overgeslagen: "overgeslagen" };
 const BK_BEOORDELEN = ["voorstel", "voorleggen"];
+const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.voorstel && r.voorstel.omschrijving) || "";
+/* Wie stelt voor? (Shereen 10 okt) "TF voorstel" = Twinfields eigen herkenning, "Shai voorstel" = historie of vaste regel. */
+const bkStatusTekst = (r) => BK_BEOORDELEN.includes(r.status) && r.voorstel
+  ? (r.voorstel.bron === "twinfield" ? "TF " : "Shai ") + r.status : (BK_STATUS_TEKST[r.status] || r.status);
 let bkRegels = [], bkFilter = "beoordelen", bkGekozen = null, bkRekNamen = {};
 const bkVink = new Set();
 const bkZeker = (z) => (z >= 85 ? "hoog" : z >= 60 ? "middel" : "laag");
@@ -4455,7 +4492,7 @@ function vernieuwBkFilters() {
 /* Wat goedgekeurd zou worden als je het voorstel ongewijzigd overneemt (ook bij de vinkjes). */
 function bkStandaardGoedkeuring(r) {
   const v = r.voorstel || {};
-  if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield" };
+  if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield", omschrijving: v.omschrijving || "" };
   if (v.soort === "grootboek" && v.regels && v.regels.length === 1 && v.regels[0].rekening)
     return { soort: "grootboek", regels: [{ rekening: v.regels[0].rekening, bedrag: Number(r.bedrag) }], omschrijving: v.omschrijving || "" };
   return null;
@@ -4479,12 +4516,12 @@ function vernieuwBkTabel() {
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>
-      <td><span class="fa-status ${escapeHtml(r.status)}">${escapeHtml(BK_STATUS_TEKST[r.status] || r.status)}</span></td>
+      <td><span class="fa-status ${escapeHtml(r.status)}">${escapeHtml(bkStatusTekst(r))}</span></td>
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}</td>
-      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
-      <td>${escapeHtml({ twinfield: "Twinfield", historie: "historie", geen: "—" }[(r.voorstel || {}).bron] || "")}</td>
+      <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}${bkOmsTekst(r) ? `<div style="margin-top:3px">“${escapeHtml(bkOmsTekst(r))}”</div>` : ""}</td>
+      <td>${escapeHtml({ twinfield: "Twinfield", historie: "historie", regel: "vaste regel", geen: "—" }[(r.voorstel || {}).bron] || "")}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
       <td class="bk-uitleg">${escapeHtml(r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "")}${escapeHtml((r.voorstel || {}).uitleg || "")}</td>`;
     tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink")) { bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel(); } });
@@ -4507,7 +4544,7 @@ function bkDetailRij(r) {
   // bij "Twinfield zegt 4832, eerder 9070" de 9070 al klaar).
   const eigen = g.soort === "grootboek" ? g.regels[0].rekening
     : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : ((v.historie || [])[0] || {}).rekening || "");
-  const eigenOms = g.omschrijving || (v.soort === "grootboek" ? v.omschrijving : "") || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
+  const eigenOms = g.omschrijving || v.omschrijving || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
   const keuzeTw = twVoorstel && g.soort !== "grootboek";
   const beoordelen = BK_BEOORDELEN.includes(r.status);
   tr.innerHTML = `<td></td><td colspan="8">
@@ -4517,7 +4554,7 @@ function bkDetailRij(r) {
     <div class="rij">
       <div><label>Rekening</label><input type="text" id="bk-rekening" list="bk-rek-lijst" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off"><span id="bk-rek-naam" style="font-size:13px"></span>
         <datalist id="bk-rek-lijst">${rekeningen.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(bkRekNamen[`${r.office}|${c}`] || "")}</option>`).join("")}</datalist></div>
-      <div style="flex:2"><label>Omschrijving in Twinfield (max 40)</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
+      <div style="flex:2"><label>Omschrijving in Twinfield (max 40) — geldt voor beide keuzes</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
     </div>
     <p style="margin:10px 0 4px">
       ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}
@@ -4529,33 +4566,50 @@ function bkDetailRij(r) {
     const el = tr.querySelector("#bk-rek-naam"); el.textContent = c ? (n ? " " + n : " onbekende rekening") : ""; el.style.color = c && !n ? "var(--rood)" : ""; };
   tr.querySelector("#bk-rekening").addEventListener("input", () => { naam(); const rg = tr.querySelector('input[value="grootboek"]'); if (rg) rg.checked = true; });
   naam();
-  const knop = (id, fn) => { const b = tr.querySelector("#" + id); if (b) b.addEventListener("click", (e) => { e.stopPropagation(); fn(); }); };
+  const knop = (id, fn) => { const b = tr.querySelector("#" + id); if (b) b.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    try { await fn(); } catch (fout) { toonMelding("melding-bk-detail", "fout", "Er ging iets mis: " + escapeHtml(fout && fout.message || String(fout))); }
+  }); };
   knop("btn-bk-goedkeuren", () => {
     const keuze = (tr.querySelector('input[name="bk-keuze"]:checked') || {}).value;
-    if (keuze === "twinfield") return bkGoedkeuren([r], () => ({ soort: "twinfield" }));
+    if (keuze === "twinfield") return bkGoedkeuren([r], () => ({ soort: "twinfield", omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40) }), "melding-bk-detail");
     const rek = tr.querySelector("#bk-rekening").value.trim();
     if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
-    bkGoedkeuren([r], () => ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40) }));
+    bkGoedkeuren([r], () => ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40) }), "melding-bk-detail");
   });
   knop("btn-bk-overslaan", () => bkZetStatus(r, "overgeslagen", "overgeslagen"));
   knop("btn-bk-terug", () => bkZetStatus(r, (r.voorstel || {}).zekerheid >= 85 ? "voorstel" : "voorleggen", "terug naar beoordelen"));
   tr.addEventListener("click", (e) => e.stopPropagation());
   return tr;
 }
-async function bkGoedkeuren(regels, goedkeuring) {
+/* Goedkeuren. Elke fout komt in beeld (onder de knop én bovenaan); een update die 0 rijen raakt telt
+   als mislukt — de database geeft dan geen foutmelding (bv. als de regel intussen veranderd is). */
+async function bkGoedkeuren(regels, goedkeuring, meldingId = "melding-bank") {
   const door = gebruiker ? gebruiker.email : null, op = new Date().toISOString();
   const mis = [];
-  for (const r of regels) {
-    const g = goedkeuring(r);
-    if (!g) { mis.push(`${r.afschrift}/${r.regel}: geen voorstel om goed te keuren`); continue; }
-    const { error } = await sb.from("bank_regels").update({ status: "goedgekeurd", goedgekeurd: g, goedgekeurd_door: door, goedgekeurd_op: op, opmerking: null, updated_by: door }).eq("id", r.id).in("status", BK_BEOORDELEN);
-    if (error) { mis.push(`${r.afschrift}/${r.regel}: ${error.message}`); continue; }
-    await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie: "goedgekeurd", details: g, door });
-    bkVink.delete(r.id);
+  let gelukt = 0;
+  toonMelding(meldingId, "ok", "Bezig met goedkeuren…");
+  try {
+    for (const r of regels) {
+      const g = goedkeuring(r);
+      if (!g) { mis.push(`${r.afschrift}/${r.regel}: geen voorstel om goed te keuren`); continue; }
+      const { data, error } = await sb.from("bank_regels").update({ status: "goedgekeurd", goedgekeurd: g, goedgekeurd_door: door, goedgekeurd_op: op, opmerking: null, updated_by: door })
+        .eq("id", r.id).in("status", BK_BEOORDELEN).select("id");
+      if (error) { mis.push(`${r.afschrift}/${r.regel}: ${error.message}`); continue; }
+      if (!data || !data.length) { mis.push(`${r.afschrift}/${r.regel}: niet opgeslagen (regel is intussen veranderd, of geen schrijfrechten — ververs de pagina)`); continue; }
+      await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie: "goedgekeurd", details: g, door });
+      bkVink.delete(r.id);
+      gelukt++;
+    }
+  } catch (e) {
+    mis.push("Onverwachte fout: " + (e && e.message || e));
   }
+  const tekst = `${gelukt} regel(s) goedgekeurd — Shai wijst ze in zijn volgende ronde toe in Twinfield.` + (mis.length ? "<br>Niet gelukt:<br>" + mis.map(escapeHtml).join("<br>") : "");
+  if (mis.length) { toonMelding(meldingId, "fout", tekst); if (!gelukt) return; }
   bkGekozen = null;
   await laadBank();
-  toonMelding("melding-bank", mis.length ? "fout" : "ok", `${regels.length - mis.length} regel(s) goedgekeurd — Shai wijst ze in zijn volgende ronde toe in Twinfield.` + (mis.length ? "<br>Niet gelukt:<br>" + mis.map(escapeHtml).join("<br>") : ""));
+  toonMelding("melding-bank", mis.length ? "fout" : "ok", tekst);
+  document.getElementById("melding-bank").scrollIntoView({ block: "nearest" });
 }
 async function bkZetStatus(r, status, actie) {
   const door = gebruiker ? gebruiker.email : null;

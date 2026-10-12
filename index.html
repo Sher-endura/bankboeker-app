@@ -142,6 +142,7 @@
   #tabel-bank .fa-status.goedgekeurd { background: #FFB6C1; color: #1f2937; }   /* "wacht op Shai" = lichtroze (Shereen 11 okt) */
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   .bk-regel1 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
+  .fa-robot button.shai-herstart { padding: 3px 10px; font-size: 12px; margin-right: 6px; }
   .bk-robot-klein { margin: 0 0 0 auto; padding: 6px 12px; font-size: 13px; max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bk-hoe { position: relative; }
   .bk-hoe summary { cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; }
@@ -3619,12 +3620,31 @@ function shaiStatus(vak, data, w) {
   else if (data.status === "fout") { soort = "let"; kop = `Verbonden met ${w.app}, maar de laatste ronde gaf een fout`; }
   else { soort = "goed"; kop = `Verbonden met ${w.app}, ingelogd als ${w.gebruiker}`; }
   vak.className = basis + " " + soort;
-  vak.innerHTML = `<b>● ${escapeHtml(kop)}</b>${rest} · ${gemeld}`;
-  vak.title = vak.innerText + (rest ? "" : bericht.replace(/^ — /, "\n"));   // volledige tekst bij erop staan
+  // ↻ Opnieuw verbinden (Shereen 12 okt): de Shai-wachter op de robot-pc stopt deze Shai en start hem opnieuw.
+  // Niet bij "niet ingelogd": dat lost een herstart niet op (inloggen met tweestaps doet Shereen zelf).
+  const knop = soort !== "goed" && data.status !== "inloggen_nodig";
+  // Knop vooraan: de smalle regel in Twinfield Bank kapt het einde af.
+  vak.innerHTML = (knop ? `<button type="button" class="knop shai-herstart">↻ Opnieuw verbinden</button> ` : "") +
+    `<b>● ${escapeHtml(kop)}</b>${rest} · ${gemeld}`;
+  vak.title = vak.innerText.replace("↻ Opnieuw verbinden", "") + (rest ? "" : bericht.replace(/^ — /, "\n"));   // volledige tekst bij erop staan
+  if (knop) vak.querySelector(".shai-herstart").addEventListener("click", (e) => shaiHerstart(e.currentTarget, vak, w));
+}
+async function shaiHerstart(knop, vak, w) {
+  knop.disabled = true;
+  knop.textContent = "Bezig…";
+  const { data: wachter } = await sb.from("robot_status").select("laatste_hartslag").eq("id", "wachter").maybeSingle();
+  const wachterLeeft = wachter && Date.now() - new Date(wachter.laatste_hartslag).getTime() < 3 * 60000;
+  // Het antwoord komt op de plek van de knop (vooraan, dus ook in de smalle regel te lezen).
+  const zeg = (tekst) => { const b = document.createElement("b"); b.textContent = tekst + " · "; knop.replaceWith(b); vak.title = tekst + "\n" + vak.title; };
+  if (!wachterLeeft) return zeg(`De Shai-wachter draait niet op de robot-pc — start daar de snelkoppeling "Shai wachter"`);
+  const { error } = await sb.from(w.log).insert({ actie: "herstart", door: gebruiker ? gebruiker.email : null });
+  if (error) return zeg("Lukte niet: " + error.message);
+  zeg("↻ Gevraagd — Shai start binnen een minuut opnieuw");
+  setTimeout(() => (w.log === "bank_log" ? laadBankStatus() : laadRobotStatus()), 60000);
 }
 async function laadRobotStatus() {
   const { data } = await sb.from("robot_status").select("*").eq("id", "basecone").maybeSingle();
-  shaiStatus(document.getElementById("fa-robot"), data, { app: "Basecone", gebruiker: "Shai", snelkoppeling: "Shai Basecone-robot", maxMinuten: 45 });
+  shaiStatus(document.getElementById("fa-robot"), data, { app: "Basecone", gebruiker: "Shai", snelkoppeling: "Shai Basecone-robot", maxMinuten: 45, log: "basecone_log" });
 }
 /* ↻ Verversen (Shereen 10 okt): lijst opnieuw laden én de voorstellen die nog beoordeeld moeten worden
    en gelezen zijn vóór de nieuwste regel/uitleg, opnieuw laten lezen — dan nemen ze die kennis mee
@@ -4728,7 +4748,7 @@ async function laadBank() {
 }
 async function laadBankStatus() {
   const { data } = await sb.from("robot_status").select("*").eq("id", "bank").maybeSingle();
-  shaiStatus(document.getElementById("bk-robot"), data, { app: "Twinfield", gebruiker: "Endura_AI", snelkoppeling: "Shai Twinfield-bank", maxMinuten: 75 });
+  shaiStatus(document.getElementById("bk-robot"), data, { app: "Twinfield", gebruiker: "Endura_AI", snelkoppeling: "Shai Twinfield-bank", maxMinuten: 75, log: "bank_log" });
 }
 async function bkNuDraaien() {
   const knop = document.getElementById("btn-bk-nu"), m = document.getElementById("bk-nu-melding");

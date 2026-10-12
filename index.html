@@ -148,6 +148,7 @@
   .fa-status.verwijderen { background: #C6F432; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
+  #tabel-bank .bk-vink-afs { margin: 0 8px 0 2px; vertical-align: middle; }
   .bk-verwijder-blok { margin: 8px 0; padding: 8px 12px; border: 1px solid #f3c4c0; background: #fdf1f0; border-radius: 8px; font-size: 13px; color: var(--tekst); }
   .bk-verwijder-blok .knop { margin-top: 6px; }
   button.knop.stil.gevaar { color: #fff; background: var(--rood); border-color: var(--rood); }
@@ -4929,7 +4930,11 @@ function vernieuwBkTabel() {
       vorigAfschrift = afs;
       const n = bkRegels.filter(x => x.office === r.office && x.bank_code === r.bank_code && x.afschrift === r.afschrift && x.sub_id === r.sub_id);
       const klaar = n.filter(x => ["goedgekeurd", "toegewezen", "verwerkt"].includes(x.status)).length;
-      tbody.insertAdjacentHTML("beforeend", `<tr class="bk-kop"><td colspan="${BK_KOLOMMEN}">Afschrift ${escapeHtml(afs)} — ${klaar} van ${n.length} regels goedgekeurd of toegewezen${n.find(x => x.boekstuk) ? ` · boekstuk ${escapeHtml(n.find(x => x.boekstuk).boekstuk)}` : ""}</td></tr>`);
+      // Vinkje per afschrift (Shereen 12 okt: "zodat het niet alles of niks is").
+      const afsSleutel = `${r.office}|${r.bank_code}|${r.afschrift}|${r.sub_id}`;
+      const vinkbaarAfs = lijst.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === afsSleutel && BK_BEOORDELEN.includes(x.status));
+      const afsVink = vinkbaarAfs.length ? `<input type="checkbox" class="bk-vink-afs" data-afs="${escapeHtml(afsSleutel)}" title="Alle te beoordelen regels van dit afschrift aanvinken"${vinkbaarAfs.every(x => bkVink.has(x.id)) ? " checked" : ""}${vinkbaarAfs.some(x => bkVink.has(x.id)) && !vinkbaarAfs.every(x => bkVink.has(x.id)) ? " data-half=\"1\"" : ""}> ` : "";
+      tbody.insertAdjacentHTML("beforeend", `<tr class="bk-kop"><td colspan="${BK_KOLOMMEN}">${afsVink}Afschrift ${escapeHtml(afs)} — ${klaar} van ${n.length} regels goedgekeurd of toegewezen${n.find(x => x.boekstuk) ? ` · boekstuk ${escapeHtml(n.find(x => x.boekstuk).boekstuk)}` : ""}</td></tr>`);
     }
     const v = r.goedgekeurd && r.goedgekeurd.regels ? { ...r.voorstel, ...r.goedgekeurd } : r.voorstel || {};
     const z = Number((r.voorstel || {}).zekerheid || 0);
@@ -4957,6 +4962,13 @@ function vernieuwBkTabel() {
     if (bkGekozen === r.id) tbody.appendChild(bkDetailRij(r));
   }
   if (perDag && lijst.length) tbody.insertAdjacentHTML("beforeend", `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">Alleen de laatste ${BK_VERWERKT_DAGEN} dagen — wat ouder is, staat gewoon in Twinfield.</td></tr>`);
+  tbody.querySelectorAll(".bk-vink-afs").forEach(v => {
+    if (v.dataset.half) v.indeterminate = true;
+    v.addEventListener("change", () => {
+      for (const x of lijst.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === v.dataset.afs && BK_BEOORDELEN.includes(x.status))) v.checked ? bkVink.add(x.id) : bkVink.delete(x.id);
+      vernieuwBkTabel();
+    });
+  });
   tbody.querySelectorAll("tr.bk-dag").forEach(tr => tr.addEventListener("click", () => {
     const d = tr.dataset.dag; bkDagOpen.has(d) ? bkDagOpen.delete(d) : bkDagOpen.add(d); vernieuwBkTabel();
   }));
@@ -5210,6 +5222,14 @@ async function bkZetStatus(r, status, actie) {
 }
 const bkVinkbaar = () => bkZichtbaar().filter(r => (document.getElementById("bk-substatus").value ? BK_BEOORDELEN.includes(r.status) : r.status === "voorstel") && bkStandaardGoedkeuring(r));
 function bkBulkStand() {
+  // Vinkje per afschrift bijwerken: aan als alles aangevinkt is, half als een deel (12 okt).
+  const zichtbaarNu = bkZichtbaar();
+  document.querySelectorAll("#tabel-bank .bk-vink-afs").forEach(v => {
+    const rijen = zichtbaarNu.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === v.dataset.afs && BK_BEOORDELEN.includes(x.status));
+    const aan = rijen.filter(x => bkVink.has(x.id)).length;
+    v.checked = rijen.length > 0 && aan === rijen.length;
+    v.indeterminate = aan > 0 && aan < rijen.length;
+  });
   // Alleen wat je ziet blijft aangevinkt (Shereen 12 okt: 699 aangevinkt terwijl de zoekopdracht er een paar toonde —
   // goedkeuren zou dan ook de onzichtbare regels raken).
   const zicht = new Set(bkZichtbaar().filter(r => BK_BEOORDELEN.includes(r.status)).map(r => r.id));

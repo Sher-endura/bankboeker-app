@@ -98,6 +98,7 @@
   .fa-scheiding:hover::after, .fa-scheiding.sleept::after { background: var(--blauw); left: 3px; width: 4px; }
   #tabel-facturen thead th { position: sticky; top: -18px; background: #fff; z-index: 1; }
   .fa-leeg { color: var(--tekst); font-size: 14px; padding: 30px 6px; }
+  #tabel-fa-regels input.fa-leeg-vak:placeholder-shown { outline: 2px solid var(--oranje); background: #fff7ed; }
   @media (max-width: 900px) {
     .fa-split { grid-template-columns: 1fr; height: auto; }
     .fa-scheiding { display: none; }
@@ -4045,7 +4046,14 @@ async function faNieuwCrdAanvragen() {
   if (!/^\d{1,3}$/.test(dagen)) fouten.push("vervaldagen moet een getal zijn (bv. 30)");
   const bestaat = naam && faStam.CRD.find(x => faNorm(x.naam) === faNorm(naam));
   if (bestaat) fouten.push(`deze crediteur bestaat al: ${bestaat.code} ${bestaat.naam} — kies die in het crediteurveld`);
-  if (fouten.length) { toonMelding("melding-fa-detail", "fout", "Nog niet goed: " + escapeHtml(fouten.join("; ")) + "."); return; }
+  if (fouten.length) {
+    // Waar het zit: de boekingsregels staan onder het formulier (Shereen 12 okt zag dat niet).
+    const regelHulp = fouten.some(f => /regel|rekening|totaal/.test(f))
+      ? " Kijk bij de <b>boekingsregels</b> hieronder: kies de grootboekrekening, pas het bedrag aan of voeg een regel toe met <b>+ Regel</b>." : "";
+    toonMelding("melding-fa-detail", "fout", "Nog niet goed: " + escapeHtml(fouten.join("; ")) + "." + regelHulp);
+    if (regelHulp) document.getElementById("tabel-fa-regels").scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
   const nc = {};
   for (const [k] of FA_NC_VELDEN) nc[k] = waarde(k) || null;
   Object.assign(nc, {
@@ -4264,7 +4272,14 @@ async function faGoedkeuren() {
   if (g.regels.some(r => !r.grootboek)) fouten.push("een regel heeft geen rekening");
   if (faStam.BAS.length) for (const r of g.regels) if (r.grootboek && !faStam.BAS.some(x => x.code === r.grootboek)) fouten.push(`rekening ${r.grootboek} bestaat niet`);
   if (Math.round(g.regels.reduce((s, r) => s + r.bedrag, 0) * 100) !== Math.round(g.bedrag * 100)) fouten.push("regels tellen niet op tot het totaal");
-  if (fouten.length) { toonMelding("melding-fa-detail", "fout", "Nog niet goed: " + escapeHtml(fouten.join("; ")) + "."); return; }
+  if (fouten.length) {
+    // Waar het zit: de boekingsregels staan onder het formulier (Shereen 12 okt zag dat niet).
+    const regelHulp = fouten.some(f => /regel|rekening|totaal/.test(f))
+      ? " Kijk bij de <b>boekingsregels</b> hieronder: kies de grootboekrekening, pas het bedrag aan of voeg een regel toe met <b>+ Regel</b>." : "";
+    toonMelding("melding-fa-detail", "fout", "Nog niet goed: " + escapeHtml(fouten.join("; ")) + "." + regelHulp);
+    if (regelHulp) document.getElementById("tabel-fa-regels").scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
 
   // Leveranciers, artikelen en aantekeningen leert de database zelf bij het goedkeuren
   // (trigger basecone_leer, database-update 3). Alleen een uitleg in gewone taal wordt een regel.
@@ -5495,7 +5510,19 @@ document.getElementById("btn-fa-regel").addEventListener("click", () => vernieuw
 document.getElementById("fa-omschrijving").addEventListener("input", faOmsTeller);
 document.getElementById("fa-datum").addEventListener("input", faDatumTekst);
 document.getElementById("fa-vervaldatum").addEventListener("input", faDatumTekst);
-document.getElementById("fa-bedrag").addEventListener("input", faSom);
+/* Totaal aanpassen (Shereen 12 okt): zonder boekingsregels komt er vanzelf één regel met dat bedrag (dan
+   alleen nog de rekening kiezen); met precies één regel loopt die regel mee met het totaal. Bij meer
+   regels verdeel je zelf. */
+document.getElementById("fa-bedrag").addEventListener("input", () => {
+  const regels = leesFaRegels(), totaal = faGetal(document.getElementById("fa-bedrag").value);
+  if (!regels.length && totaal) {
+    vernieuwFaRegels([{ grootboek: "", bedrag: totaal, inhoud: "", omschrijving: document.getElementById("fa-omschrijving").value }]);
+    document.querySelector("#tabel-fa-regels tbody .fa-gl").classList.add("fa-leeg-vak");
+  } else if (regels.length === 1) {
+    document.querySelector("#tabel-fa-regels tbody .fa-rb").value = faBedrag(totaal);
+  }
+  faSom();
+});
 document.getElementById("btn-hh-regel").addEventListener("click", () => {
   vernieuwHhRegels([...leesRegelRijen(), { rekening: "", kpl: "", omschrijving: "", bedrag: "", zijde: "credit" }]);
 });

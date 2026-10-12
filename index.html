@@ -78,7 +78,16 @@
   .fa-status.voorstel { background: var(--blauw); } .fa-status.voorleggen { background: var(--oranje); }
   .fa-status.goedgekeurd { background: var(--paars); } .fa-status.ingevuld, .fa-status.geboekt { background: var(--groen); }
   .fa-status.fout { background: var(--rood); }
-  .fa-status.afwijzen { background: #9a3412; } .fa-status.afgewezen { background: #4b5563; } .fa-status.splitsen { background: #0e7490; }
+  .fa-status.verwijderen { background: #9a3412; } .fa-status.verwijderd { background: #4b5563; } .fa-status.splitsen { background: #0e7490; }
+  .fa-verwijder-vak { margin: 8px 0 4px; padding: 10px 12px; border: 1px solid #9a3412; border-radius: 6px; background: #fff7ed; }
+  .fa-verwijder-vak input { width: 100%; margin: 4px 0 8px; }
+  #tabel-verwijderd img.vw-mini { width: 70px; height: 90px; object-fit: cover; object-position: top; border: 1px solid var(--rand); border-radius: 3px; cursor: zoom-in; background: #fff; display: block; }
+  #tabel-verwijderd td { vertical-align: top; }
+  .vw-mail { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--rand); border-radius: 8px; }
+  .vw-mail .vw-voorbeeld { border: 1px solid var(--rand); border-radius: 6px; padding: 10px 12px; background: #fff; color: #1f2937; max-height: 360px; overflow: auto; margin: 8px 0; }
+  .vw-mail label.vw-ontvanger { display: block; font-weight: normal; margin: 2px 0; }
+  #vw-groot { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none; align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; }
+  #vw-groot img { max-width: 92vw; max-height: 92vh; background: #fff; }
   .fa-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
   /* Gesplitst scherm zoals in Basecone: lijst links, document rechts, scheiding versleepbaar */
   main.breed { max-width: none; }
@@ -189,7 +198,7 @@
 </header>
 <nav>
   <button data-tab="bank">🏦 Twinfield Bank</button>
-  <button data-tab="facturen">🧾 Basecone</button>
+  <button data-tab="basecone">🧾 Basecone</button>
   <button data-tab="kennisbank">🧠 Knowledgebase Shai</button>
   <button data-tab="herhaal">📅 Herhaal</button>
   <button data-tab="vraagposten" class="actief">📋 Vraagposten (2999)</button>
@@ -642,8 +651,14 @@
           <button class="knop stil" id="btn-fa-opnieuw">Opnieuw lezen</button>
           <button class="knop stil" id="btn-fa-terug" style="display:none">Terug naar beoordelen</button>
           <button class="knop stil" id="btn-fa-overslaan">Overslaan</button>
-          <button class="knop stil" id="btn-fa-afwijzen" title="Shai wijst dit document bij zijn volgende ronde af in Basecone; het komt in de Rejectbox (terug te halen).">Laten afwijzen door Shai</button>
+          <button class="knop stil" id="btn-fa-verwijderen" title="Shai verwijdert dit document bij zijn volgende ronde uit Basecone. De scan blijft bewaard in het tabje DELETED.">Laten verwijderen door Shai</button>
         </p>
+        <div class="fa-verwijder-vak" id="fa-verwijder-vak" style="display:none">
+          <label for="fa-verwijder-reden">Waarom verwijderen? (komt in de mail aan de klant)</label>
+          <input type="text" id="fa-verwijder-reden" placeholder="bv. Dit is een rekeningoverzicht, geen factuur" maxlength="300">
+          <button class="knop" id="btn-fa-verwijder-ok">Verwijderen door Shai</button>
+          <button class="knop stil" id="btn-fa-verwijder-annuleer">Annuleren</button>
+        </div>
         <div id="melding-fa-detail"></div>
         <div class="rij">
           <div><label>Crediteur * <button type="button" class="knop stil" id="btn-fa-crd-ververs" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Net een crediteur aangemaakt in Twinfield? Haal de lijst opnieuw op.">↻ Crediteuren uit Twinfield</button><button type="button" class="knop stil" id="btn-fa-crd-nieuw" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Staat de leverancier er nog niet in? Shai maakt hem aan in Basecone.">＋ Nieuwe crediteur</button></label><div class="fa-crd-vak"><input type="text" id="fa-crediteur" placeholder="bv. C0197 of een naam" autocomplete="off"><span id="fa-crediteur-naam" class="fa-crd-naam"></span></div></div>
@@ -696,6 +711,30 @@
     </div>
   </div>
 
+</section>
+
+<!-- ============ TAB: BASECONE → DELETED (Shereen 12 okt) ============ -->
+<section id="tab-verwijderd" style="display:none">
+  <div class="kaart">
+    <h2>Basecone — verwijderd door Shai</h2>
+    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Hier staat elk document dat Shai op jouw aanwijzing uit Basecone heeft verwijderd (knop <b>Laten verwijderen door Shai</b> bij een document), met de eerste pagina van de scan, de uploaddatum en de reden. De scan blijft hier bewaard. Vink documenten van één klant aan en kies <b>✉ Klant mailen</b> om de klant te laten weten welke documenten we hebben weggehaald en waarom. De mail gaat naar de contactpersonen die in E-Board de aanleverherinneringen krijgen, vanaf het Endura-mailadres; de eerste pagina van elk document zit als bijlage bij de mail. Klik op een afbeelding om hem groot te zien.</details>
+    <div class="fa-balk">
+      <select id="vw-office" style="width:auto"></select>
+      <label style="font-weight:normal; display:flex; align-items:center; gap:6px; margin:0"><input type="checkbox" id="vw-ook-gemaild"> Ook al gemailde tonen</label>
+      <button class="knop stil" id="btn-vw-ververs" style="padding:6px 12px">↻ Verversen</button>
+      <button class="knop" id="btn-vw-mail" disabled>✉ Klant mailen</button>
+      <span id="vw-tal" style="font-size:13px"></span>
+    </div>
+    <div id="melding-verwijderd"></div>
+    <div class="vw-mail" id="vw-mail" style="display:none"></div>
+  </div>
+  <div class="kaart">
+    <table id="tabel-verwijderd">
+      <thead><tr><th class="fa-vink"><input type="checkbox" id="vw-vink-alles" title="Alles in deze lijst aanvinken"></th><th>Scan</th><th>Administratie</th><th>Document</th><th>Geüpload</th><th>Reden</th><th>Verwijderd</th><th>Klant gemaild</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div id="vw-groot"><img alt=""></div>
 </section>
 
 <!-- ============ TAB: KNOWLEDGEBASE SHAI (wat de Basecone-robot weet) ============ -->
@@ -3485,7 +3524,7 @@ let faDocs = [], faGekozen = null, faStam = { BAS: [], CRD: [] };
 const FA_STATUS_TEKST = {
   nieuw: "nieuw", gelezen: "wordt gelezen", voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "goedgekeurd",
   ingevuld: "ingevuld in Basecone", fout: "fout", geboekt: "geboekt", overgeslagen: "overgeslagen",
-  afwijzen: "wordt afgewezen", afgewezen: "afgewezen (Rejectbox)", splitsen: "wacht op splitsen",
+  verwijderen: "wordt verwijderd", verwijderd: "verwijderd", splitsen: "wacht op splitsen",
 };
 const datumNlKort = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? iso.split("-").reverse().join("-") : (iso || ""));   // 2026-10-01 → 01-10-2026
 const faBedrag = (n) => (n === null || n === undefined || n === "" ? "" : Number(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -3602,7 +3641,7 @@ async function faNuDraaien() {
    voorleggen (= het oude "Te beoordelen"); de keuze onthoudt deze browser. */
 const FA_STATUSSEN = [["voorstel", "Voorstel"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Wacht op robot"], ["ingevuld", "Ingevuld in Basecone"],
   ["geboekt", "Geboekt"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"], ["nieuw", "Nieuw"], ["gelezen", "Wordt gelezen"],
-  ["splitsen", "Wacht op splitsen"], ["afwijzen", "Wordt afgewezen"], ["afgewezen", "Afgewezen (Rejectbox)"]];
+  ["splitsen", "Wacht op splitsen"], ["verwijderen", "Wordt verwijderd"]];   // verwijderd: tabje DELETED
 let faStatusSel = new Set(["voorstel", "voorleggen"]);
 try { const s = JSON.parse(localStorage.getItem("bankboeker.basecone.status") || "null"); if (Array.isArray(s) && s.length) faStatusSel = new Set(s); } catch (e) { /* standaard */ }
 function faStatusBewaar() { try { localStorage.setItem("bankboeker.basecone.status", JSON.stringify([...faStatusSel])); } catch (e) { /* niet erg */ } }
@@ -4105,9 +4144,10 @@ async function openFactuur(id) {
   document.getElementById("btn-fa-goedkeuren").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-opnieuw").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-overslaan").style.display = beoordelen ? "" : "none";
-  document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "afwijzen"].includes(d.status) ? "" : "none";
-  // Afwijzen kan alleen bij een getagd document (niet bij 'splitsen': dat staat nog bij Aangeleverd).
-  document.getElementById("btn-fa-afwijzen").style.display = beoordelen || d.status === "overgeslagen" ? "" : "none";
+  document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "verwijderen"].includes(d.status) ? "" : "none";
+  // Verwijderen: alles wat nog niet geboekt of ingevuld is (Shai doet het in Basecone, ook bij Aangeleverd).
+  document.getElementById("btn-fa-verwijderen").style.display = beoordelen || ["overgeslagen", "splitsen"].includes(d.status) ? "" : "none";
+  document.getElementById("fa-verwijder-vak").style.display = "none";
   for (const el of document.querySelectorAll("#kaart-fa-detail .fa-form input, #kaart-fa-detail .fa-form select")) el.disabled = !beoordelen;
 }
 function vernieuwFaRegels(regels) {
@@ -4248,16 +4288,30 @@ async function faOpnieuwLezen() {
   } catch (e) { toonMelding("melding-fa-detail", "fout", "Lezen mislukt: " + escapeHtml(e.message)); }
   knop.disabled = false;
 }
-async function faZetStatus(status, logActie) {
+async function faZetStatus(status, logActie, extra = {}) {
   const d = faGekozen; if (!d) return;
   const wie = gebruiker ? gebruiker.email : null;
-  const { error } = await sb.from("basecone_documenten").update({ status, updated_by: wie }).eq("id", d.id);
+  const { error } = await sb.from("basecone_documenten").update({ status, updated_by: wie, ...extra }).eq("id", d.id);
   if (error) { toonMelding("melding-fa-detail", "fout", escapeHtml(error.message)); return; }
-  await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: logActie, door: wie });
+  await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: logActie, door: wie, details: extra });
   await laadFacturen();
   if (status === "overgeslagen") faVolgendeOfSluiten(d.office, "Overgeslagen.");
-  else if (status === "afwijzen") faVolgendeOfSluiten(d.office, "Shai wijst dit document bij zijn volgende ronde af (Rejectbox).");
+  else if (status === "verwijderen") faVolgendeOfSluiten(d.office, "Shai verwijdert dit document bij zijn volgende ronde uit Basecone (daarna te vinden onder DELETED).");
   else await openFactuur(d.id);
+}
+/* Laten verwijderen door Shai (Shereen 12 okt): eerst de reden vragen — die komt in de mail aan de klant. */
+function faVerwijderVragen() {
+  const d = faGekozen; if (!d) return;
+  const vak = document.getElementById("fa-verwijder-vak"), veld = document.getElementById("fa-verwijder-reden");
+  vak.style.display = "";
+  veld.value = d.verwijder_reden || "";
+  veld.focus();
+}
+async function faVerwijderBevestigen() {
+  const reden = document.getElementById("fa-verwijder-reden").value.trim();
+  if (!reden) { toonMelding("melding-fa-detail", "fout", "Vul in waarom het document weg moet — dat komt in de mail aan de klant."); return; }
+  document.getElementById("fa-verwijder-vak").style.display = "none";
+  await faZetStatus("verwijderen", "verwijderen gevraagd", { verwijder_reden: reden, verwijderd_door: gebruiker ? gebruiker.email : null });
 }
 /* Na goedkeuren/overslaan: door naar het volgende document dat beoordeeld moet worden (eerst dezelfde
    administratie, in de volgorde van de lijst), of het rechterdeel sluiten als er niets meer is
@@ -4869,8 +4923,9 @@ document.getElementById("bk-zoek").addEventListener("input", vernieuwBkTabel);
 const TAB_GROEPEN = {
   vraagposten: [["ronde", "🔁 Ronde"], ["inlezen", "1 · Inlezen"], ["controleren", "2 · Controleren"], ["exporteren", "3 · Doorvoeren"]],
   kennisbank: [["kennis", "🧠 Knowledgebase Shai"], ["regels", "Boekingsregels (2999)"]],
+  basecone: [["facturen", "🧾 Documenten"], ["verwijderd", "🗑️ DELETED"]],
 };
-const laatsteInGroep = { vraagposten: "inlezen", kennisbank: "kennis" };
+const laatsteInGroep = { vraagposten: "inlezen", kennisbank: "kennis", basecone: "facturen" };
 const groepVan = (naam) => Object.keys(TAB_GROEPEN).find(g => TAB_GROEPEN[g].some(t => t[0] === naam)) || null;
 function kiesTab(naam) {
   if (TAB_GROEPEN[naam]) naam = laatsteInGroep[naam];
@@ -4882,10 +4937,11 @@ function kiesTab(naam) {
   sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "") +
     (groep === "vraagposten" ? `<span id="kop-klant" class="subnav-klant">${huidig ? escapeHtml(`Actieve klant: ${huidig.code} · ${huidig.naam}`) : ""}</span>` : "");
   sub.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.sub)));
-  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","bank","kennis"])
+  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
   if (naam === "herhaal") laadHerhaal();
-  document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank");
+  if (naam === "verwijderd") laadVerwijderd();
+  document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank" || naam === "verwijderd");
   if (naam === "bank") { laadBank(); requestAnimationFrame(bkHoogte); }
   if (naam === "facturen") { laadFacturen(); requestAnimationFrame(faHoogte); }
   if (naam === "kennis") laadKennisTab();
@@ -5228,8 +5284,188 @@ document.getElementById("fa-crediteur").addEventListener("input", faCrediteurNaa
 faKeuzelijst(document.getElementById("fa-crediteur"), () => faStam.CRD);
 document.getElementById("btn-fa-opnieuw").addEventListener("click", faOpnieuwLezen);
 metTweedeKlik(document.getElementById("btn-fa-overslaan"), "Zeker? Klik nog eens", () => faZetStatus("overgeslagen", "overgeslagen"));
+
+/* ===== Basecone → DELETED (Shereen 12 okt) =====
+   Wat Shai op aanwijzing uit Basecone verwijderde: eerste pagina van de scan, uploaddatum, naam, reden.
+   Een selectie (één klant) kan naar de klant gemaild worden: ontvangers = contactpersonen met het vinkje
+   aanleverherinneringen in E-Board (functie shai-klantcontacten in het E-Board-project); versturen via
+   basecone-verwijderd-mail (Microsoft 365, vanaf het Endura-adres). De koppeling administratie → E-Board-
+   klant staat in het klantprofiel (eboard_klant) en wordt bij de eerste mail één keer gekozen. */
+let vwDocs = [], vwVink = new Set(), vwEboardKlanten = null;
+const EBOARD_FUNCTIES = "https://xwswtarlyygiayjrzefh.supabase.co/functions/v1";
+const vwDatum = (iso) => iso ? new Date(iso).toLocaleDateString("nl-NL", { timeZone: "America/Aruba", day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+async function vwRoep(url, body) {
+  const { data: { session } } = await sb.auth.getSession();
+  const resp = await fetch(url, { method: "POST", headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const r = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(r.fout || `HTTP ${resp.status}`);
+  return r;
+}
+const vwEboard = (body) => vwRoep(`${EBOARD_FUNCTIES}/shai-klantcontacten`, body);
+const vwMailFunctie = (body) => vwRoep(`${CFG.SUPABASE_URL}/functions/v1/basecone-verwijderd-mail`, body);
+
+async function laadVerwijderd() {
+  const { data, error } = await sb.from("basecone_documenten")
+    .select("id, office, bestandsnaam, geupload_op, verwijder_reden, verwijderd_op, verwijderd_door, klant_gemaild_op, klant_gemaild_door, klant_gemaild_aan, scan_paden, status, opmerking")
+    .in("status", ["verwijderd", "verwijderen"]).order("verwijderd_op", { ascending: false, nullsFirst: true });
+  if (error) { toonMelding("melding-verwijderd", "fout", escapeHtml(error.message)); return; }
+  vwDocs = data || [];
+  const paden = [...new Set(vwDocs.map(d => (d.scan_paden || [])[0]).filter(Boolean))];
+  const urls = {};
+  for (let i = 0; i < paden.length; i += 100) {
+    const { data: s } = await sb.storage.from("basecone-scans").createSignedUrls(paden.slice(i, i + 100), 3600);
+    for (const x of s || []) if (x.signedUrl) urls[x.path] = x.signedUrl;
+  }
+  for (const d of vwDocs) d._mini = urls[(d.scan_paden || [])[0]] || null;
+  const kies = document.getElementById("vw-office"), vorige = kies.value;
+  const offices = [...new Set(vwDocs.map(d => d.office))].sort();
+  kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
+  for (const id of [...vwVink]) if (!vwDocs.some(d => d.id === id && d.status === "verwijderd")) vwVink.delete(id);
+  vernieuwVerwijderd();
+}
+function vwZichtbaar() {
+  const office = document.getElementById("vw-office").value, ook = document.getElementById("vw-ook-gemaild").checked;
+  return vwDocs.filter(d => (!office || d.office === office) && (ook || !d.klant_gemaild_op));
+}
+function vernieuwVerwijderd() {
+  const lijst = vwZichtbaar();
+  const tbody = document.querySelector("#tabel-verwijderd tbody");
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="8" style="padding:14px">Niets om te tonen.</td></tr>`;
+  for (const d of lijst) {
+    const tr = document.createElement("tr");
+    const isPdf = /\.pdf$/i.test((d.scan_paden || [])[0] || "");
+    const scan = !d._mini ? "—" : isPdf ? `<a href="${escapeHtml(d._mini)}" target="_blank" rel="noopener">PDF</a>` : `<img class="vw-mini" src="${escapeHtml(d._mini)}" alt="eerste pagina">`;
+    const weg = d.status === "verwijderen"
+      ? `<span class="fa-status verwijderen">wacht op Shai</span>${d.opmerking ? `<br><span style="font-size:12px">${escapeHtml(d.opmerking)}</span>` : ""}`
+      : `${escapeHtml(vwDatum(d.verwijderd_op))}${d.verwijderd_door ? `<br><span style="font-size:12px">${escapeHtml(d.verwijderd_door)}</span>` : ""}`;
+    const gemaild = d.klant_gemaild_op ? `${escapeHtml(vwDatum(d.klant_gemaild_op))}<br><span style="font-size:12px">${escapeHtml(d.klant_gemaild_aan || "")}</span>` : "";
+    tr.innerHTML = `<td class="fa-vink">${d.status === "verwijderd" ? `<input type="checkbox"${vwVink.has(d.id) ? " checked" : ""}>` : ""}</td>
+      <td>${scan}</td><td>${escapeHtml(d.office)}</td><td>${escapeHtml(d.bestandsnaam || "")}</td><td>${escapeHtml(vwDatum(d.geupload_op))}</td>
+      <td>${escapeHtml(d.verwijder_reden || "")}</td><td>${weg}</td><td>${gemaild}</td>`;
+    const vak = tr.querySelector("input[type=checkbox]");
+    if (vak) vak.addEventListener("change", () => { vak.checked ? vwVink.add(d.id) : vwVink.delete(d.id); vwKnoppen(); });
+    const img = tr.querySelector("img.vw-mini");
+    if (img) img.addEventListener("click", () => { const g = document.getElementById("vw-groot"); g.querySelector("img").src = d._mini; g.style.display = "flex"; });
+    tbody.appendChild(tr);
+  }
+  document.getElementById("vw-vink-alles").checked = lijst.some(d => d.status === "verwijderd") && lijst.filter(d => d.status === "verwijderd").every(d => vwVink.has(d.id));
+  vwKnoppen();
+}
+function vwKnoppen() {
+  const gekozen = vwDocs.filter(d => vwVink.has(d.id));
+  const offices = new Set(gekozen.map(d => d.office));
+  document.getElementById("btn-vw-mail").disabled = !gekozen.length || offices.size !== 1;
+  document.getElementById("vw-tal").textContent = !gekozen.length ? "" : offices.size > 1
+    ? `${gekozen.length} aangevinkt — kies documenten van één klant om te mailen`
+    : `${gekozen.length} aangevinkt (${[...offices][0]})`;
+}
+
+/* Het mailvenster: E-Board-klant (eenmalig koppelen), ontvangers, taal, toelichting, voorbeeld, proef, versturen. */
+let vwMail = null;   // { office, ids, klant, contacten }
+async function vwMailOpenen() {
+  const gekozen = vwDocs.filter(d => vwVink.has(d.id) && d.status === "verwijderd");
+  const office = gekozen[0]?.office;
+  if (!gekozen.length || gekozen.some(d => d.office !== office)) return;
+  vwMail = { office, ids: gekozen.map(d => d.id), klant: null, contacten: [] };
+  const vak = document.getElementById("vw-mail");
+  vak.style.display = "";
+  vak.innerHTML = "Even kijken in E-Board…";
+  const p = profielen.find(x => x.code === office);
+  if (p && p.eboard_klant && p.eboard_klant.id) await vwKlantGekozen(p.eboard_klant.id);
+  else await vwKlantKiezen();
+}
+async function vwKlantKiezen() {
+  const vak = document.getElementById("vw-mail"), { office } = vwMail;
+  try { if (!vwEboardKlanten) vwEboardKlanten = (await vwEboard({ actie: "klanten" })).klanten; }
+  catch (e) { vak.innerHTML = `<p>E-Board gaf de klantenlijst niet: ${escapeHtml(e.message)}</p>`; return; }
+  const p = profielen.find(x => x.code === office);
+  // Voorstel: E-Board-klant met de meeste woorden gemeen met de naam van de administratie.
+  const woorden = (s) => new Set(String(s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter(w => w.length > 2));
+  const eigen = woorden((p && p.naam) || office);
+  let best = null, score = 0;
+  for (const k of vwEboardKlanten) { const s = [...woorden(k.naam)].filter(w => eigen.has(w)).length; if (s > score) { score = s; best = k; } }
+  const label = (k) => `${k.naam} (${k.debiteur || "geen debiteurnr"})`;
+  vak.innerHTML = `<p style="margin:0 0 6px"><b>Bij welke klant in E-Board hoort ${escapeHtml(office)}${p && p.naam ? " (" + escapeHtml(p.naam) + ")" : ""}?</b> Dit kies je één keer; Shai Booking onthoudt het.</p>
+    <input type="text" id="vw-klant-zoek" list="vw-klant-lijst" style="width:420px; max-width:100%" placeholder="Typ de naam of het debiteurnummer" value="${best ? escapeHtml(label(best)) : ""}">
+    <datalist id="vw-klant-lijst">${vwEboardKlanten.map(k => `<option value="${escapeHtml(label(k))}"></option>`).join("")}</datalist>
+    <button class="knop" id="btn-vw-klant-ok">Koppelen</button> <button class="knop stil" id="btn-vw-sluit">Annuleren</button>`;
+  document.getElementById("btn-vw-sluit").addEventListener("click", vwMailSluiten);
+  document.getElementById("btn-vw-klant-ok").addEventListener("click", async () => {
+    const waarde = document.getElementById("vw-klant-zoek").value.trim();
+    const k = vwEboardKlanten.find(x => label(x) === waarde);
+    if (!k) { toonMelding("melding-verwijderd", "fout", "Kies een klant uit de lijst."); return; }
+    if (p) { p.eboard_klant = { id: k.id, naam: k.naam, debiteur: k.debiteur }; bewaarCloud(); }
+    await vwKlantGekozen(k.id);
+  });
+}
+async function vwKlantGekozen(customerId) {
+  const vak = document.getElementById("vw-mail");
+  let r;
+  try { r = await vwEboard({ actie: "contacten", customer_id: customerId }); }
+  catch (e) { vak.innerHTML = `<p>E-Board gaf de contactpersonen niet: ${escapeHtml(e.message)}</p> <button class="knop stil" id="btn-vw-anders">Andere E-Board-klant kiezen</button>`; document.getElementById("btn-vw-anders").addEventListener("click", vwKlantKiezen); return; }
+  vwMail.klant = r.klant; vwMail.contacten = r.contacten;
+  const n = vwMail.ids.length;
+  vak.innerHTML = `<p style="margin:0 0 6px"><b>Mail aan ${escapeHtml(r.klant.naam)}</b> (${escapeHtml(r.klant.debiteur || "")}) over ${n} verwijderd${n === 1 ? " document" : "e documenten"} · <a href="#" id="vw-anders">andere E-Board-klant</a></p>
+    <div><b>Aan</b> (contactpersonen met aanleverherinneringen in E-Board):</div>
+    ${r.contacten.length ? r.contacten.map((c, i) => `<label class="vw-ontvanger"><input type="checkbox" class="vw-aan" value="${escapeHtml(c.email)}" checked> ${escapeHtml(c.naam || "")} &lt;${escapeHtml(c.email)}&gt;</label>`).join("")
+      : `<p style="margin:2px 0">Niemand bij deze klant heeft in E-Board het vinkje <i>aanleverherinneringen</i>. Vul hieronder zelf een adres in, of zet het vinkje in E-Board.</p>`}
+    <label style="margin-top:6px">Extra adres(sen), met komma's</label><input type="text" id="vw-extra" style="width:420px; max-width:100%">
+    <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:6px">
+      <div><label>Taal</label><select id="vw-taal"><option value="nl"${r.klant.taal !== "en" ? " selected" : ""}>Nederlands</option><option value="en"${r.klant.taal === "en" ? " selected" : ""}>English</option></select></div>
+      <div style="flex:1; min-width:260px"><label>Extra toelichting (optioneel, komt onder de tabel)</label><textarea id="vw-toelichting" rows="2" style="width:100%"></textarea></div>
+    </div>
+    <div class="vw-voorbeeld" id="vw-voorbeeld">Voorbeeld laden…</div>
+    <button class="knop stil" id="btn-vw-proef">Proefmail naar mij</button>
+    <button class="knop" id="btn-vw-verstuur">✉ Verstuur naar de klant</button>
+    <button class="knop stil" id="btn-vw-sluit">Sluiten</button>`;
+  document.getElementById("vw-anders").addEventListener("click", (e) => { e.preventDefault(); vwKlantKiezen(); });
+  document.getElementById("btn-vw-sluit").addEventListener("click", vwMailSluiten);
+  document.getElementById("vw-taal").addEventListener("change", vwVoorbeeld);
+  let t = null; document.getElementById("vw-toelichting").addEventListener("input", () => { clearTimeout(t); t = setTimeout(vwVoorbeeld, 600); });
+  document.getElementById("btn-vw-proef").addEventListener("click", () => vwVersturen("proef"));
+  metTweedeKlik(document.getElementById("btn-vw-verstuur"), () => `Zeker? Klik nog eens (naar ${vwOntvangers().length} adres${vwOntvangers().length === 1 ? "" : "sen"})`, () => vwVersturen("versturen"));
+  vwVoorbeeld();
+}
+function vwOntvangers() {
+  const aan = [...document.querySelectorAll("#vw-mail .vw-aan:checked")].map(i => i.value);
+  const extra = (document.getElementById("vw-extra")?.value || "").split(/[,;\s]+/).map(s => s.trim()).filter(Boolean);
+  return [...new Set([...aan, ...extra].map(s => s.toLowerCase()))];
+}
+function vwBody(modus) {
+  return { document_ids: vwMail.ids, klant_naam: vwMail.klant.naam, taal: document.getElementById("vw-taal").value,
+    toelichting: document.getElementById("vw-toelichting").value, aan: vwOntvangers(), modus };
+}
+async function vwVoorbeeld() {
+  const vak = document.getElementById("vw-voorbeeld"); if (!vak) return;
+  try { const r = await vwMailFunctie(vwBody("voorbeeld")); vak.innerHTML = `<div style="font-weight:600; margin-bottom:6px">Onderwerp: ${escapeHtml(r.onderwerp)}</div>${r.html}`; }
+  catch (e) { vak.textContent = "Voorbeeld lukte niet: " + e.message; }
+}
+async function vwVersturen(modus) {
+  if (modus === "versturen" && !vwOntvangers().length) { toonMelding("melding-verwijderd", "fout", "Kies minstens één ontvanger."); return; }
+  const knoppen = [...document.querySelectorAll("#vw-mail button")]; knoppen.forEach(k => k.disabled = true);
+  try {
+    const r = await vwMailFunctie(vwBody(modus));
+    const zonder = r.zonder_bijlage && r.zonder_bijlage.length ? ` (zonder bijlage: ${r.zonder_bijlage.join(", ")})` : "";
+    if (modus === "proef") toonMelding("melding-verwijderd", "ok", `Proefmail verstuurd naar ${escapeHtml(r.aan.join(", "))}${escapeHtml(zonder)}.`);
+    else { toonMelding("melding-verwijderd", "ok", `Verstuurd naar ${escapeHtml(r.aan.join(", "))}${escapeHtml(zonder)}.`); vwVink.clear(); vwMailSluiten(); await laadVerwijderd(); }
+  } catch (e) { toonMelding("melding-verwijderd", "fout", "Versturen lukte niet: " + escapeHtml(e.message)); }
+  knoppen.forEach(k => { if (k.isConnected) k.disabled = false; });
+}
+function vwMailSluiten() { vwMail = null; const v = document.getElementById("vw-mail"); v.style.display = "none"; v.innerHTML = ""; }
+document.getElementById("vw-office").addEventListener("change", vernieuwVerwijderd);
+document.getElementById("vw-ook-gemaild").addEventListener("change", vernieuwVerwijderd);
+document.getElementById("btn-vw-ververs").addEventListener("click", laadVerwijderd);
+document.getElementById("btn-vw-mail").addEventListener("click", vwMailOpenen);
+document.getElementById("vw-vink-alles").addEventListener("change", (e) => {
+  for (const d of vwZichtbaar()) if (d.status === "verwijderd") e.target.checked ? vwVink.add(d.id) : vwVink.delete(d.id);
+  vernieuwVerwijderd();
+});
+document.getElementById("vw-groot").addEventListener("click", (e) => { e.currentTarget.style.display = "none"; });
 document.getElementById("btn-fa-terug").addEventListener("click", () => faZetStatus("voorstel", "terug naar beoordelen"));
-metTweedeKlik(document.getElementById("btn-fa-afwijzen"), "Zeker? Klik nog eens", () => faZetStatus("afwijzen", "afwijzen gevraagd"));
+document.getElementById("btn-fa-verwijderen").addEventListener("click", faVerwijderVragen);
+document.getElementById("btn-fa-verwijder-ok").addEventListener("click", faVerwijderBevestigen);
+document.getElementById("btn-fa-verwijder-annuleer").addEventListener("click", () => { document.getElementById("fa-verwijder-vak").style.display = "none"; });
+document.getElementById("fa-verwijder-reden").addEventListener("keydown", (e) => { if (e.key === "Enter") faVerwijderBevestigen(); });
 document.getElementById("btn-fa-regel").addEventListener("click", () => vernieuwFaRegels([...leesFaRegels(), { grootboek: "", bedrag: 0, inhoud: "", omschrijving: document.getElementById("fa-omschrijving").value }]));
 document.getElementById("fa-omschrijving").addEventListener("input", faOmsTeller);
 document.getElementById("fa-datum").addEventListener("input", faDatumTekst);

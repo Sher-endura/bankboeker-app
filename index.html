@@ -3799,10 +3799,6 @@ async function laadFacturen() {
     faRekNamen = {}; faCrdNamen = {};
     for (const rij of st || []) for (const x of rij.data || []) (rij.soort === "CRD" ? faCrdNamen : faRekNamen)[`${rij.office}|${x.code}`] = x.naam;
   }
-  const kies = document.getElementById("fa-office");
-  const offices = [...new Set(faDocs.map(d => d.office))].sort();
-  const vorige = kies.value;
-  kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
   vernieuwFaFilters();
   vernieuwFaTabel();
 }
@@ -3920,6 +3916,8 @@ function vernieuwFaFilters() {
   requestAnimationFrame(faHoogte);
 }
 function vernieuwFaTabel() {
+  const faSub = document.getElementById("fa-substatus").value;
+  vulAdminKeuze("fa-office", faDocs.filter(d => faStatusSel.has(d.status) && pastSubstatus(faSub, d.status, "shai")).map(d => d.office));
   const tbody = document.querySelector("#tabel-facturen tbody");
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
@@ -5016,8 +5014,6 @@ async function laadBank() {
   }
   const { data: ur } = await sb.from("bank_uitleg_regels").select("*").eq("actief", true);
   bkUitlegRegels = ur || [];
-  const kies = document.getElementById("bk-office"), vorige = kies.value;
-  kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
   vernieuwBkFilters();
   vernieuwBkTabel();
 }
@@ -5091,6 +5087,9 @@ function bkStandaardGoedkeuring(r) {
   return null;
 }
 function vernieuwBkTabel() {
+  const bkSub = document.getElementById("bk-substatus").value;
+  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) &&
+    pastSubstatus(bkSub, r.status, r.voorstel && r.voorstel.bron)).map(r => r.office));
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">${document.getElementById("bk-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : "Niets in deze lijst."}</td></tr>`;
@@ -5613,6 +5612,19 @@ kiesTab("inlezen");   // tot de inlog klaar is; daarna opent de app op Twinfield
 /* Een getypte naam die bij geen enkele administratie past (Shereen 12 okt): de lijst wordt leeg met
    "Niet gevonden" — niet blijven hangen op de vorige klant. Het filter krijgt dan deze waarde. */
 const GEEN_ADMIN = "__niet_gevonden__";
+/* Keuzelijst administraties volgt het tabje (Shereen 12 okt): alleen klanten die in dit tabje iets hebben.
+   De gekozen klant (of "Niet gevonden") blijft staan, ook als die hier niets heeft. */
+function vulAdminKeuze(selectId, offices) {
+  const kies = document.getElementById(selectId), vorige = kies.value;
+  const lijst = [...new Set(offices.filter(Boolean))].sort();
+  if (vorige && vorige !== GEEN_ADMIN && !lijst.includes(vorige)) lijst.push(vorige);
+  const sleutel = lijst.join("|");
+  if (kies.dataset.lijst === sleutel) return;   // ongewijzigd: niets opnieuw opbouwen
+  const geen = [...kies.options].find(x => x.value === GEEN_ADMIN);
+  kies.innerHTML = `<option value="">Alle administraties</option>` + lijst.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
+  if (vorige === GEEN_ADMIN && geen) { kies.appendChild(geen); kies.value = GEEN_ADMIN; }
+  kies.dataset.lijst = sleutel;
+}
 function maakZoekbaar(selectId, placeholder, { nietGevonden = false } = {}) {
   const sel = document.getElementById(selectId);
   if (!sel || sel.dataset.zoekbaar) return;

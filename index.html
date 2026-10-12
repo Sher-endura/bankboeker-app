@@ -3610,19 +3610,19 @@ function shaiStatus(vak, data, w) {
   if (!data) { vak.className = basis; vak.textContent = `Shai heeft zich nog niet gemeld bij ${w.app}.`; return; }
   const minuten = Math.round((Date.now() - new Date(data.laatste_hartslag).getTime()) / 60000);
   const gemeld = `laatst gemeld ${minuten < 1 ? "net" : minuten + " min geleden"}`;
-  const start = `start de snelkoppeling "${w.snelkoppeling}"`;
   const bericht = data.bericht ? " — " + escapeHtml(data.bericht) : "";
   let soort, kop, rest = bericht;
-  if (data.status === "gestopt") { soort = "slecht"; kop = `Shai is gestopt — ${start}`; }
-  else if (minuten > w.maxMinuten) { soort = "slecht"; kop = `Shai draait niet (al ${minuten} min niets gehoord) — ${start}`; rest = ""; }
+  if (data.status === "gestopt") { soort = "slecht"; kop = `Shai is gestopt — klik ↻ Opnieuw verbinden`; }
+  else if (minuten > w.maxMinuten) { soort = "slecht"; kop = `Shai draait niet (al ${minuten} min niets gehoord) — klik ↻ Opnieuw verbinden`; rest = ""; }
   else if (data.status === "geen_verbinding") { soort = "slecht"; kop = `Geen verbinding met het ${w.app}-venster`; }
-  else if (data.status === "inloggen_nodig") { soort = "slecht"; kop = `Niet ingelogd bij ${w.app} — log in het ${w.app}-venster in als ${w.gebruiker}`; rest = ""; }
+  else if (data.status === "inloggen_nodig") { soort = "slecht"; kop = `Niet ingelogd bij ${w.app} — klik ↻: Shai zet zijn ${w.app}-venster vooraan, log daar in als ${w.gebruiker}`; rest = ""; }
   else if (data.status === "fout") { soort = "let"; kop = `Verbonden met ${w.app}, maar de laatste ronde gaf een fout`; }
   else { soort = "goed"; kop = `Verbonden met ${w.app}, ingelogd als ${w.gebruiker}`; }
   vak.className = basis + " " + soort;
   // ↻ Opnieuw verbinden (Shereen 12 okt): de Shai-wachter op de robot-pc stopt deze Shai en start hem opnieuw.
-  // Niet bij "niet ingelogd": dat lost een herstart niet op (inloggen met tweestaps doet Shereen zelf).
-  const knop = soort !== "goed" && data.status !== "inloggen_nodig";
+  // Ook bij "niet ingelogd" (Shereen 12 okt): de wachter zet dan Shai's eigen venster vooraan, zodat je
+  // ziet wáár je moet inloggen. Inloggen (met tweestaps) doet Shereen zelf; Shai gaat daarna vanzelf verder.
+  const knop = soort !== "goed";
   // Knop vooraan: de smalle regel in Twinfield Bank kapt het einde af.
   vak.innerHTML = (knop ? `<button type="button" class="knop shai-herstart">↻ Opnieuw verbinden</button> ` : "") +
     `<b>● ${escapeHtml(kop)}</b>${rest} · ${gemeld}`;
@@ -3639,7 +3639,7 @@ async function shaiHerstart(knop, vak, w) {
   if (!wachterLeeft) return zeg(`De Shai-wachter draait niet op de robot-pc — start daar de snelkoppeling "Shai wachter"`);
   const { error } = await sb.from(w.log).insert({ actie: "herstart", door: gebruiker ? gebruiker.email : null });
   if (error) return zeg("Lukte niet: " + error.message);
-  zeg("↻ Gevraagd — Shai start binnen een minuut opnieuw");
+  zeg(`↻ Gevraagd — Shai start opnieuw en zet zijn ${w.app}-venster vooraan (binnen een minuut)`);
   setTimeout(() => (w.log === "bank_log" ? laadBankStatus() : laadRobotStatus()), 60000);
 }
 async function laadRobotStatus() {

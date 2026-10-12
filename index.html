@@ -136,12 +136,15 @@
   .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
   /* Statuskleuren — één werkwijze voor Twinfield Bank én Basecone (Shereen 12 okt): verander je hier iets,
      dan verandert het in beide tabbladen. Per bron (11 okt): TF voorstel turquoise, TF voorleggen lichtblauw,
-     Shai voorstel paars, Shai voorleggen oranje; "wacht op Shai" lichtroze. */
+     Shai voorstel paars, Shai voorleggen oranje; goedgekeurd lichtroze. Basecone heeft twee eigen statussen
+     met een frisse kleur (Shereen 12 okt): wacht op splitsen zonnig geel, wordt verwijderd limoen. */
   .fa-status.voorstel.shai { background: #9D00FF; color: #fff; }
   .fa-status.voorleggen.shai { background: #FFA500; color: #1f2937; }
   .fa-status.voorleggen.tf { background: #00BFFF; color: #06263a; }
   .fa-status.voorstel.tf { background: #40E0D0; color: #06302d; }
   .fa-status.goedgekeurd { background: #FFB6C1; color: #1f2937; }
+  .fa-status.splitsen { background: #FFD93D; color: #1f2937; }
+  .fa-status.verwijderen { background: #C6F432; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   .bk-regel1 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
   .fa-robot button.shai-herstart { padding: 3px 10px; font-size: 12px; margin-right: 6px; }
@@ -3554,7 +3557,7 @@ let faDocs = [], faGekozen = null, faStam = { BAS: [], CRD: [] };
    één moet same zijn bij de ander"). Zelfde woorden en (via de CSS .fa-status) zelfde kleuren. Bij voorstel
    en voorleggen staat erbij wie voorstelt: "TF" (Twinfields eigen herkenning) of "Shai". */
 const SHAI_STATUS_TEKST = {
-  nieuw: "nieuw", gelezen: "wordt gelezen", voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "wacht op Shai",
+  nieuw: "nieuw", gelezen: "wordt gelezen", voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "goedgekeurd",
   ingevuld: "ingevuld in Basecone", toegewezen: "toegewezen", verwerkt: "verwerkt (concept)", geboekt: "geboekt",
   fout: "fout", overgeslagen: "overgeslagen", verwijderen: "wordt verwijderd", verwijderd: "verwijderd", splitsen: "wacht op splitsen",
 };
@@ -3711,7 +3714,7 @@ async function faNuDraaien() {
 }
 /* Status als uitklaplijst met vinkjes, net als Twinfield Bank (Shereen 11 okt). Standaard voorstel +
    voorleggen (= het oude "Te beoordelen"); de keuze onthoudt deze browser. */
-const FA_STATUSSEN = [["voorstel", "Voorstel"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Wacht op Shai"], ["ingevuld", "Ingevuld in Basecone"],
+const FA_STATUSSEN = [["voorstel", "Voorstel"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Goedgekeurd"], ["ingevuld", "Ingevuld in Basecone"],
   ["geboekt", "Geboekt"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"], ["nieuw", "Nieuw"], ["gelezen", "Wordt gelezen"],
   ["splitsen", "Wacht op splitsen"], ["verwijderen", "Wordt verwijderd"]];   // verwijderd: tabje DELETED
 let faStatusSel = new Set(["voorstel", "voorleggen"]);
@@ -4776,7 +4779,7 @@ function bkZichtbaar() {
 }
 /* Status als uitklaplijst met vinkjes (Shereen 11 okt). Losse statussen, zodat combineren kan;
    standaard voorstel + voorleggen (= het oude "Te beoordelen"). De keuze onthoudt deze browser. */
-const BK_STATUSSEN = [["voorstel", "Voorstel (TF en Shai)"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Wacht op Shai"],
+const BK_STATUSSEN = [["voorstel", "Voorstel (TF en Shai)"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Goedgekeurd"],
   ["toegewezen", "Toegewezen"], ["verwerkt", "Verwerkt (concept)"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"]];
 let bkStatusSel = new Set(["voorstel", "voorleggen"]);
 try { const s = JSON.parse(localStorage.getItem("bankboeker.bank.status") || "null"); if (Array.isArray(s) && s.length) bkStatusSel = new Set(s); } catch (e) { /* standaard */ }
@@ -5442,7 +5445,7 @@ function vernieuwVerwijderd() {
     const isPdf = /\.pdf$/i.test((d.scan_paden || [])[0] || "");
     const scan = !d._mini ? "—" : isPdf ? `<a href="${escapeHtml(d._mini)}" target="_blank" rel="noopener">PDF</a>` : `<img class="vw-mini" src="${escapeHtml(d._mini)}" alt="eerste pagina">`;
     const weg = d.status === "verwijderen"
-      ? `<span class="fa-status verwijderen">wacht op Shai</span>${d.opmerking ? `<br><span style="font-size:12px">${escapeHtml(d.opmerking)}</span>` : ""}`
+      ? `${statusLabel("verwijderen")}${d.opmerking ? `<br><span style="font-size:12px">${escapeHtml(d.opmerking)}</span>` : ""}`
       : `${escapeHtml(vwDatum(d.verwijderd_op))}${d.verwijderd_door ? `<br><span style="font-size:12px">${escapeHtml(d.verwijderd_door)}</span>` : ""}`;
     const gemaild = d.klant_gemaild_op ? `${escapeHtml(vwDatum(d.klant_gemaild_op))}<br><span style="font-size:12px">${escapeHtml(d.klant_gemaild_aan || "")}</span>` : "";
     tr.innerHTML = `<td class="fa-vink">${d.status === "verwijderd" ? `<input type="checkbox"${vwVink.has(d.id) ? " checked" : ""}>` : ""}</td>

@@ -775,6 +775,7 @@
     <div class="status-tabjes" id="bk-tabjes"></div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
+      <button class="knop stil" id="btn-bk-vraagposten" title="Keurt de aangevinkte regels goed op de vraagpostenrekening van die klant (bv. 2999); Shai wijst ze daarna toe en boekt ze (concept).">→ Aangevinkte naar Vraagposten</button>
       <span id="bk-bulk-tekst"></span>
     </div>
     <div id="melding-bank"></div>
@@ -4859,7 +4860,7 @@ function vernieuwBkTabel() {
     }
     const v = r.goedgekeurd && r.goedgekeurd.regels ? { ...r.voorstel, ...r.goedgekeurd } : r.voorstel || {};
     const z = Number((r.voorstel || {}).zekerheid || 0);
-    const kanVink = BK_BEOORDELEN.includes(r.status) && bkStandaardGoedkeuring(r);
+    const kanVink = BK_BEOORDELEN.includes(r.status);   // ook zonder voorstel: kan naar Vraagposten (Shereen 12 okt)
     const bron = bkHerkomst(r);   // herkomst: alleen in de ⓘ en in de kolom Bron (Shereen 11 okt)
     const uitleg = (r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "");
     const tr = document.createElement("tr");
@@ -5000,13 +5001,27 @@ function bkBulkStand() {
   alles.indeterminate = bkVink.size > 0 && !alles.checked;
   document.getElementById("bk-bulk").style.display = bkVink.size ? "" : "none";
   const voorleggen = bkRegels.filter(r => bkVink.has(r.id) && r.status === "voorleggen").length;
-  document.getElementById("bk-bulk-tekst").textContent = `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Shai wijst ze daarna toe in Twinfield, precies zoals voorgesteld.`;
+  const zonder = bkRegels.filter(r => bkVink.has(r.id) && !bkStandaardGoedkeuring(r)).length;
+  document.getElementById("bk-bulk-tekst").textContent = `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Goedkeuren: Shai wijst ze toe precies zoals voorgesteld${zonder ? ` (${zonder} zonder voorstel — die kunnen alleen naar Vraagposten)` : ""}. Naar Vraagposten: op de vraagpostenrekening van de klant.`;
 }
 document.getElementById("bk-vink-alles").addEventListener("change", (e) => {
   for (const r of bkVinkbaar()) e.target.checked ? bkVink.add(r.id) : bkVink.delete(r.id);
   vernieuwBkTabel();
 });
 document.getElementById("btn-bk-bulk").addEventListener("click", () => bkGoedkeuren(bkRegels.filter(r => bkVink.has(r.id)), bkStandaardGoedkeuring));
+/* Aangevinkte naar Vraagposten (Shereen 12 okt): goedkeuren op de vraagpostenrekening van die klant
+   (klantprofiel, standaard 2999) met de nette omschrijving; Shai wijst daarna toe en boekt (concept). */
+document.getElementById("btn-bk-vraagposten").addEventListener("click", () => {
+  const regels = bkRegels.filter(r => bkVink.has(r.id));
+  const vpVan = (office) => ((profielen.find(p => p.code === office) || {}).vraagposten || "2999").trim();
+  const zonder = [...new Set(regels.filter(r => !bkRekNamen[`${r.office}|${vpVan(r.office)}`]).map(r => `${r.office} (${vpVan(r.office)})`))];
+  if (zonder.length) return toonMelding("melding-bank", "fout", "De vraagpostenrekening staat niet in het rekeningschema van: " + escapeHtml(zonder.join(", ")) + ". Zet de juiste rekening in het klantprofiel (Settings). Er is niets goedgekeurd.");
+  bkGoedkeuren(regels, (r) => {
+    const vp = vpVan(r.office);
+    return { soort: "grootboek", vraagposten: true, regels: [{ rekening: vp, bedrag: Number(r.bedrag) }],
+      omschrijving: (bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum)).slice(0, 40) };
+  });
+});
 document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);
 document.getElementById("btn-bk-ververs").addEventListener("click", async (e) => {
   // Laten zien dát hij ververst (Shereen 12 okt: "ik denk dat deze knop niet werkt").

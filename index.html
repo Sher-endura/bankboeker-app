@@ -152,11 +152,11 @@
   .bk-hoe { position: relative; }
   .bk-hoe summary { cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; }
   .bk-hoe-tekst { position: absolute; right: 0; top: 26px; width: min(560px, 90vw); background: #fff; border: 1px solid var(--rand); border-radius: 10px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.15); z-index: 40; margin: 0; }
-  .bk-status-keuze { position: relative; display: inline-block; }
-  .bk-status-lijst { position: absolute; top: 38px; left: 0; z-index: 40; background: #fff; border: 1px solid var(--rand); border-radius: 10px; padding: 8px 12px; box-shadow: 0 6px 24px rgba(0,0,0,.15); min-width: 270px; }
-  .bk-status-lijst label { display: flex; gap: 8px; align-items: center; padding: 4px 0; font-size: 14px; cursor: pointer; white-space: nowrap; color: var(--tekst); }
-  .bk-status-lijst .bk-snel { border-top: 1px solid var(--rand); margin-top: 6px; padding-top: 6px; display: flex; gap: 12px; font-size: 13px; }
-  .bk-status-lijst .bk-snel a { color: var(--blauw); cursor: pointer; }
+  /* Status als tabjes (Shereen 12 okt), gelijk in Twinfield Bank en Basecone; selectiestreep zalm. */
+  .status-tabjes { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--rand); margin: 0 0 10px; }
+  .status-tabjes button { background: none; border: none; border-bottom: 3px solid transparent; padding: 6px 6px; font-size: 14px; color: var(--tekst); cursor: pointer; white-space: nowrap; }
+  .status-tabjes button:hover { color: var(--blauw); }
+  .status-tabjes button.actief { color: var(--blauw); font-weight: 600; border-bottom-color: #FB7974; }
   .bk-scroll { overflow: auto; }
   #tabel-bank thead th { position: sticky; top: 0; z-index: 5; background: var(--grijs); }
   #tabel-bank tr.bk-kop td { background: var(--grijs); color: var(--tekst); font-weight: 600; font-size: 13px; }
@@ -612,7 +612,6 @@
     </div>
     <div class="bk-regel1">
       <input type="search" id="fa-zoek" placeholder="🔍 Zoek: leverancier, factuurnr, bedrag, datum, rekening…" style="width:380px; max-width:100%" autocomplete="off" title="Zoekt in álle documenten (los van het tabje). Meerdere woorden mag: bv. compra 516">
-      <span id="fa-zoek-tal" style="font-size:13px"></span>
       <div id="fa-robot" class="fa-robot bk-robot-klein"></div>
       <details class="bk-hoe"><summary>Hoe werkt dit?</summary><div class="bk-hoe-tekst fa-uitleg">De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</div></details>
     </div>
@@ -621,12 +620,9 @@
       <select id="fa-zekerheid" style="width:auto" title="Alleen documenten met deze zekerheid tonen">
         <option value="">Alle zekerheden</option><option value="hoog">Zekerheid hoog</option><option value="middel">Zekerheid middel</option><option value="laag">Zekerheid laag</option>
       </select>
-      <div class="bk-status-keuze" id="fa-status-keuze">
-        <button type="button" class="knop stil" id="btn-fa-status" style="padding:6px 12px">Status ▾</button>
-        <div class="bk-status-lijst" id="fa-filters" style="display:none"></div>
-      </div>
       <button class="knop stil" id="btn-fa-ververs" style="padding:6px 12px">↻ Verversen</button>
     </div>
+    <div class="status-tabjes" id="fa-tabjes"></div>
     <div class="fa-bulk" id="fa-bulk" style="display:none">
       <button class="knop" id="btn-fa-bulk-goedkeuren">✓ Aangevinkte goedkeuren</button>
       <span id="fa-bulk-tekst"></span>
@@ -766,12 +762,9 @@
     </div>
     <div class="fa-balk">
       <select id="bk-office" style="width:auto"></select>
-      <div class="bk-status-keuze" id="bk-status-keuze">
-        <button type="button" class="knop stil" id="btn-bk-status" style="padding:6px 12px">Status ▾</button>
-        <div class="bk-status-lijst" id="bk-filters" style="display:none"></div>
-      </div>
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
+    <div class="status-tabjes" id="bk-tabjes"></div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
       <span id="bk-bulk-tekst"></span>
@@ -3565,6 +3558,17 @@ const SHAI_STATUS_TEKST = {
   ingevuld: "ingevuld in Basecone", toegewezen: "toegewezen", verwerkt: "verwerkt (concept)", geboekt: "geboekt",
   fout: "fout", overgeslagen: "overgeslagen", verwijderen: "wordt verwijderd", verwijderd: "verwijderd", splitsen: "wacht op splitsen",
 };
+/* Statustabjes (Shereen 12 okt: "maak default voorstel en voorleggen in een tab, en alle anderen in aparte
+   tabs, voor beide"). tabjes = [[sleutel, tekst, [statussen]], …]; het eerste is de standaard. De keuze
+   onthoudt deze browser. */
+function statusTabjes(vakId, tabjes, gekozen, telling, kies) {
+  const vak = document.getElementById(vakId);
+  vak.innerHTML = tabjes.map(([sleutel, tekst, st]) =>
+    `<button type="button" data-tab="${sleutel}"${sleutel === gekozen ? ' class="actief"' : ""}>${escapeHtml(tekst)} (${st.reduce((n, x) => n + telling(x), 0)})</button>`).join("");
+  vak.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kies(b.dataset.tab)));
+}
+const leesTabje = (sleutel, tabjes) => { try { const t = localStorage.getItem(sleutel); if (tabjes.some(x => x[0] === t)) return t; } catch (e) { /* standaard */ } return tabjes[0][0]; };
+const bewaarTabje = (sleutel, t) => { try { localStorage.setItem(sleutel, t); } catch (e) { /* niet erg */ } };
 function statusLabel(status, bron) {
   const wie = (status === "voorstel" || status === "voorleggen") && bron ? (bron === "twinfield" ? "tf" : "shai") : "";
   const tekst = (wie ? (wie === "tf" ? "TF " : "Shai ") : "") + (SHAI_STATUS_TEKST[status] || status);
@@ -3716,49 +3720,26 @@ async function faNuDraaien() {
   }
   setTimeout(() => { knop.disabled = false; laadRobotStatus(); }, 30000);
 }
-/* Status als uitklaplijst met vinkjes, net als Twinfield Bank (Shereen 11 okt). Standaard voorstel +
-   voorleggen (= het oude "Te beoordelen"); de keuze onthoudt deze browser. */
-const FA_STATUSSEN = [["voorstel", "Voorstel"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Goedgekeurd"], ["ingevuld", "Ingevuld in Basecone"],
-  ["geboekt", "Geboekt"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"], ["nieuw", "Nieuw"], ["gelezen", "Wordt gelezen"],
-  ["splitsen", "Wacht op splitsen"], ["verwijderen", "Wordt verwijderd"]];   // verwijderd: tabje DELETED
-let faStatusSel = new Set(["voorstel", "voorleggen"]);
-try { const s = JSON.parse(localStorage.getItem("bankboeker.basecone.status") || "null"); if (Array.isArray(s) && s.length) faStatusSel = new Set(s); } catch (e) { /* standaard */ }
-function faStatusBewaar() { try { localStorage.setItem("bankboeker.basecone.status", JSON.stringify([...faStatusSel])); } catch (e) { /* niet erg */ } }
+/* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Twinfield Bank. */
+const FA_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
+  ["ingevuld", "Ingevuld in Basecone", ["ingevuld"]], ["geboekt", "Geboekt", ["geboekt"]], ["fout", "Fout", ["fout"]],
+  ["overgeslagen", "Overgeslagen", ["overgeslagen"]], ["nieuw", "Nieuw", ["nieuw"]], ["gelezen", "Wordt gelezen", ["gelezen"]],
+  ["splitsen", "Wacht op splitsen", ["splitsen"]], ["verwijderen", "Wordt verwijderd", ["verwijderen"]]];   // verwijderd: tabje DELETED
+let faTabje = leesTabje("bankboeker.basecone.tabje", FA_TABJES);
+let faStatusSel = new Set(FA_TABJES.find(t => t[0] === faTabje)[2]);
 function vernieuwFaFilters() {
-  const vak = document.getElementById("fa-filters"), office = document.getElementById("fa-office").value;
-  const telling = (s) => faDocs.filter(d => (!office || d.office === office) && d.status === s).length;
-  vak.innerHTML = FA_STATUSSEN.map(([s, tekst]) => `<label><input type="checkbox" value="${s}"${faStatusSel.has(s) ? " checked" : ""}> ${escapeHtml(tekst)} (${telling(s)})</label>`).join("") +
-    `<div class="bk-snel"><a data-snel="beoordelen">Te beoordelen</a><a data-snel="alles">Alles</a></div>`;
-  vak.querySelectorAll("input").forEach(i => i.addEventListener("change", () => {
-    i.checked ? faStatusSel.add(i.value) : faStatusSel.delete(i.value);
-    faStatusBewaar(); faStatusKnop(); vernieuwFaTabel();
-  }));
-  vak.querySelectorAll("[data-snel]").forEach(a => a.addEventListener("click", () => {
-    faStatusSel = new Set(a.dataset.snel === "alles" ? FA_STATUSSEN.map(x => x[0]) : ["voorstel", "voorleggen"]);
-    faStatusBewaar(); vernieuwFaFilters(); vernieuwFaTabel();
-  }));
-  faStatusKnop();
+  const office = document.getElementById("fa-office").value;
+  statusTabjes("fa-tabjes", FA_TABJES, faTabje, (s) => faDocs.filter(d => (!office || d.office === office) && d.status === s).length, (t) => {
+    faTabje = t; faStatusSel = new Set(FA_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.basecone.tabje", t);
+    vernieuwFaFilters(); vernieuwFaTabel();
+  });
   requestAnimationFrame(faHoogte);
 }
-function faStatusKnop() {
-  const office = document.getElementById("fa-office").value;
-  const n = faDocs.filter(d => (!office || d.office === office) && faStatusSel.has(d.status)).length;
-  const namen = FA_STATUSSEN.filter(([s]) => faStatusSel.has(s)).map(([, t]) => t);
-  document.getElementById("btn-fa-status").textContent =
-    `Status: ${namen.length === FA_STATUSSEN.length ? "alles" : namen.length > 2 ? namen.length + " gekozen" : namen.join(" + ") || "niets"} (${n}) ▾`;
-}
-document.getElementById("btn-fa-status").addEventListener("click", (e) => {
-  e.stopPropagation();
-  const l = document.getElementById("fa-filters");
-  l.style.display = l.style.display === "none" ? "" : "none";
-});
-document.addEventListener("click", (e) => { if (!e.target.closest("#fa-status-keuze")) document.getElementById("fa-filters").style.display = "none"; });
 function vernieuwFaTabel() {
   const tbody = document.querySelector("#tabel-facturen tbody");
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
   const zoekt = document.getElementById("fa-zoek").value.trim();
-  document.getElementById("fa-zoek-tal").textContent = zoekt ? `${lijst.length} gevonden (in alle statussen)` : "";
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
   for (const d of lijst) {
     const v = d.goedgekeurd || d.voorstel || {};
@@ -4781,43 +4762,25 @@ function bkZichtbaar() {
   return bkRegels.filter(r => (!office || r.office === office) && (zoek.length || bkStatusSel.has(r.status)) &&
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
-/* Status als uitklaplijst met vinkjes (Shereen 11 okt). Losse statussen, zodat combineren kan;
-   standaard voorstel + voorleggen (= het oude "Te beoordelen"). De keuze onthoudt deze browser. */
-const BK_STATUSSEN = [["voorstel", "Voorstel (TF en Shai)"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Goedgekeurd"],
-  ["toegewezen", "Toegewezen"], ["verwerkt", "Verwerkt (concept)"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"]];
-let bkStatusSel = new Set(["voorstel", "voorleggen"]);
-try { const s = JSON.parse(localStorage.getItem("bankboeker.bank.status") || "null"); if (Array.isArray(s) && s.length) bkStatusSel = new Set(s); } catch (e) { /* standaard */ }
-function bkStatusBewaar() { try { localStorage.setItem("bankboeker.bank.status", JSON.stringify([...bkStatusSel])); } catch (e) { /* niet erg */ } }
+/* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Basecone. */
+const BK_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
+  ["toegewezen", "Toegewezen", ["toegewezen"]], ["verwerkt", "Verwerkt (concept)", ["verwerkt"]], ["fout", "Fout", ["fout"]],
+  ["overgeslagen", "Overgeslagen", ["overgeslagen"]]];
+let bkTabje = leesTabje("bankboeker.bank.tabje", BK_TABJES);
+let bkStatusSel = new Set(BK_TABJES.find(t => t[0] === bkTabje)[2]);
 function vernieuwBkFilters() {
-  const vak = document.getElementById("bk-filters"), office = document.getElementById("bk-office").value;
-  const telling = (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s).length;
-  vak.innerHTML = BK_STATUSSEN.map(([s, tekst]) => `<label><input type="checkbox" value="${s}"${bkStatusSel.has(s) ? " checked" : ""}> ${escapeHtml(tekst)} (${telling(s)})</label>`).join("") +
-    `<div class="bk-snel"><a data-snel="beoordelen">Te beoordelen</a><a data-snel="alles">Alles</a></div>`;
-  vak.querySelectorAll("input").forEach(i => i.addEventListener("change", () => {
-    i.checked ? bkStatusSel.add(i.value) : bkStatusSel.delete(i.value);
-    bkStatusBewaar(); bkGekozen = null; bkStatusKnop(); vernieuwBkTabel();
-  }));
-  vak.querySelectorAll("[data-snel]").forEach(a => a.addEventListener("click", () => {
-    bkStatusSel = new Set(a.dataset.snel === "alles" ? BK_STATUSSEN.map(x => x[0]) : ["voorstel", "voorleggen"]);
-    bkStatusBewaar(); bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
-  }));
+  const office = document.getElementById("bk-office").value;
+  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s).length, (t) => {
+    bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
+    bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
+  });
   bkStatusKnop();
 }
 function bkStatusKnop() {
   const office = document.getElementById("bk-office").value;
   document.getElementById("btn-bk-nu").textContent = `▶ Shai nu laten draaien (${office || "alle klanten"})`;
-  const n = bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status)).length;
-  const namen = BK_STATUSSEN.filter(([s]) => bkStatusSel.has(s)).map(([, t]) => t.replace(/ \(.*\)/, ""));
-  document.getElementById("btn-bk-status").textContent =
-    `Status: ${namen.length === BK_STATUSSEN.length ? "alles" : namen.length > 2 ? namen.length + " gekozen" : namen.join(" + ") || "niets"} (${n}) ▾`;
 }
-document.getElementById("btn-bk-status").addEventListener("click", (e) => {
-  e.stopPropagation();
-  const l = document.getElementById("bk-filters");
-  l.style.display = l.style.display === "none" ? "" : "none";
-});
 document.addEventListener("click", (e) => {
-  if (!e.target.closest("#bk-status-keuze")) document.getElementById("bk-filters").style.display = "none";
   if (!e.target.closest(".bk-hoe")) document.querySelectorAll(".bk-hoe").forEach((d) => d.removeAttribute("open"));
 });
 /* Alleen de regels scrollen: de lijst krijgt de hoogte die onder het vaste deel overblijft. */

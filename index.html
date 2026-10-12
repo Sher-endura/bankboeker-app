@@ -1309,9 +1309,17 @@ function belastingOmschrijving(ruw, datum) {
    omschrijvingen gebruikt heb"). De omschrijving van de eerdere boeking van dezelfde naam, met de periode bijgewerkt
    ("LB - Aug 2026" → "LB - Sep 2026"). Veilig: niet als het nog de ruwe banktekst is (alleen hoofdletters, lange
    nummers) en niet als er na de periode nog cijfers in staan (bv. een oud factuurnummer). Anders null. */
+const HIST_BANKRUIS = /\b(MAESTRO|POS|TFR|TRANSFER|PAYMENT|ACH|MC ?DEBIT|MCDEBIT|VS-?MC|SALE|INTERNET ?BANKING|DEBIT|CREDIT|REF|I\.?F\.?O|AUTHORI[SZ]ATION|AUTHORIZAT|CMS|MOBILEWEB|MOBILEIOS|INSTANT|ONLINE BANKING|REVERSAL|CHEQUE)\b/i;   // bankwoorden: nooit uit de historie overnemen
 function omschrijvingUitHistorie(hist, ruw, datum) {
   const h = String(hist || "").trim();
   if (!h || h.length > 40 || !/[a-z]/.test(h) || /\d{6,}/.test(h)) return null;
+  // Ruwe bankinfo nooit overnemen (Shereen 12 okt: "daar heb ik Shai juist voor gemaakt: nette omschrijvingen"):
+  // bankwoorden, een stuk van de banktekst zelf, of grotendeels woorden in hoofdletters.
+  if (HIST_BANKRUIS.test(h)) return null;
+  const hn = uitlegNorm(h).trim();
+  if (hn.length >= 6 && uitlegNorm(ruw).includes(" " + hn + " ")) return null;
+  const woorden = h.split(/\s+/).filter((w) => /[A-Za-z]{2,}/.test(w));
+  if (woorden.length && woorden.filter((w) => w === w.toUpperCase()).length / woorden.length > 0.5) return null;
   const p = periodeDelen(ruw, datum);
   let uit = h, periodeGevonden = false;
   // mm/jjjj of jjjj-mm → nieuwe periode

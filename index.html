@@ -613,7 +613,7 @@
       <button class="knop stil" id="btn-fa-nu" style="padding:6px 12px" title="Shai wacht anders tot zijn volgende ronde (elk uur). Hij begint binnen een halve minuut.">▶ Shai nu laten draaien</button>
     </div>
     <div class="bk-regel1">
-      <input type="search" id="fa-zoek" placeholder="🔍 Zoek: leverancier, factuurnr, bedrag, datum, rekening…" style="width:380px; max-width:100%" autocomplete="off" title="Zoekt in álle documenten (los van het tabje). Meerdere woorden mag: bv. compra 516">
+      <input type="search" id="fa-zoek" placeholder="🔍 Zoek: leverancier, factuurnr, bedrag, datum, rekening…" style="width:380px; max-width:100%" autocomplete="off" title="Zoekt binnen het gekozen tabje. Meerdere woorden mag: bv. compra 516">
       <div id="fa-robot" class="fa-robot bk-robot-klein"></div>
       <details class="bk-hoe"><summary>Hoe werkt dit?</summary><div class="bk-hoe-tekst fa-uitleg">De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</div></details>
     </div>
@@ -3799,7 +3799,7 @@ const faVink = new Set();
 let faSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const FA_ZEKER = { hoog: 3, middel: 2, laag: 1 };
 /* Zoeken (Shereen 10 okt): op naam, crediteur, factuurnr, bedrag, datum, omschrijving, rekening, boekstuk.
-   Alle woorden moeten voorkomen. Zoekt in álle statussen, los van het gekozen tabje. */
+   Alle woorden moeten voorkomen. Zoekt binnen het gekozen tabje en de gekozen status (12 okt). */
 function faZoektekst(d) {
   const v = d.goedgekeurd || d.voorstel || {};
   const b = Number(v.bedrag);
@@ -3818,8 +3818,8 @@ function faZichtbaar() {
   const zoek = document.getElementById("fa-zoek").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const zekerVan = (d) => ((d.goedgekeurd || d.voorstel || {}).zekerheid || "");
   const sub = document.getElementById("fa-substatus").value;
-  const lijst = faDocs.filter(d => (!office || d.office === office) && (zoek.length || faStatusSel.has(d.status)) &&
-    (zoek.length || pastSubstatus(sub, d.status, "shai")) &&
+  const lijst = faDocs.filter(d => (!office || d.office === office) && faStatusSel.has(d.status) &&
+    pastSubstatus(sub, d.status, "shai") &&   // zoeken blijft binnen tabje + status (12 okt)
     (!zeker || zekerVan(d) === zeker) && (!zoek.length || (t => zoek.every(w => /^\d{1,2}$/.test(w) ? new RegExp(`(^|\\D)${w}(\\D|$)`).test(t) : t.includes(w)))(faZoektekst(d))));
   if (faSorteer) lijst.sort((a, b) => ((FA_ZEKER[zekerVan(a)] || 0) - (FA_ZEKER[zekerVan(b)] || 0)) * (faSorteer === "af" ? -1 : 1));
   return lijst;
@@ -4789,8 +4789,8 @@ function bkZichtbaar() {
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
   const sub = document.getElementById("bk-substatus").value;
-  return bkRegels.filter(r => (!office || r.office === office) && (zoek.length || bkStatusSel.has(r.status)) &&
-    (zoek.length || pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron)) &&
+  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) &&
+    pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron) &&   // zoeken blijft binnen tabje + status (12 okt)
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
 /* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Basecone. */

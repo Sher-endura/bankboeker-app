@@ -4940,7 +4940,7 @@ function bkDetailRij(r) {
     ${beoordelen ? `<label style="display:block; margin:8px 0 3px; font-size:12px; font-weight:600">Waarom verbeter je dit? (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</label>
       <input type="text" id="bk-reden" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%">` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
     <p style="margin:10px 0 4px">
-      ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}
+      ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}
       ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
       ${r.goedgekeurd_door ? `<span style="font-size:13px">Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}</span>` : ""}
     </p>
@@ -5012,6 +5012,12 @@ function bkDetailRij(r) {
     const rek = tr.querySelector("#bk-rekening").value.trim();
     if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
     bkGoedkeuren([r], () => ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
+  });
+  knop("btn-bk-naar-vp", () => {
+    const oms = tr.querySelector("#bk-oms").value.trim().slice(0, 40);
+    const reden = (tr.querySelector("#bk-reden") || {}).value?.trim() || undefined;
+    // De omschrijving uit het vak gaat mee (zoals bij Goedkeuren).
+    return bkNaarVraagposten([{ ...r, goedgekeurd: oms ? { omschrijving: oms } : r.goedgekeurd }], "melding-bk-detail", reden);
   });
   knop("btn-bk-overslaan", () => bkZetStatus(r, "overgeslagen", "overgeslagen"));
   knop("btn-bk-terug", () => bkZetStatus(r, (r.voorstel || {}).zekerheid >= 85 ? "voorstel" : "voorleggen", "terug naar beoordelen"));
@@ -5129,17 +5135,19 @@ function vraagpostenRekening(office) {
 }
 /* Aangevinkte naar Vraagposten (Shereen 12 okt): goedkeuren op de vraagpostenrekening van die klant
    (vraagpostenRekening) met de nette omschrijving; Shai wijst daarna toe en boekt (concept). */
-document.getElementById("btn-bk-vraagposten").addEventListener("click", () => {
-  const regels = bkRegels.filter(r => bkVink.has(r.id));
+/* Naar Vraagposten — één regel (knop in het uitklapvak) of de aangevinkte (Shereen 12 okt: "bij elke banktransactie
+   makkelijk kiezen om het naar vraagposten te boeken"). Eén werkwijze voor beide knoppen. */
+function bkNaarVraagposten(regels, meldingId = "melding-bank", reden) {
   const vpVan = vraagpostenRekening;
   const zonder = [...new Set(regels.filter(r => !vpVan(r.office)).map(r => r.office))];
-  if (zonder.length) return toonMelding("melding-bank", "fout", "Geen vraagpostenrekening gevonden bij: " + escapeHtml(zonder.join(", ")) + " (niet in het klantprofiel en geen rekening die Vraagposten / Ask the accountant / Uit te zoeken posten heet). Zet de juiste rekening in het klantprofiel (Settings). Er is niets goedgekeurd.");
-  bkGoedkeuren(regels, (r) => {
+  if (zonder.length) return toonMelding(meldingId, "fout", "Geen vraagpostenrekening gevonden bij: " + escapeHtml(zonder.join(", ")) + " (niet in het klantprofiel en geen rekening die Vraagposten / Ask the accountant / Uit te zoeken posten heet). Zet de juiste rekening in het klantprofiel (Settings). Er is niets goedgekeurd.");
+  return bkGoedkeuren(regels, (r) => {
     const vp = vpVan(r.office);
     return { soort: "grootboek", vraagposten: true, regels: [{ rekening: vp, bedrag: Number(r.bedrag) }],
-      omschrijving: (bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum)).slice(0, 40) };
-  });
-});
+      omschrijving: (bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum)).slice(0, 40), reden };
+  }, meldingId);
+}
+document.getElementById("btn-bk-vraagposten").addEventListener("click", () => bkNaarVraagposten(bkRegels.filter(r => bkVink.has(r.id))));
 document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);
 document.getElementById("btn-bk-ververs").addEventListener("click", async (e) => {
   // Laten zien dát hij ververst (Shereen 12 okt: "ik denk dat deze knop niet werkt").

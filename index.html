@@ -148,6 +148,7 @@
   .fa-status.verwijderen { background: #C6F432; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
+  #tabel-bank tr.bk-dag td { background: #e8f1fb; color: var(--tekst); font-weight: 700; font-size: 14px; cursor: pointer; user-select: none; }
   .bk-fzoek { width: 380px; max-width: 100%; margin: 0 0 6px; }
   /* Hooguit 5 kolommen, maar nooit smaller dan 270px — zo wordt het bedrag nooit afgekapt (12 okt: "open 1..."). */
   .bk-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(270px, calc((100% - 72px) / 5)), 1fr)); gap: 2px 18px; }
@@ -4754,7 +4755,7 @@ async function laadBank() {
   let data = [], error = null;
   for (let van = 0; ; van += 1000) {
     const deel = await sb.from("bank_regels")
-      .select("id, office, bank_code, afschrift, sub_id, regel, datum, bedrag, valuta, omschrijving, twinfield_bak, status, voorstel, goedgekeurd, goedgekeurd_door, opmerking, boekstuk, updated_at")
+      .select("id, office, bank_code, afschrift, sub_id, regel, datum, verwerkt_op, bedrag, valuta, omschrijving, twinfield_bak, status, voorstel, goedgekeurd, goedgekeurd_door, opmerking, boekstuk, updated_at")
       .order("id", { ascending: true }).range(van, van + 999);
     if (deel.error) { error = deel.error; break; }
     data = data.concat(deel.data || []);
@@ -4792,6 +4793,12 @@ async function bkNuDraaien() {
   m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"} (als zijn Twinfield-venster open en ingelogd is).`;
   setTimeout(() => { knop.disabled = false; laadBankStatus(); }, 30000);
 }
+/* Tabje Verwerkt (Shereen 12 okt: "anders wordt het een megalijst"): per dag inklapbaar, nieuwste dag open, en
+   alleen de laatste 31 dagen. Ouder staat gewoon in Twinfield; de regels blijven bewaard (Shai leert ervan). */
+const BK_VERWERKT_DAGEN = 31;
+const bkDagVan = (r) => new Date(r.verwerkt_op || r.updated_at || r.datum).toLocaleDateString("sv-SE", { timeZone: "America/Aruba" });
+const bkRecentVerwerkt = (r) => r.status !== "verwerkt" || Date.now() - new Date(r.verwerkt_op || r.updated_at || r.datum).getTime() < BK_VERWERKT_DAGEN * 86400000;
+let bkDagOpen = null;   // welke dagen open staan (null = nog niet gekozen → nieuwste dag)
 function bkZichtbaar() {
   const office = document.getElementById("bk-office").value;
   const zoek = document.getElementById("bk-zoek").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -4799,7 +4806,7 @@ function bkZichtbaar() {
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
   const sub = document.getElementById("bk-substatus").value;
-  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) &&
+  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) && bkRecentVerwerkt(r) &&
     pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron) &&   // zoeken blijft binnen tabje + status (12 okt)
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
@@ -4811,7 +4818,7 @@ let bkTabje = leesTabje("bankboeker.bank.tabje", BK_TABJES);
 let bkStatusSel = new Set(BK_TABJES.find(t => t[0] === bkTabje)[2]);
 function vernieuwBkFilters() {
   const office = document.getElementById("bk-office").value;
-  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s).length, (t) => {
+  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s && bkRecentVerwerkt(r)).length, (t) => {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
   });
@@ -4851,12 +4858,23 @@ function vernieuwBkTabel() {
   // Per klant één blok: eerst op administratie, dan dagboek, afschrift, regel. Gesorteerd op zekerheid
   // (Shereen 12 okt, zoals in Basecone): binnen elke klant op zekerheid, zonder afschriftbalken.
   const zekerheid = (r) => (r.voorstel ? Number(r.voorstel.zekerheid || 0) : -1);
-  lijst.sort((a, b) => a.office.localeCompare(b.office) ||
+  const perDag = bkTabje === "verwerkt";
+  lijst.sort((a, b) => (perDag ? bkDagVan(b).localeCompare(bkDagVan(a)) : 0) || a.office.localeCompare(b.office) ||
     (bkSorteer ? (zekerheid(a) - zekerheid(b)) * (bkSorteer === "af" ? -1 : 1) : 0) ||
     a.bank_code.localeCompare(b.bank_code) || a.afschrift - b.afschrift || a.sub_id - b.sub_id || a.regel - b.regel);
   document.getElementById("bk-sorteer-pijl").textContent = bkSorteer === "af" ? "▼ hoog→laag" : bkSorteer === "op" ? "▲ laag→hoog" : "⇅";
-  let vorigAfschrift = "", vorigeKlant = "";
+  let vorigAfschrift = "", vorigeKlant = "", vorigeDag = "";
+  if (perDag && bkDagOpen === null) bkDagOpen = new Set(lijst.length ? [bkDagVan(lijst[0])] : []);
   for (const r of lijst) {
+    if (perDag) {
+      const d = bkDagVan(r);
+      if (d !== vorigeDag) {
+        vorigeDag = d; vorigeKlant = ""; vorigAfschrift = "";
+        const n = lijst.filter(x => bkDagVan(x) === d).length, open = bkDagOpen.has(d);
+        tbody.insertAdjacentHTML("beforeend", `<tr class="bk-dag" data-dag="${d}"><td colspan="${BK_KOLOMMEN}">${open ? "▾" : "▸"} Verwerkt op ${escapeHtml(datumNlKort(d))} — ${n} regel${n === 1 ? "" : "s"}</td></tr>`);
+      }
+      if (!bkDagOpen.has(d)) continue;
+    }
     if (r.office !== vorigeKlant) {
       vorigeKlant = r.office; vorigAfschrift = "";
       const naam = (profielen.find(p => p.code === r.office) || {}).naam || "";
@@ -4895,6 +4913,10 @@ function vernieuwBkTabel() {
     tbody.appendChild(tr);
     if (bkGekozen === r.id) tbody.appendChild(bkDetailRij(r));
   }
+  if (perDag && lijst.length) tbody.insertAdjacentHTML("beforeend", `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">Alleen de laatste ${BK_VERWERKT_DAGEN} dagen — wat ouder is, staat gewoon in Twinfield.</td></tr>`);
+  tbody.querySelectorAll("tr.bk-dag").forEach(tr => tr.addEventListener("click", () => {
+    const d = tr.dataset.dag; bkDagOpen.has(d) ? bkDagOpen.delete(d) : bkDagOpen.add(d); vernieuwBkTabel();
+  }));
   bkBulkStand();
   bkStatusKnop();
   requestAnimationFrame(bkHoogte);

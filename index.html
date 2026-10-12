@@ -1305,6 +1305,37 @@ function belastingOmschrijving(ruw, datum) {
 }
 /* Debiteuren/crediteuren (Shereen 12 okt): "het invoicenr is belangrijk in de omschrijving, en anders zo goed mogelijk
    de tekst van de raw bankomschrijving". Factuurnummer(s) vooraan, dan de naam. Leeg als er geen factuur is. */
+/* Omschrijving uit de historie (Shereen 12 okt: "technisch kan hij in de historie van Twinfield zien dat ik die
+   omschrijvingen gebruikt heb"). De omschrijving van de eerdere boeking van dezelfde naam, met de periode bijgewerkt
+   ("LB - Aug 2026" → "LB - Sep 2026"). Veilig: niet als het nog de ruwe banktekst is (alleen hoofdletters, lange
+   nummers) en niet als er na de periode nog cijfers in staan (bv. een oud factuurnummer). Anders null. */
+function omschrijvingUitHistorie(hist, ruw, datum) {
+  const h = String(hist || "").trim();
+  if (!h || h.length > 40 || !/[a-z]/.test(h) || /\d{6,}/.test(h)) return null;
+  const p = periodeDelen(ruw, datum);
+  let uit = h, periodeGevonden = false;
+  // mm/jjjj of jjjj-mm → nieuwe periode
+  uit = uit.replace(/\b(0?[1-9]|1[0-2])([\/-])(20\d{2})\b|\b(20\d{2})([\/-])(0?[1-9]|1[0-2])\b/g, (heel, m1, s1, j1, j2, s2) => {
+    periodeGevonden = true;
+    if (p.maand < 0) return heel;
+    const mm = String(p.maand + 1).padStart(2, "0"), jj = p.jaar || j1 || j2;
+    return m1 ? `${mm}${s1}${jj}` : `${jj}${s2}${mm}`;   // zelfde schrijfwijze houden
+  });
+  // maandnaam (+ eventueel jaar) → nieuwe maand (+ jaar)
+  uit = uit.replace(/\b([A-Za-z]{3,10})\.?(\s+20\d{2})?\b/g, (heel, w, j) => {
+    if (maandVanWoord(w.toUpperCase()) < 0 || p.maand < 0) return heel;
+    periodeGevonden = true;
+    const lang = w.length > 4 && !/^sept?$/i.test(w);
+    const naam = lang ? MAANDEN_NL[p.maand] : MAAND_KORT[p.maand];
+    const nieuw = w === w.toLowerCase() ? naam.toLowerCase() : naam;
+    return nieuw + (j ? " " + (p.jaar || j.trim()) : "");
+  });
+  // "week 40" → de week vóór de datum (zoals bij tips)
+  uit = uit.replace(/\bweek\s*\d{1,2}\b/gi, () => { periodeGevonden = true; return weekVoorDatum(datum) || "week"; });
+  const zonderPeriode = uit.replace(/\b(0?[1-9]|1[0-2])[\/-]20\d{2}\b|\b20\d{2}[\/-](0?[1-9]|1[0-2])\b/g, "").replace(/\b20\d{2}\b/g, "").replace(/\bweek\s*\d{1,2}\b/gi, "");
+  if (/\d/.test(zonderPeriode)) return null;   // nog andere cijfers (bv. een oud factuurnummer): niet kopiëren
+  return uit.slice(0, 40).trim() || null;
+}
 /* Regels uit de uitleg (database-update 11; Shereen 12 okt: "laat het vak werken met AI"). Haiku maakt van een uitleg
    een regel {office ('*' = alle klanten), zoek: {een_van, alle, richting}, zet: {rekening, omschrijving}}; deze code
    herkent en past toe — zonder AI, in de app (Verversen) en in elke ronde van de bank-Shai.
@@ -4928,6 +4959,8 @@ function bkOmsTekst(r) {
   if (v.soort === "klant") { const t = factuurOmschrijving((v.regels || []).map(x => x.factuur), regel.relatienaam); if (t) return t; }
   const u = pasUitlegToe(bkUitlegRegels.filter(x => x.office === r.office || x.office === "*"), r.omschrijving, Number(r.bedrag), r.datum);
   if (u && u.omschrijving) return u.omschrijving;
+  const uitHist = omschrijvingUitHistorie(((v.historie || [])[0] || {}).omschrijving, r.omschrijving, r.datum);
+  if (uitHist) return uitHist;
   return netteOmschrijving(r.omschrijving, regel.naam || bkRekNamen[`${r.office}|${regel.rekening}`], r.datum) || v.omschrijving || "";
 }
 let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [];

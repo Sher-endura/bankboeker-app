@@ -78,6 +78,7 @@
   .fa-status.voorstel { background: var(--blauw); } .fa-status.voorleggen { background: var(--oranje); }
   .fa-status.goedgekeurd { background: var(--paars); } .fa-status.ingevuld, .fa-status.geboekt { background: var(--groen); }
   .fa-status.fout { background: var(--rood); }
+  .fa-status.afwijzen { background: #9a3412; } .fa-status.afgewezen { background: #4b5563; } .fa-status.splitsen { background: #0e7490; }
   .fa-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
   /* Gesplitst scherm zoals in Basecone: lijst links, document rechts, scheiding versleepbaar */
   main.breed { max-width: none; }
@@ -641,6 +642,7 @@
           <button class="knop stil" id="btn-fa-opnieuw">Opnieuw lezen</button>
           <button class="knop stil" id="btn-fa-terug" style="display:none">Terug naar beoordelen</button>
           <button class="knop stil" id="btn-fa-overslaan">Overslaan</button>
+          <button class="knop stil" id="btn-fa-afwijzen" title="Shai wijst dit document bij zijn volgende ronde af in Basecone; het komt in de Rejectbox (terug te halen).">Laten afwijzen door Shai</button>
         </p>
         <div id="melding-fa-detail"></div>
         <div class="rij">
@@ -3483,6 +3485,7 @@ let faDocs = [], faGekozen = null, faStam = { BAS: [], CRD: [] };
 const FA_STATUS_TEKST = {
   nieuw: "nieuw", gelezen: "wordt gelezen", voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "goedgekeurd",
   ingevuld: "ingevuld in Basecone", fout: "fout", geboekt: "geboekt", overgeslagen: "overgeslagen",
+  afwijzen: "wordt afgewezen", afgewezen: "afgewezen (Rejectbox)", splitsen: "wacht op splitsen",
 };
 const datumNlKort = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? iso.split("-").reverse().join("-") : (iso || ""));   // 2026-10-01 → 01-10-2026
 const faBedrag = (n) => (n === null || n === undefined || n === "" ? "" : Number(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -3598,7 +3601,8 @@ async function faNuDraaien() {
 /* Status als uitklaplijst met vinkjes, net als Twinfield Bank (Shereen 11 okt). Standaard voorstel +
    voorleggen (= het oude "Te beoordelen"); de keuze onthoudt deze browser. */
 const FA_STATUSSEN = [["voorstel", "Voorstel"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Wacht op robot"], ["ingevuld", "Ingevuld in Basecone"],
-  ["geboekt", "Geboekt"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"], ["nieuw", "Nieuw"], ["gelezen", "Wordt gelezen"]];
+  ["geboekt", "Geboekt"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"], ["nieuw", "Nieuw"], ["gelezen", "Wordt gelezen"],
+  ["splitsen", "Wacht op splitsen"], ["afwijzen", "Wordt afgewezen"], ["afgewezen", "Afgewezen (Rejectbox)"]];
 let faStatusSel = new Set(["voorstel", "voorleggen"]);
 try { const s = JSON.parse(localStorage.getItem("bankboeker.basecone.status") || "null"); if (Array.isArray(s) && s.length) faStatusSel = new Set(s); } catch (e) { /* standaard */ }
 function faStatusBewaar() { try { localStorage.setItem("bankboeker.basecone.status", JSON.stringify([...faStatusSel])); } catch (e) { /* niet erg */ } }
@@ -4101,7 +4105,9 @@ async function openFactuur(id) {
   document.getElementById("btn-fa-goedkeuren").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-opnieuw").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-overslaan").style.display = beoordelen ? "" : "none";
-  document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen"].includes(d.status) ? "" : "none";
+  document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "afwijzen"].includes(d.status) ? "" : "none";
+  // Afwijzen kan alleen bij een getagd document (niet bij 'splitsen': dat staat nog bij Aangeleverd).
+  document.getElementById("btn-fa-afwijzen").style.display = beoordelen || d.status === "overgeslagen" ? "" : "none";
   for (const el of document.querySelectorAll("#kaart-fa-detail .fa-form input, #kaart-fa-detail .fa-form select")) el.disabled = !beoordelen;
 }
 function vernieuwFaRegels(regels) {
@@ -4250,6 +4256,7 @@ async function faZetStatus(status, logActie) {
   await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: logActie, door: wie });
   await laadFacturen();
   if (status === "overgeslagen") faVolgendeOfSluiten(d.office, "Overgeslagen.");
+  else if (status === "afwijzen") faVolgendeOfSluiten(d.office, "Shai wijst dit document bij zijn volgende ronde af (Rejectbox).");
   else await openFactuur(d.id);
 }
 /* Na goedkeuren/overslaan: door naar het volgende document dat beoordeeld moet worden (eerst dezelfde
@@ -5222,6 +5229,7 @@ faKeuzelijst(document.getElementById("fa-crediteur"), () => faStam.CRD);
 document.getElementById("btn-fa-opnieuw").addEventListener("click", faOpnieuwLezen);
 metTweedeKlik(document.getElementById("btn-fa-overslaan"), "Zeker? Klik nog eens", () => faZetStatus("overgeslagen", "overgeslagen"));
 document.getElementById("btn-fa-terug").addEventListener("click", () => faZetStatus("voorstel", "terug naar beoordelen"));
+metTweedeKlik(document.getElementById("btn-fa-afwijzen"), "Zeker? Klik nog eens", () => faZetStatus("afwijzen", "afwijzen gevraagd"));
 document.getElementById("btn-fa-regel").addEventListener("click", () => vernieuwFaRegels([...leesFaRegels(), { grootboek: "", bedrag: 0, inhoud: "", omschrijving: document.getElementById("fa-omschrijving").value }]));
 document.getElementById("fa-omschrijving").addEventListener("input", faOmsTeller);
 document.getElementById("fa-datum").addEventListener("input", faDatumTekst);

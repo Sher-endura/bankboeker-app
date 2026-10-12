@@ -4910,15 +4910,24 @@ function bkDetailRij(r) {
   const eigenOms = g.omschrijving || v.omschrijving || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
   // Afletteren (11 okt): openstaande facturen met hetzelfde bedrag, voorgekozen wat Shai voorstelt.
   const kandidaten = v.kandidaten || [];
-  const keuzeKlant = kandidaten.length > 0 && g.soort !== "grootboek" && (g.soort === "klant" || v.soort === "klant");
+  const keuzeKlant = g.soort === "klant" || (g.soort !== "grootboek" && (v.soort === "klant" || v.soort === "relatie"));
   const keuzeTw = !keuzeKlant && twVoorstel && g.soort !== "grootboek";
-  const gekozenFactuur = (g.soort === "klant" ? g.regels[0].boekstuk : (v.regels && v.regels[0] && v.regels[0].boekstuk)) || "";
   const beoordelen = BK_BEOORDELEN.includes(r.status);
+  // Afletteren op klant (Shereen 12 okt): elke ontvangst kan op een klant, met één of meer openstaande facturen;
+  // is de betaling hoger dan de facturen samen, dan blijft het verschil als vooruitbetaling op de klant staan.
+  const toonKlant = Number(r.bedrag) > 0 || kandidaten.length > 0 || g.soort === "klant";
+  const startRelatie = (g.soort === "klant" && (g.relatie || (g.regels[0] || {}).relatie))
+    || ((v.soort === "klant" || v.soort === "relatie") && v.regels && v.regels[0] && v.regels[0].relatie) || (kandidaten[0] || {}).relatie || "";
+  const startFacturen = new Set(g.soort === "klant" ? (g.regels || []).map(x => x.boekstuk) : (v.soort === "klant" && v.regels ? v.regels.map(x => x.boekstuk) : []));
   tr.innerHTML = `<td></td><td colspan="${BK_KOLOMMEN - 1}">
     ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
     ${twVoorstel ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="twinfield"${keuzeTw ? " checked" : ""}${beoordelen ? "" : " disabled"}> Twinfields voorstel accepteren: ${(v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + ")}</label>` : ""}
-    ${kandidaten.length ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="klant"${keuzeKlant ? " checked" : ""}${beoordelen ? "" : " disabled"}> Afletteren op openstaande factuur:</label>
-      <select id="bk-factuur" style="margin:0 0 6px 24px; max-width:640px"${beoordelen ? "" : " disabled"}>${gekozenFactuur ? "" : `<option value="">— kies een factuur —</option>`}${kandidaten.map(k => `<option value="${escapeHtml(k.code + "|" + k.nummer)}"${k.code + "|" + k.nummer === gekozenFactuur ? " selected" : ""}>${escapeHtml(`${k.factuur || k.code + " " + k.nummer} · ${k.relatie} ${k.relatienaam} · ${datumNlKort(k.datum)} · ${faBedrag(k.open)}`)}</option>`).join("")}</select>` : ""}
+    ${toonKlant ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="klant"${keuzeKlant ? " checked" : ""}${beoordelen ? "" : " disabled"}> Afletteren op klant — een of meer openstaande facturen (rest = vooruitbetaling op de klant):</label>
+      <div class="bk-aflet" style="margin:0 0 8px 24px">
+        <div class="fa-crd-vak" style="max-width:460px"><input type="text" id="bk-relatie" value="${escapeHtml(startRelatie)}" placeholder="klant: nummer of naam" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-relatie-naam" class="fa-crd-naam"></span></div>
+        <div id="bk-facturen" class="fa-uitleg" style="margin:6px 0"></div>
+        <div id="bk-aflet-som" style="font-size:13px"></div>
+      </div>` : ""}
     <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
     <div class="rij">
       <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div></div>
@@ -4938,6 +4947,35 @@ function bkDetailRij(r) {
     tr.querySelector("#bk-rekening").title = n ? `${c} ${n}` : ""; };
   tr.querySelector("#bk-rekening").addEventListener("input", () => { naam(); const rg = tr.querySelector('input[value="grootboek"]'); if (rg) rg.checked = true; });
   if (beoordelen) faKeuzelijst(tr.querySelector("#bk-rekening"), () => rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })));
+  let aflet = { klanten: [], open: [], fout: "" };
+  const relVeld = tr.querySelector("#bk-relatie");
+  const gekozenFacturen = () => [...tr.querySelectorAll(".bk-fvink:checked")].map(x => aflet.open.find(o => o.code + "|" + o.nummer === x.value)).filter(Boolean);
+  const somTekst = () => {
+    const el = tr.querySelector("#bk-aflet-som"); if (!el) return;
+    const som = Math.round(gekozenFacturen().reduce((t, o) => t + o.open, 0) * 100) / 100, rest = Math.round((Number(r.bedrag) - som) * 100) / 100;
+    el.innerHTML = `Aangevinkt <b>${faBedrag(som)}</b> · ontvangen <b>${faBedrag(r.bedrag)}</b> · ` + (rest < -0.004
+      ? `<b style="color:var(--rood)">de facturen zijn samen ${faBedrag(-rest)} méér dan de betaling — vink er minder aan</b>`
+      : rest > 0.004 ? `verschil <b>${faBedrag(rest)}</b> blijft als <b>vooruitbetaling op de klant</b> openstaan` : "past precies");
+  };
+  const toonFacturen = () => {
+    const vak = tr.querySelector("#bk-facturen"); if (!vak) return;
+    const rel = relVeld.value.trim();
+    const k = aflet.klanten.find(x => x.code === rel);
+    const naamEl = tr.querySelector("#bk-relatie-naam"); naamEl.textContent = rel && k ? k.naam : rel && !/[a-z]/i.test(rel) && aflet.klanten.length ? "onbekende klant" : "";
+    if (aflet.fout) { vak.innerHTML = `<span style="color:var(--rood)">Openstaande facturen ophalen lukte niet: ${escapeHtml(aflet.fout)}</span>`; return; }
+    if (!rel) { vak.textContent = "Kies eerst de klant."; somTekst(); return; }
+    const lijst = aflet.open.filter(o => o.relatie === rel).sort((a, b) => a.datum.localeCompare(b.datum));
+    vak.innerHTML = lijst.length ? lijst.map(o => `<label style="display:block; font-weight:400"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${startFacturen.has(o.code + "|" + o.nummer) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("")
+      : "Deze klant heeft geen openstaande facturen — het hele bedrag wordt dan vooruitbetaling op de klant.";
+    vak.querySelectorAll(".bk-fvink").forEach(x => x.addEventListener("change", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; somTekst(); }));
+    somTekst();
+  };
+  if (relVeld) {
+    tr.querySelector("#bk-facturen").textContent = "Openstaande facturen ophalen uit Twinfield…";
+    bkAfletGegevens(r.office).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });
+    relVeld.addEventListener("input", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; toonFacturen(); });
+    if (beoordelen) faKeuzelijst(relVeld, () => aflet.klanten);
+  }
   naam();
   const knop = (id, fn) => { const b = tr.querySelector("#" + id); if (b) b.addEventListener("click", async (e) => {
     e.stopPropagation();
@@ -4948,9 +4986,16 @@ function bkDetailRij(r) {
     const reden = (tr.querySelector("#bk-reden") || {}).value?.trim() || undefined;   // Shai leert het mee (bank.mjs historie)
     if (keuze === "twinfield") return bkGoedkeuren([r], () => ({ soort: "twinfield", omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
     if (keuze === "klant") {
-      const k = kandidaten.find(x => x.code + "|" + x.nummer === tr.querySelector("#bk-factuur").value);
-      if (!k) return toonMelding("melding-bk-detail", "fout", "Kies eerst een factuur.");
-      return bkGoedkeuren([r], () => ({ soort: "klant", regels: [bkKlantRegel(k, r)], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
+      const rel = relVeld.value.trim();
+      const k = aflet.klanten.find(x => x.code === rel);
+      if (!k) return toonMelding("melding-bk-detail", "fout", "Kies eerst een bestaande klant (nummer of naam).");
+      const facturen = gekozenFacturen();
+      const som = Math.round(facturen.reduce((t, o) => t + o.open, 0) * 100) / 100;
+      const rest = Math.round((Number(r.bedrag) - som) * 100) / 100;
+      if (rest < -0.004) return toonMelding("melding-bk-detail", "fout", "De aangevinkte facturen zijn samen meer dan de betaling — vink er minder aan.");
+      return bkGoedkeuren([r], () => ({ soort: "klant", relatie: k.code, relatienaam: k.naam,
+        regels: facturen.map(o => ({ ...bkKlantRegel(o, r), bedrag: o.open })), vooruitbetaling: rest > 0.004 ? rest : 0,
+        omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
     }
     const rek = tr.querySelector("#bk-rekening").value.trim();
     if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
@@ -4960,6 +5005,36 @@ function bkDetailRij(r) {
   knop("btn-bk-terug", () => bkZetStatus(r, (r.voorstel || {}).zekerheid >= 85 ? "voorstel" : "voorleggen", "terug naar beoordelen"));
   tr.addEventListener("click", (e) => e.stopPropagation());
   return tr;
+}
+/* Klanten en openstaande verkoopfacturen van een administratie, live via DirectLink (zelfde browse 130_3 als
+   bank-herkenning.mjs openDebiteuren). Eén keer per administratie per bezoek aan het tabblad. */
+const bkAfletCache = {};
+function bkAfletGegevens(office) {
+  if (bkAfletCache[office]) return bkAfletCache[office];
+  bkAfletCache[office] = (async () => {
+    const kol = (f) => `<column><field>${f}</field><label>${f}</label><visible>true</visible></column>`;
+    const velden = ["fin.trs.head.code", "fin.trs.head.number", "fin.trs.head.date", "fin.trs.line.dim1", "fin.trs.line.dim1name",
+      "fin.trs.line.dim2", "fin.trs.line.dim2name", "fin.trs.line.invnumber", "fin.trs.line.openbasevaluesigned", "fin.trs.line.matchstatus"];
+    const doc = await dlLees(`<columns code="130_3"><column><field>fin.trs.head.office</field><label>office</label><visible>true</visible><ask>true</ask><operator>equal</operator><from>${office}</from><to></to></column>` + velden.map(kol).join("") + `</columns>`);
+    const browse = doc.getElementsByTagName("browse")[0];
+    if (browse && browse.getAttribute("msgtype") === "error") throw new Error(browse.getAttribute("msg") || "Twinfield gaf een fout");
+    const open = [];
+    for (const rij of doc.getElementsByTagName("tr")) {
+      const x = {};
+      for (const td of rij.getElementsByTagName("td")) x[(td.getAttribute("field") || "").replace(/^fin\.trs\.(head|line)\./, "")] = td.textContent;
+      const bedrag = Number(x.openbasevaluesigned);
+      if (x.matchstatus === "matched" || !(bedrag > 0)) continue;
+      open.push({ code: x.code, nummer: x.number, datum: (x.date || "").replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"), rekening: x.dim1, rekeningnaam: x.dim1name,
+        relatie: x.dim2, relatienaam: (x.dim2name || "").trim(), factuur: x.invnumber || "", open: bedrag });
+    }
+    let klanten = [];
+    try { klanten = await liveDimensies(office, "DEB"); } catch (e) { /* dan alleen klanten met open posten */ }
+    const gezien = new Set(klanten.map(k => k.code));
+    for (const o of open) if (o.relatie && !gezien.has(o.relatie)) { klanten.push({ code: o.relatie, naam: o.relatienaam }); gezien.add(o.relatie); }
+    return { klanten, open, fout: "" };
+  })();
+  bkAfletCache[office].catch(() => { delete bkAfletCache[office]; });
+  return bkAfletCache[office];
 }
 /* Eén factuurkandidaat als goed te keuren regel (soort klant). */
 function bkKlantRegel(k, r) {

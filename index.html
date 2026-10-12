@@ -642,9 +642,10 @@
         <label style="margin-top:2px">Waarom verbeter je dit? (optioneel — wordt een regel voor de robot)</label>
         <input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris">
         <select id="fa-reden-voor" style="width:auto; margin-top:4px" title="Voor wie geldt je uitleg?">
-          <option value="leverancier">Geldt alleen voor deze leverancier</option>
-          <option value="klant">Geldt voor alle leveranciers van deze klant</option>
-          <option value="alle">Geldt voor alle klanten</option>
+          <option value="leverancier">Alleen deze leverancier, alleen bij deze klant</option>
+          <option value="leverancier_alle">Deze leverancier, bij alle klanten</option>
+          <option value="klant">Alle leveranciers van deze klant</option>
+          <option value="alle">Alle leveranciers bij alle klanten</option>
         </select>
         <p style="margin:10px 0 4px">
           <button class="knop" id="btn-fa-goedkeuren">✓ Goedkeuren</button>
@@ -3528,7 +3529,23 @@ const FA_STATUS_TEKST = {
 };
 const datumNlKort = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? iso.split("-").reverse().join("-") : (iso || ""));   // 2026-10-01 → 01-10-2026
 const faBedrag = (n) => (n === null || n === undefined || n === "" ? "" : Number(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-const faGetal = (s) => Number(String(s).trim().replace(/\./g, "").replace(",", ".")) || 0;   // "1.574,75" → 1574.75
+// "1.574,75" → 1574.75. Eén punt met 1–2 cijfers erachter en geen komma (bv. "20749.52", geplakt of
+// getypt met de punt van het numerieke toetsenblok) is een decimaalteken, geen duizendtal (Shereen 12 okt).
+const faGetal = (s) => {
+  const t = String(s).trim().replace(/\s/g, "");
+  if (/^-?\d+\.\d{1,2}$/.test(t)) return Number(t) || 0;
+  return Number(t.replace(/\./g, "").replace(",", ".")) || 0;
+};
+/* De punt van het numerieke toetsenblok typt in een bedragveld een komma (Shereen 12 okt: "ik moet echt
+   een KOMMA klikken voor een centen-separator"). */
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "NumpadDecimal" || !e.target.matches || !e.target.matches("#fa-bedrag, .fa-rb")) return;
+  e.preventDefault();
+  const el = e.target, van = el.selectionStart ?? el.value.length, tot = el.selectionEnd ?? van;
+  el.value = el.value.slice(0, van) + "," + el.value.slice(tot);
+  el.setSelectionRange(van + 1, van + 1);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+});
 
 async function laadFacturen() {
   if (!CLOUD) { toonMelding("melding-facturen", "fout", "Het tabblad Basecone werkt alleen in cloud-modus (met inlog)."); return; }
@@ -4082,7 +4099,14 @@ async function openFactuur(id) {
   document.getElementById("fa-titel").textContent = `${d.bestandsnaam || d.id} · ${d.office}`;
   document.getElementById("melding-fa-detail").innerHTML = "";
   document.getElementById("fa-reden").value = "";
-  document.getElementById("fa-reden-voor").value = "leverancier";
+  const voorKeuze = document.getElementById("fa-reden-voor");
+  voorKeuze.value = "leverancier";
+  { // Echte namen in de keuzes, zodat duidelijk is voor wie de regel geldt.
+    const lev = (d.ai && d.ai.leverancier_naam) || "deze leverancier";
+    const t = { leverancier: `Alleen ${lev}, alleen bij ${d.office}`, leverancier_alle: `${lev}, bij alle klanten`,
+      klant: `Alle leveranciers van ${d.office}`, alle: "Alle leveranciers bij alle klanten" };
+    for (const o of voorKeuze.options) if (t[o.value]) o.textContent = t[o.value];
+  }
 
   // Scan(s)
   const scan = document.getElementById("fa-scan");
@@ -4250,8 +4274,9 @@ async function faGoedkeuren() {
   const reden = document.getElementById("fa-reden").value.trim();
   // Voor wie de uitleg geldt (Shereen 10 okt: een datumregel bij Verina bedoelde ze voor iedereen).
   const voor = document.getElementById("fa-reden-voor").value;
-  if (reden) nieuweRegels.push(voor === "leverancier"
-    ? { office: d.office, soort: "leverancier", sleutel: leverancier, bron: "geleerd", created_by: wie, toelichting: reden }
+  // Shereen 12 okt: ook "deze leverancier bij álle klanten" (office '*', soort leverancier).
+  if (reden) nieuweRegels.push(voor === "leverancier" || voor === "leverancier_alle"
+    ? { office: voor === "leverancier_alle" ? "*" : d.office, soort: "leverancier", sleutel: leverancier, bron: "geleerd", created_by: wie, toelichting: reden }
     : { office: voor === "alle" ? "*" : d.office, soort: "algemeen", sleutel: null, bron: "geleerd", created_by: wie, toelichting: reden });
 
   const knop = document.getElementById("btn-fa-goedkeuren"); knop.disabled = true;

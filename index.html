@@ -4267,8 +4267,9 @@ function vernieuwFaRegels(regels) {
     const glNaam = () => {
       const c = faStam.BAS.find(x => x.code === gl.value.trim());
       const vak = tr.querySelector(".fa-gl-naam");
-      vak.textContent = !gl.value.trim() ? "" : c ? c.naam : (faStam.BAS.length ? "onbekende rekening" : "");
-      vak.classList.toggle("onbekend", !!gl.value.trim() && !c && faStam.BAS.length > 0);
+      const zoekt = !c && /[a-z]/i.test(gl.value);   // zoekt op naam: niets over de getypte tekst heen
+      vak.textContent = !gl.value.trim() || zoekt ? "" : c ? c.naam : (faStam.BAS.length ? "onbekende rekening" : "");
+      vak.classList.toggle("onbekend", !!gl.value.trim() && !c && !zoekt && faStam.BAS.length > 0);
       gl.title = c ? `${c.code} ${c.naam}` : "";
     };
     gl.addEventListener("input", () => { glNaam(); faSom(); });
@@ -4912,7 +4913,7 @@ function bkDetailRij(r) {
       <select id="bk-factuur" style="margin:0 0 6px 24px; max-width:640px"${beoordelen ? "" : " disabled"}>${gekozenFactuur ? "" : `<option value="">— kies een factuur —</option>`}${kandidaten.map(k => `<option value="${escapeHtml(k.code + "|" + k.nummer)}"${k.code + "|" + k.nummer === gekozenFactuur ? " selected" : ""}>${escapeHtml(`${k.factuur || k.code + " " + k.nummer} · ${k.relatie} ${k.relatienaam} · ${datumNlKort(k.datum)} · ${faBedrag(k.open)}`)}</option>`).join("")}</select>` : ""}
     <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
     <div class="rij">
-      <div><label>Rekening</label><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="Typ nummer of naam…"><span id="bk-rek-naam" style="font-size:13px"></span></div>
+      <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div></div>
       <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
     </div>
     ${beoordelen ? `<label style="display:block; margin:8px 0 3px; font-size:12px; font-weight:600">Waarom verbeter je dit? (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</label>
@@ -4924,7 +4925,9 @@ function bkDetailRij(r) {
     </p>
     <div id="melding-bk-detail"></div></td>`;
   const naam = () => { const c = tr.querySelector("#bk-rekening").value.trim(); const n = bkRekNamen[`${r.office}|${c}`];
-    const el = tr.querySelector("#bk-rek-naam"); el.textContent = c ? (n ? " " + n : " onbekende rekening") : ""; el.style.color = c && !n ? "var(--rood)" : ""; };
+    const el = tr.querySelector("#bk-rek-naam"); const zoekt = !n && /[a-z]/i.test(c);   // zoekt op naam: niets over de getypte tekst heen
+    el.textContent = c && !zoekt ? (n || "onbekende rekening") : ""; el.classList.toggle("onbekend", !!c && !n && !zoekt);
+    tr.querySelector("#bk-rekening").title = n ? `${c} ${n}` : ""; };
   tr.querySelector("#bk-rekening").addEventListener("input", () => { naam(); const rg = tr.querySelector('input[value="grootboek"]'); if (rg) rg.checked = true; });
   if (beoordelen) faKeuzelijst(tr.querySelector("#bk-rekening"), () => rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })));
   naam();

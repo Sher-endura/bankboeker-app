@@ -1127,6 +1127,31 @@ function naamWoorden(omschrijving) {
   d = d.replace(/[0-9]+/g, " ").replace(/[^A-Z ]/g, " ").replace(/ +/g, " ").trim();
   return d.split(" ").filter(w => w.length > 1 && !OMS_RUIS.has(w) && maandVanWoord(w) < 0);
 }
+/* De naam in een salaris-/tipomschrijving (Shereen 12 okt): voornaam, dan tussenvoegsel klein en de
+   achternaam — "Jantina C. van Mal" → "Jantina van Mal"; "T van Mal" blijft (geen voluit geschreven
+   voornaam: de eerste voorletter blijft). Een tweede voorletter valt altijd weg, een tweede voornaam
+   alleen als het anders niet in de ruimte past. Identiek aan robot/bank-herkenning.mjs. */
+const TUSSENVOEGSELS = new Set(["VAN", "DE", "DEN", "DER", "TER", "TEN", "TE", "DA", "DOS", "DEL", "LA"]);
+function naamVoorOmschrijving(ruw, ruimte = 40) {
+  let d = (ruw || "").toUpperCase().replace(/\bI\.?\s*F\.?\s*O\.?/g, " ");
+  const soort = soortVan(d);
+  if (soort) d = d.replace(new RegExp(`(?:${soort.her.source})[A-Z]*`, "g"), " ");
+  const w = [...new Set(d.replace(/[0-9]+/g, " ").replace(/[^A-Z ]/g, " ").replace(/ +/g, " ").trim().split(" ")
+    .filter((x) => x && (TUSSENVOEGSELS.has(x) || !OMS_RUIS.has(x)) && maandVanWoord(x) < 0))];
+  while (w.length && TUSSENVOEGSELS.has(w[0])) w.shift();
+  while (w.length && (TUSSENVOEGSELS.has(w[w.length - 1]) || (w.length > 1 && w[w.length - 1].length === 1))) w.pop();
+  if (!w.length) return "";
+  let a = w.findIndex((x, i) => i > 0 && TUSSENVOEGSELS.has(x));   // achternaam vanaf het tussenvoegsel,
+  if (a < 0) a = Math.max(1, w.length - 1);                          // anders het laatste woord
+  const voluit = w.slice(0, a).filter((x) => x.length > 1);
+  const voor = voluit.length ? voluit : w.slice(0, 1);
+  const achter = w.slice(a).filter((x) => x.length > 1);
+  const kast = (x) => (TUSSENVOEGSELS.has(x) && achter.indexOf(x) < achter.length - 1 ? x.toLowerCase()
+    : OMS_KAPITALEN.has(x) ? x : x.charAt(0) + x.slice(1).toLowerCase());
+  const tekst = () => [...voor, ...achter].map(kast).join(" ");
+  while (tekst().length > ruimte && voor.length > 1) voor.splice(1, 1);
+  return tekst();
+}
 function sleutels(omschrijving) {
   const naam = naamWoorden(omschrijving);
   const soort = soortVan(omschrijving);
@@ -1162,16 +1187,15 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   // Hoofdletters per stukje: "VS-MC", "Maestro/POS", "Aug-2026"; afkortingen van 1-2 letters blijven groot.
   const kast = (w) => OMS_KAPITALEN.has(w) || /^[A-Z]{1,2}$/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase();
   const titelKast = (w) => w.split(/([\/\-])/).map((x) => (x === "/" || x === "-" ? x : kast(x))).join("");
-  const naamKast = (w) => (OMS_KAPITALEN.has(w) ? w : w.charAt(0) + w.slice(1).toLowerCase());   // namen: "Yu", niet "YU"
   // Salaris en tips (Shereen 10 okt): "<Naam> - <Maand> salaris" en "<Naam> - week <nr> tip";
   // een tip gaat over de week vóór de betaling.
   const naam = [...new Set(naamWoorden(ruw))];
   if (naam.length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) {
-    const titel = naam.map(naamKast).join(" ");
     const wanneer = soort.label === "SALARIS"
       ? maandUitTekst(boven) || (week ? "week " + week[1] : null) || maandUitDatum(datum)
       : (week ? "week " + week[1] : null) || maandUitTekst(boven) || weekVoorDatum(datum);
     const staart = " - " + (wanneer ? wanneer + " " : "") + (soort.label === "SALARIS" ? "salaris" : "tip");
+    const titel = naamVoorOmschrijving(ruw, 40 - staart.length);
     return titel.slice(0, 40 - staart.length).trim() + staart;
   }
   // Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste

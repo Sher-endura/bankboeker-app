@@ -70,8 +70,8 @@
   #tabel-facturen tbody tr { cursor: pointer; } #tabel-facturen tbody tr:hover { background: #eef5fb; }
   #tabel-facturen tbody tr.gekozen { background: #dcebf8; }
   #tabel-facturen .fa-vink { width: 34px; text-align: center; cursor: default; }
-  #tabel-facturen th.fa-sorteer { cursor: pointer; user-select: none; white-space: nowrap; }
-  #tabel-facturen th.fa-sorteer:hover { color: var(--blauw); }
+  #tabel-facturen th.fa-sorteer, #tabel-bank th.fa-sorteer { cursor: pointer; user-select: none; white-space: nowrap; }
+  #tabel-facturen th.fa-sorteer:hover, #tabel-bank th.fa-sorteer:hover { color: var(--blauw); }
   #tabel-facturen .fa-vink input { width: 17px; height: 17px; cursor: pointer; }
   .fa-bulk { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--tekst); }
   .fa-status { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #fff; background: #4b5563; }
@@ -760,7 +760,7 @@
         <button type="button" class="knop stil" id="btn-bk-status" style="padding:6px 12px">Status ▾</button>
         <div class="bk-status-lijst" id="bk-filters" style="display:none"></div>
       </div>
-      <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px">↻ Verversen</button>
+      <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
       <div id="bk-robot" class="fa-robot bk-robot-klein"></div>
     </div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
@@ -771,7 +771,7 @@
     <!-- Alleen de regels scrollen; alles hierboven en de kolomkoppen blijven staan (Shereen 11 okt). -->
     <div class="bk-scroll" id="bk-scroll">
       <table id="tabel-bank">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th>Zekerheid</th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -4709,6 +4709,7 @@ const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.vo
 const bkStatusTekst = (r) => BK_BEOORDELEN.includes(r.status) && r.voorstel
   ? (r.voorstel.bron === "twinfield" ? "TF " : "Shai ") + r.status : (BK_STATUS_TEKST[r.status] || r.status);
 let bkRegels = [], bkGekozen = null, bkRekNamen = {};
+let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const bkVink = new Set();
 const bkZeker = (z) => (z >= 85 ? "hoog" : z >= 60 ? "middel" : "laag");
 const bkRekTekst = (office, r) => `<b>${escapeHtml(r.rekening || "")}</b> ${escapeHtml(r.naam || bkRekNamen[`${office}|${r.rekening}`] || "")}` +
@@ -4830,9 +4831,13 @@ function vernieuwBkTabel() {
   const klap = document.getElementById("bk-klap");
   klap.textContent = bkUitklap ? "◂ Bron & uitleg" : "▸ Bron & uitleg";
   klap.classList.toggle("open", bkUitklap);
-  // Per klant één blok: eerst op administratie, dan dagboek, afschrift, regel.
-  lijst.sort((a, b) => a.office.localeCompare(b.office) || a.bank_code.localeCompare(b.bank_code) ||
-    a.afschrift - b.afschrift || a.sub_id - b.sub_id || a.regel - b.regel);
+  // Per klant één blok: eerst op administratie, dan dagboek, afschrift, regel. Gesorteerd op zekerheid
+  // (Shereen 12 okt, zoals in Basecone): binnen elke klant op zekerheid, zonder afschriftbalken.
+  const zekerheid = (r) => (r.voorstel ? Number(r.voorstel.zekerheid || 0) : -1);
+  lijst.sort((a, b) => a.office.localeCompare(b.office) ||
+    (bkSorteer ? (zekerheid(a) - zekerheid(b)) * (bkSorteer === "af" ? -1 : 1) : 0) ||
+    a.bank_code.localeCompare(b.bank_code) || a.afschrift - b.afschrift || a.sub_id - b.sub_id || a.regel - b.regel);
+  document.getElementById("bk-sorteer-pijl").textContent = bkSorteer === "af" ? "▼ hoog→laag" : bkSorteer === "op" ? "▲ laag→hoog" : "⇅";
   let vorigAfschrift = "", vorigeKlant = "";
   for (const r of lijst) {
     if (r.office !== vorigeKlant) {
@@ -4842,7 +4847,7 @@ function vernieuwBkTabel() {
       tbody.insertAdjacentHTML("beforeend", `<tr class="bk-klant"><td colspan="${BK_KOLOMMEN}">${escapeHtml(r.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${open} regel${open === 1 ? "" : "s"}</span></td></tr>`);
     }
     const afs = `${r.bank_code} ${r.afschrift}${r.sub_id > 1 ? "/" + r.sub_id : ""}`;
-    if (afs !== vorigAfschrift) {
+    if (afs !== vorigAfschrift && !bkSorteer) {
       vorigAfschrift = afs;
       const n = bkRegels.filter(x => x.office === r.office && x.bank_code === r.bank_code && x.afschrift === r.afschrift && x.sub_id === r.sub_id);
       const klaar = n.filter(x => ["goedgekeurd", "toegewezen", "verwerkt"].includes(x.status)).length;
@@ -4998,7 +5003,19 @@ document.getElementById("bk-vink-alles").addEventListener("change", (e) => {
 });
 document.getElementById("btn-bk-bulk").addEventListener("click", () => bkGoedkeuren(bkRegels.filter(r => bkVink.has(r.id)), bkStandaardGoedkeuring));
 document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);
-document.getElementById("btn-bk-ververs").addEventListener("click", laadBank);
+document.getElementById("btn-bk-ververs").addEventListener("click", async (e) => {
+  // Laten zien dát hij ververst (Shereen 12 okt: "ik denk dat deze knop niet werkt").
+  const knop = e.currentTarget;
+  knop.disabled = true; knop.textContent = "Bezig…";
+  try { await laadBank(); knop.textContent = `✓ Ververst ${new Date().toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}`; }
+  catch (fout) { knop.textContent = "Lukte niet"; }
+  knop.disabled = false;
+  setTimeout(() => { knop.textContent = "↻ Verversen"; }, 4000);
+});
+document.getElementById("bk-sorteer-zekerheid").addEventListener("click", () => {
+  bkSorteer = bkSorteer === null ? "af" : bkSorteer === "af" ? "op" : null;
+  vernieuwBkTabel();
+});
 document.getElementById("bk-office").addEventListener("change", () => { vernieuwBkFilters(); vernieuwBkTabel(); });
 document.getElementById("bk-zoek").addEventListener("input", vernieuwBkTabel);
 

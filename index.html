@@ -148,6 +148,9 @@
   .fa-status.verwijderen { background: #C6F432; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
+  .bk-verwijder-blok { margin: 8px 0; padding: 8px 12px; border: 1px solid #f3c4c0; background: #fdf1f0; border-radius: 8px; font-size: 13px; color: var(--tekst); }
+  .bk-verwijder-blok .knop { margin-top: 6px; }
+  button.knop.stil.gevaar { color: #fff; background: var(--rood); border-color: var(--rood); }
   #tabel-bank tr.bk-dag td { background: #e8f1fb; color: var(--tekst); font-weight: 700; font-size: 14px; cursor: pointer; user-select: none; }
   .bk-fzoek { width: 380px; max-width: 100%; margin: 0 0 6px; }
   /* Hooguit 5 kolommen, maar nooit smaller dan 270px — zo wordt het bedrag nooit afgekapt (12 okt: "open 1..."). */
@@ -4966,6 +4969,7 @@ function bkDetailRij(r) {
       ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
       ${r.goedgekeurd_door ? `<span style="font-size:13px">Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}</span>` : ""}
     </p>
+    ${bkVerwijderBlok(r)}
     <div id="melding-bk-detail"></div></td>`;
   const naam = () => { const c = tr.querySelector("#bk-rekening").value.trim(); const n = bkRekNamen[`${r.office}|${c}`];
     const el = tr.querySelector("#bk-rek-naam"); const zoekt = !n && /[a-z]/i.test(c);   // zoekt op naam: niets over de getypte tekst heen
@@ -5042,6 +5046,29 @@ function bkDetailRij(r) {
     return bkNaarVraagposten([{ ...r, goedgekeurd: oms ? { omschrijving: oms } : r.goedgekeurd }], "melding-bk-detail", reden);
   });
   knop("btn-bk-overslaan", () => bkZetStatus(r, "overgeslagen", "overgeslagen"));
+  // Afschrift laten verwijderen in Twinfield (alleen als alle regels DUBBEL zijn) — tweede klik = zeker.
+  const vk = tr.querySelector("#btn-bk-afs-verwijder");
+  if (vk) vk.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!vk.dataset.zeker) { vk.dataset.zeker = "1"; vk.textContent = `Zeker? Klik nog een keer: Shai verwijdert afschrift ${r.bank_code} ${r.afschrift} in Twinfield`; vk.classList.add("gevaar"); return; }
+    vk.disabled = true;
+    const door = gebruiker ? gebruiker.email : null;
+    const regels = bkAfschriftRegels(r);
+    const { error } = await sb.from("bank_regels").update({ goedgekeurd: { soort: "afschrift_verwijderen", door, op: new Date().toISOString() }, updated_by: door })
+      .in("id", regels.map(x => x.id)).eq("status", "overgeslagen");
+    if (error) { vk.disabled = false; return toonMelding("melding-bk-detail", "fout", escapeHtml(error.message)); }
+    await sb.from("bank_log").insert({ office: r.office, actie: "afschrift verwijderen gevraagd", details: { afschrift: `${r.bank_code} ${r.afschrift}`, sub_id: r.sub_id }, door });
+    bkGekozen = null; await laadBank();
+    toonMelding("melding-bank", "ok", `Gevraagd: Shai verwijdert afschrift ${escapeHtml(r.bank_code + " " + r.afschrift)} van ${escapeHtml(r.office)} in Twinfield in zijn volgende ronde (of druk op ▶).`);
+  });
+  const va = tr.querySelector("#btn-bk-afs-annuleer");
+  if (va) va.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const door = gebruiker ? gebruiker.email : null;
+    await sb.from("bank_regels").update({ goedgekeurd: null, updated_by: door }).in("id", bkAfschriftRegels(r).map(x => x.id)).eq("status", "overgeslagen");
+    await sb.from("bank_log").insert({ office: r.office, actie: "afschrift verwijderen ingetrokken", details: { afschrift: `${r.bank_code} ${r.afschrift}` }, door });
+    bkGekozen = null; laadBank();
+  });
   knop("btn-bk-terug", () => bkZetStatus(r, (r.voorstel || {}).zekerheid >= 85 ? "voorstel" : "voorleggen", "terug naar beoordelen"));
   tr.addEventListener("click", (e) => e.stopPropagation());
   return tr;
@@ -5075,6 +5102,19 @@ function bkAfletGegevens(office) {
   })();
   bkAfletCache[office].catch(() => { delete bkAfletCache[office]; });
   return bkAfletCache[office];
+}
+/* Afschrift verwijderen in Twinfield (Shereen 12 okt: een afschrift dat al geboekt staat, wil ze vanuit Shai laten
+   verwijderen — met een tweede klik om zeker te zijn). Alleen als ALLE regels van het afschrift DUBBEL zijn. */
+const bkAfschriftRegels = (r) => bkRegels.filter(x => x.office === r.office && x.bank_code === r.bank_code && x.afschrift === r.afschrift && x.sub_id === r.sub_id);
+function bkVerwijderBlok(r) {
+  const regels = bkAfschriftRegels(r);
+  const dubbel = (x) => x.status === "overgeslagen" && String(x.opmerking || "").startsWith("DUBBEL:");
+  if (!regels.length || !regels.every(dubbel)) return "";
+  const vraag = regels.find(x => x.goedgekeurd && x.goedgekeurd.soort === "afschrift_verwijderen");
+  const afs = escapeHtml(`${r.bank_code} ${r.afschrift}`);
+  return `<div class="bk-verwijder-blok"><b>Alle ${regels.length} regel(s) van afschrift ${afs} staan al geboekt in Twinfield.</b> Het afschrift zelf kan weg uit de bankmodule.<br>` +
+    (vraag ? `Verwijderen gevraagd door ${escapeHtml((vraag.goedgekeurd.door || "").split("@")[0])} — Shai doet het in zijn volgende ronde (of druk op ▶). <button class="knop stil" id="btn-bk-afs-annuleer">Toch niet</button>`
+      : `<button class="knop stil" id="btn-bk-afs-verwijder">🗑 Afschrift ${afs} verwijderen in Twinfield</button>`) + `</div>`;
 }
 /* Eén factuurkandidaat als goed te keuren regel (soort klant). */
 function bkKlantRegel(k, r) {

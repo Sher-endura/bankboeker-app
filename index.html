@@ -698,14 +698,16 @@
 <!-- ============ TAB: KNOWLEDGEBASE SHAI (wat de Basecone-robot weet) ============ -->
 <section id="tab-bank" style="display:none">
   <div class="kaart">
-    <h2>Twinfield Bank — Shai in de bankmodule</h2>
-    <!-- Eén regel (Shereen 11 okt): knop + zoeken links, Shai's status en "Hoe werkt dit?" rechts. -->
-    <div class="bk-regel1">
+    <!-- Indeling (Shereen 12 okt): titel met rechts de knop ▶; zoeken met rechts "Hoe werkt dit?";
+         filters met rechts Shai's status. -->
+    <div class="bk-regel1" style="margin-bottom:8px">
+      <h2 style="margin:0">Twinfield Bank — Shai in de bankmodule</h2>
+      <span id="bk-nu-melding" style="font-size:13px; margin-left:auto"></span>
       <button class="knop stil" id="btn-bk-nu" style="padding:6px 12px" title="Shai begint binnen een halve minuut aan een ronde in Twinfield.">▶ Shai nu laten draaien</button>
+    </div>
+    <div class="bk-regel1">
       <input type="search" id="bk-zoek" placeholder="🔍 Zoek: omschrijving, bedrag, rekening, afschrift…" style="width:380px; max-width:100%" autocomplete="off">
-      <span id="bk-nu-melding" style="font-size:13px"></span>
-      <div id="bk-robot" class="fa-robot bk-robot-klein"></div>
-      <details class="bk-hoe"><summary>Hoe werkt dit?</summary><div class="bk-hoe-tekst fa-uitleg">Shai leest in Twinfield (Kas &amp; Banken → Bankafschriftverwerking) de uitstaande afschriften. Per bankregel zie je hier wat <b>Twinfield</b> zelf voorstelt en wat Shai in de <b>historie</b> van de bankdagboeken vond (de recentste boeking telt). Zijn die het eens, dan is de zekerheid hoog; spreken ze elkaar tegen, dan legt Shai de regel aan je voor. Jij keurt goed (één voor één of met de vinkjes) — pas dán wijst Shai de regel in Twinfield toe. Is een afschrift helemaal toegewezen, dan drukt hij op <b>Verwerken</b>; het boekstuk blijft <b>concept</b>. Een ontvangst zonder voorstel van Twinfield koppelt Shai waar het kan aan een openstaande factuur (zelfde bedrag, plus factuurnummer of naam) en lettert die af; betalingen via een leverancier wijs je zelf in Twinfield toe. <b>Wanneer?</b> Maandag t/m vrijdag om 10:00 en 17:00. Keur je later op de dag goed, druk dan op <b>▶ Shai nu laten draaien</b>; hij begint binnen een halve minuut.</div></details>
+      <details class="bk-hoe" style="margin-left:auto"><summary>Hoe werkt dit?</summary><div class="bk-hoe-tekst fa-uitleg">Shai leest in Twinfield (Kas &amp; Banken → Bankafschriftverwerking) de uitstaande afschriften. Per bankregel zie je hier wat <b>Twinfield</b> zelf voorstelt en wat Shai in de <b>historie</b> van de bankdagboeken vond (de recentste boeking telt). Zijn die het eens, dan is de zekerheid hoog; spreken ze elkaar tegen, dan legt Shai de regel aan je voor. Jij keurt goed (één voor één of met de vinkjes) — pas dán wijst Shai de regel in Twinfield toe. Is een afschrift helemaal toegewezen, dan drukt hij op <b>Verwerken</b>; het boekstuk blijft <b>concept</b>. Een ontvangst zonder voorstel van Twinfield koppelt Shai waar het kan aan een openstaande factuur (zelfde bedrag, plus factuurnummer of naam) en lettert die af; betalingen via een leverancier wijs je zelf in Twinfield toe. <b>Wanneer?</b> Maandag t/m vrijdag om 10:00 en 17:00. Keur je later op de dag goed, druk dan op <b>▶ Shai nu laten draaien</b>; hij begint binnen een halve minuut.</div></details>
     </div>
     <div class="fa-balk">
       <select id="bk-office" style="width:auto"></select>
@@ -714,6 +716,7 @@
         <div class="bk-status-lijst" id="bk-filters" style="display:none"></div>
       </div>
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px">↻ Verversen</button>
+      <div id="bk-robot" class="fa-robot bk-robot-klein"></div>
     </div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>

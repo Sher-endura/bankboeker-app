@@ -4912,10 +4912,11 @@ function bkDetailRij(r) {
       <select id="bk-factuur" style="margin:0 0 6px 24px; max-width:640px"${beoordelen ? "" : " disabled"}>${gekozenFactuur ? "" : `<option value="">— kies een factuur —</option>`}${kandidaten.map(k => `<option value="${escapeHtml(k.code + "|" + k.nummer)}"${k.code + "|" + k.nummer === gekozenFactuur ? " selected" : ""}>${escapeHtml(`${k.factuur || k.code + " " + k.nummer} · ${k.relatie} ${k.relatienaam} · ${datumNlKort(k.datum)} · ${faBedrag(k.open)}`)}</option>`).join("")}</select>` : ""}
     <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
     <div class="rij">
-      <div><label>Rekening</label><input type="text" id="bk-rekening" list="bk-rek-lijst" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off"><span id="bk-rek-naam" style="font-size:13px"></span>
-        <datalist id="bk-rek-lijst">${rekeningen.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(bkRekNamen[`${r.office}|${c}`] || "")}</option>`).join("")}</datalist></div>
+      <div><label>Rekening</label><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="Typ nummer of naam…"><span id="bk-rek-naam" style="font-size:13px"></span></div>
       <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
     </div>
+    ${beoordelen ? `<label style="display:block; margin:8px 0 3px; font-size:12px; font-weight:600">Waarom verbeter je dit? (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</label>
+      <input type="text" id="bk-reden" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%">` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
     <p style="margin:10px 0 4px">
       ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}
       ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
@@ -4925,6 +4926,7 @@ function bkDetailRij(r) {
   const naam = () => { const c = tr.querySelector("#bk-rekening").value.trim(); const n = bkRekNamen[`${r.office}|${c}`];
     const el = tr.querySelector("#bk-rek-naam"); el.textContent = c ? (n ? " " + n : " onbekende rekening") : ""; el.style.color = c && !n ? "var(--rood)" : ""; };
   tr.querySelector("#bk-rekening").addEventListener("input", () => { naam(); const rg = tr.querySelector('input[value="grootboek"]'); if (rg) rg.checked = true; });
+  if (beoordelen) faKeuzelijst(tr.querySelector("#bk-rekening"), () => rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })));
   naam();
   const knop = (id, fn) => { const b = tr.querySelector("#" + id); if (b) b.addEventListener("click", async (e) => {
     e.stopPropagation();
@@ -4932,15 +4934,16 @@ function bkDetailRij(r) {
   }); };
   knop("btn-bk-goedkeuren", () => {
     const keuze = (tr.querySelector('input[name="bk-keuze"]:checked') || {}).value;
-    if (keuze === "twinfield") return bkGoedkeuren([r], () => ({ soort: "twinfield", omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40) }), "melding-bk-detail");
+    const reden = (tr.querySelector("#bk-reden") || {}).value?.trim() || undefined;   // Shai leert het mee (bank.mjs historie)
+    if (keuze === "twinfield") return bkGoedkeuren([r], () => ({ soort: "twinfield", omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
     if (keuze === "klant") {
       const k = kandidaten.find(x => x.code + "|" + x.nummer === tr.querySelector("#bk-factuur").value);
       if (!k) return toonMelding("melding-bk-detail", "fout", "Kies eerst een factuur.");
-      return bkGoedkeuren([r], () => ({ soort: "klant", regels: [bkKlantRegel(k, r)], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40) }), "melding-bk-detail");
+      return bkGoedkeuren([r], () => ({ soort: "klant", regels: [bkKlantRegel(k, r)], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
     }
     const rek = tr.querySelector("#bk-rekening").value.trim();
     if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
-    bkGoedkeuren([r], () => ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40) }), "melding-bk-detail");
+    bkGoedkeuren([r], () => ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
   });
   knop("btn-bk-overslaan", () => bkZetStatus(r, "overgeslagen", "overgeslagen"));
   knop("btn-bk-terug", () => bkZetStatus(r, (r.voorstel || {}).zekerheid >= 85 ? "voorstel" : "voorleggen", "terug naar beoordelen"));

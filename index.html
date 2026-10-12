@@ -776,7 +776,7 @@
     <div class="status-tabjes" id="bk-tabjes"></div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
-      <button class="knop stil" id="btn-bk-vraagposten" title="Keurt de aangevinkte regels goed op de vraagpostenrekening van die klant (bv. 2999); Shai wijst ze daarna toe en boekt ze (concept).">→ Aangevinkte naar Vraagposten</button>
+      <button class="knop stil" id="btn-bk-vraagposten" title="Keurt de aangevinkte regels goed op de vraagpostenrekening van die klant (uit het klantprofiel, anders herkend aan de naam: Vraagposten / Ask the accountant / Uit te zoeken posten); Shai wijst ze daarna toe en boekt ze (concept).">→ Aangevinkte naar Vraagposten</button>
       <span id="bk-bulk-tekst"></span>
     </div>
     <div id="melding-bank"></div>
@@ -5022,13 +5022,27 @@ document.getElementById("bk-vink-alles").addEventListener("change", (e) => {
   vernieuwBkTabel();
 });
 document.getElementById("btn-bk-bulk").addEventListener("click", () => bkGoedkeuren(bkRegels.filter(r => bkVink.has(r.id)), bkStandaardGoedkeuring));
+/* De vraagpostenrekening van een klant (Shereen 12 okt: "niet alle klanten hebben 2999 — het heet Vraagpost,
+   Vraagposten, Ask the accountant of zoiets, zo herken je het"). Eerst de rekening uit het klantprofiel als die in
+   het rekeningschema staat; anders herkennen aan de naam. "Vraagposten Quickbooks" (2998, voor de QuickBooks-
+   koppeling) telt niet. Gemeten 12 okt: bij alle bankklanten is het 2999 ("Uit te zoeken posten" /
+   "#assistance required#"). Geeft null als er niets te vinden is. */
+const VRAAGPOST_NAAM = [/^\s*vraag\s*post(en)?\s*$/i, /ask\s*(the|your|an)?\s*accountant/i, /vraag\s*post/i, /uit\s*te\s*zoeken/i, /assistance\s*required/i];
+function vraagpostenRekening(office) {
+  const prof = ((profielen.find(p => p.code === office) || {}).vraagposten || "").trim();
+  if (prof && bkRekNamen[`${office}|${prof}`]) return prof;
+  const schema = Object.keys(bkRekNamen).filter(k => k.startsWith(office + "|")).map(k => ({ code: k.split("|")[1], naam: bkRekNamen[k] || "" }))
+    .filter(x => !/quickbooks/i.test(x.naam));
+  for (const re of VRAAGPOST_NAAM) { const x = schema.find(y => re.test(y.naam)); if (x) return x.code; }
+  return null;
+}
 /* Aangevinkte naar Vraagposten (Shereen 12 okt): goedkeuren op de vraagpostenrekening van die klant
-   (klantprofiel, standaard 2999) met de nette omschrijving; Shai wijst daarna toe en boekt (concept). */
+   (vraagpostenRekening) met de nette omschrijving; Shai wijst daarna toe en boekt (concept). */
 document.getElementById("btn-bk-vraagposten").addEventListener("click", () => {
   const regels = bkRegels.filter(r => bkVink.has(r.id));
-  const vpVan = (office) => ((profielen.find(p => p.code === office) || {}).vraagposten || "2999").trim();
-  const zonder = [...new Set(regels.filter(r => !bkRekNamen[`${r.office}|${vpVan(r.office)}`]).map(r => `${r.office} (${vpVan(r.office)})`))];
-  if (zonder.length) return toonMelding("melding-bank", "fout", "De vraagpostenrekening staat niet in het rekeningschema van: " + escapeHtml(zonder.join(", ")) + ". Zet de juiste rekening in het klantprofiel (Settings). Er is niets goedgekeurd.");
+  const vpVan = vraagpostenRekening;
+  const zonder = [...new Set(regels.filter(r => !vpVan(r.office)).map(r => r.office))];
+  if (zonder.length) return toonMelding("melding-bank", "fout", "Geen vraagpostenrekening gevonden bij: " + escapeHtml(zonder.join(", ")) + " (niet in het klantprofiel en geen rekening die Vraagposten / Ask the accountant / Uit te zoeken posten heet). Zet de juiste rekening in het klantprofiel (Settings). Er is niets goedgekeurd.");
   bkGoedkeuren(regels, (r) => {
     const vp = vpVan(r.office);
     return { soort: "grootboek", vraagposten: true, regels: [{ rekening: vp, bedrag: Number(r.bedrag) }],

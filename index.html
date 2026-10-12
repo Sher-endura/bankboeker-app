@@ -618,6 +618,9 @@
     </div>
     <div class="fa-balk">
       <select id="fa-office" style="width:auto"></select>
+      <select id="fa-substatus" style="width:auto" title="Alleen deze status tonen — de vinkjes bovenaan vinken dan ook voorleggen aan">
+        <option value="">Alle statussen</option><option value="shai|voorstel">Shai voorstel</option><option value="shai|voorleggen">Shai voorleggen</option>
+      </select>
       <select id="fa-zekerheid" style="width:auto" title="Alleen documenten met deze zekerheid tonen">
         <option value="">Alle zekerheden</option><option value="hoog">Zekerheid hoog</option><option value="middel">Zekerheid middel</option><option value="laag">Zekerheid laag</option>
       </select>
@@ -634,7 +637,7 @@
   <div class="fa-split" id="fa-split">
     <div class="kaart">
       <table id="tabel-facturen">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th id="fa-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde">Zekerheid <span id="fa-sorteer-pijl"></span></th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan). Kies je een status in &quot;Alle statussen&quot;, dan vinkt dit alles van die status aan — ook voorleggen."></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th id="fa-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde">Zekerheid <span id="fa-sorteer-pijl"></span></th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -763,6 +766,10 @@
     </div>
     <div class="fa-balk">
       <select id="bk-office" style="width:auto"></select>
+      <select id="bk-substatus" style="width:auto" title="Alleen deze status tonen — de vinkjes bovenaan vinken dan ook voorleggen aan">
+        <option value="">Alle statussen</option><option value="tf|voorstel">TF voorstel</option><option value="tf|voorleggen">TF voorleggen</option>
+        <option value="shai|voorstel">Shai voorstel</option><option value="shai|voorleggen">Shai voorleggen</option>
+      </select>
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
     <div class="status-tabjes" id="bk-tabjes"></div>
@@ -774,7 +781,7 @@
     <!-- Alleen de regels scrollen; alles hierboven en de kolomkoppen blijven staan (Shereen 11 okt). -->
     <div class="bk-scroll" id="bk-scroll">
       <table id="tabel-bank">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan)"></th><th>Status</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan). Kies je een status in &quot;Alle statussen&quot;, dan vinkt dit alles van die status aan — ook voorleggen."></th><th>Status</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -3570,6 +3577,19 @@ function statusTabjes(vakId, tabjes, gekozen, telling, kies) {
 }
 const leesTabje = (sleutel, tabjes) => { try { const t = localStorage.getItem(sleutel); if (tabjes.some(x => x[0] === t)) return t; } catch (e) { /* standaard */ } return tabjes[0][0]; };
 const bewaarTabje = (sleutel, t) => { try { localStorage.setItem(sleutel, t); } catch (e) { /* niet erg */ } };
+/* Filter op status binnen "Te beoordelen" (Shereen 12 okt: "per status selecteren en goedkeuren"). Waarde
+   "tf|voorstel" enz. — dezelfde indeling als het label in de statuskolom. Alleen zichtbaar bij Te beoordelen. */
+const bronVan = (bron) => (bron === "twinfield" ? "tf" : "shai");
+function pastSubstatus(waarde, status, bron) {
+  if (!waarde) return true;
+  const [b, st] = waarde.split("|");
+  return status === st && bronVan(bron) === b;
+}
+function toonSubstatus(id, zichtbaar) {
+  const el = document.getElementById(id);
+  el.style.display = zichtbaar ? "" : "none";
+  if (!zichtbaar) el.value = "";
+}
 function statusLabel(status, bron) {
   const wie = (status === "voorstel" || status === "voorleggen") && bron ? (bron === "twinfield" ? "tf" : "shai") : "";
   const tekst = (wie ? (wie === "tf" ? "TF " : "Shai ") : "") + (SHAI_STATUS_TEKST[status] || status);
@@ -3734,6 +3754,7 @@ function vernieuwFaFilters() {
     faTabje = t; faStatusSel = new Set(FA_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.basecone.tabje", t);
     vernieuwFaFilters(); vernieuwFaTabel();
   });
+  toonSubstatus("fa-substatus", faTabje === "beoordelen");
   requestAnimationFrame(faHoogte);
 }
 function vernieuwFaTabel() {
@@ -3794,7 +3815,9 @@ function faZichtbaar() {
   const zeker = document.getElementById("fa-zekerheid").value;
   const zoek = document.getElementById("fa-zoek").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const zekerVan = (d) => ((d.goedgekeurd || d.voorstel || {}).zekerheid || "");
+  const sub = document.getElementById("fa-substatus").value;
   const lijst = faDocs.filter(d => (!office || d.office === office) && (zoek.length || faStatusSel.has(d.status)) &&
+    (zoek.length || pastSubstatus(sub, d.status, "shai")) &&
     (!zeker || zekerVan(d) === zeker) && (!zoek.length || (t => zoek.every(w => /^\d{1,2}$/.test(w) ? new RegExp(`(^|\\D)${w}(\\D|$)`).test(t) : t.includes(w)))(faZoektekst(d))));
   if (faSorteer) lijst.sort((a, b) => ((FA_ZEKER[zekerVan(a)] || 0) - (FA_ZEKER[zekerVan(b)] || 0)) * (faSorteer === "af" ? -1 : 1));
   return lijst;
@@ -3803,9 +3826,10 @@ function faSorteerZekerheid() {
   faSorteer = faSorteer === null ? "af" : faSorteer === "af" ? "op" : null;
   vernieuwFaTabel();
 }
+const faVinkbaar = () => faZichtbaar().filter(d => document.getElementById("fa-substatus").value ? FA_BEOORDELEN.includes(d.status) : d.status === "voorstel");
 function faBulkStand() {
   for (const id of [...faVink]) if (!faDocs.some(d => d.id === id && FA_BEOORDELEN.includes(d.status))) faVink.delete(id);
-  const voorstellen = faZichtbaar().filter(d => d.status === "voorstel");
+  const voorstellen = faVinkbaar();
   const alles = document.getElementById("fa-vink-alles");
   const aan = voorstellen.filter(d => faVink.has(d.id)).length;
   alles.checked = voorstellen.length > 0 && aan === voorstellen.length;
@@ -3817,7 +3841,7 @@ function faBulkStand() {
 }
 function faVinkAlles() {
   const aan = document.getElementById("fa-vink-alles").checked;
-  for (const d of faZichtbaar().filter(d => d.status === "voorstel")) aan ? faVink.add(d.id) : faVink.delete(d.id);
+  for (const d of faVinkbaar()) aan ? faVink.add(d.id) : faVink.delete(d.id);
   vernieuwFaTabel();
 }
 /* Dezelfde controles als bij één document goedkeuren, maar op het voorstel zoals Shai het maakte. */
@@ -4761,7 +4785,9 @@ function bkZichtbaar() {
   const tekst = (r) => { const v = r.goedgekeurd && r.goedgekeurd.regels ? r.goedgekeurd : r.voorstel || {};
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
+  const sub = document.getElementById("bk-substatus").value;
   return bkRegels.filter(r => (!office || r.office === office) && (zoek.length || bkStatusSel.has(r.status)) &&
+    (zoek.length || pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron)) &&
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
 /* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Basecone. */
@@ -4776,6 +4802,7 @@ function vernieuwBkFilters() {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
   });
+  toonSubstatus("bk-substatus", bkTabje === "beoordelen");
   bkStatusKnop();
 }
 function bkStatusKnop() {
@@ -4963,9 +4990,10 @@ async function bkZetStatus(r, status, actie) {
   bkGekozen = null;
   laadBank();
 }
+const bkVinkbaar = () => bkZichtbaar().filter(r => (document.getElementById("bk-substatus").value ? BK_BEOORDELEN.includes(r.status) : r.status === "voorstel") && bkStandaardGoedkeuring(r));
 function bkBulkStand() {
   for (const id of [...bkVink]) if (!bkRegels.some(r => r.id === id && BK_BEOORDELEN.includes(r.status))) bkVink.delete(id);
-  const voorstellen = bkZichtbaar().filter(r => r.status === "voorstel" && bkStandaardGoedkeuring(r));
+  const voorstellen = bkVinkbaar();
   const alles = document.getElementById("bk-vink-alles");
   const aan = voorstellen.filter(r => bkVink.has(r.id)).length;
   alles.checked = voorstellen.length > 0 && aan === voorstellen.length;
@@ -4975,7 +5003,7 @@ function bkBulkStand() {
   document.getElementById("bk-bulk-tekst").textContent = `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Shai wijst ze daarna toe in Twinfield, precies zoals voorgesteld.`;
 }
 document.getElementById("bk-vink-alles").addEventListener("change", (e) => {
-  for (const r of bkZichtbaar().filter(r => r.status === "voorstel" && bkStandaardGoedkeuring(r))) e.target.checked ? bkVink.add(r.id) : bkVink.delete(r.id);
+  for (const r of bkVinkbaar()) e.target.checked ? bkVink.add(r.id) : bkVink.delete(r.id);
   vernieuwBkTabel();
 });
 document.getElementById("btn-bk-bulk").addEventListener("click", () => bkGoedkeuren(bkRegels.filter(r => bkVink.has(r.id)), bkStandaardGoedkeuring));
@@ -4995,6 +5023,7 @@ document.getElementById("bk-sorteer-zekerheid").addEventListener("click", () => 
 });
 document.getElementById("bk-office").addEventListener("change", () => { vernieuwBkFilters(); vernieuwBkTabel(); });
 document.getElementById("bk-zoek").addEventListener("input", vernieuwBkTabel);
+document.getElementById("bk-substatus").addEventListener("change", () => { bkGekozen = null; vernieuwBkTabel(); });
 
 /* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de
    Boekingsregels onder de Knowledgebase. Een groep onthoudt welk sub-tabblad laatst open stond. */
@@ -5360,6 +5389,7 @@ addEventListener("resize", faHoogte);
 })();
 document.getElementById("fa-office").addEventListener("change", () => { vernieuwFaFilters(); vernieuwFaTabel(); });
 document.getElementById("fa-zekerheid").addEventListener("change", vernieuwFaTabel);
+document.getElementById("fa-substatus").addEventListener("change", vernieuwFaTabel);
 let faZoekKlok = null;
 document.getElementById("fa-zoek").addEventListener("input", () => { clearTimeout(faZoekKlok); faZoekKlok = setTimeout(vernieuwFaTabel, 200); });
 document.getElementById("btn-fa-nu").addEventListener("click", faNuDraaien);

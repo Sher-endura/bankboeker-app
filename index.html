@@ -25,6 +25,7 @@
   .subnav { background: #f3f6fa; border-bottom: 1px solid var(--rand); padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
   .subnav button { border: none; background: none; padding: 8px 14px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--tekst); }
   input.zoek-keuze { min-width: 280px; }
+  input.zoek-keuze.niet-gevonden { border-color: var(--rood); outline-color: var(--rood); }
   .subnav .subnav-klant { margin-left: auto; align-self: center; font-size: 13px; font-weight: 600; color: var(--tekst); }
   .subnav button.actief { color: var(--blauw); border-bottom-color: var(--zalm); font-weight: 600; }
   nav button.actief { color: var(--blauw); border-bottom-color: var(--zalm); font-weight: 600; }
@@ -3740,7 +3741,7 @@ function vernieuwFaTabel() {
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
   const zoekt = document.getElementById("fa-zoek").value.trim();
-  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${document.getElementById("fa-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
   for (const d of lijst) {
     const v = d.goedgekeurd || d.voorstel || {};
     const pnt = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
@@ -4749,6 +4750,7 @@ async function bkNuDraaien() {
   knop.disabled = true;
   // Eén klant of iedereen: volgt de keuze in "Alle administraties" (Shereen 11 okt).
   const office = document.getElementById("bk-office").value || null;
+  if (office === GEEN_ADMIN) { m.textContent = "Kies eerst een bestaande administratie (of maak het zoekvak leeg voor alle klanten)."; knop.disabled = false; return; }
   const { error } = await sb.from("bank_log").insert({ actie: "nu draaien", office, door: gebruiker ? gebruiker.email : null });
   m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"} (als zijn Twinfield-venster open en ingelogd is).`;
   setTimeout(() => { knop.disabled = false; laadBankStatus(); }, 30000);
@@ -4778,7 +4780,7 @@ function vernieuwBkFilters() {
 }
 function bkStatusKnop() {
   const office = document.getElementById("bk-office").value;
-  document.getElementById("btn-bk-nu").textContent = `▶ Shai nu laten draaien (${office || "alle klanten"})`;
+  document.getElementById("btn-bk-nu").textContent = `▶ Shai nu laten draaien (${office === GEEN_ADMIN ? "niet gevonden" : office || "alle klanten"})`;
 }
 document.addEventListener("click", (e) => {
   if (!e.target.closest(".bk-hoe")) document.querySelectorAll(".bk-hoe").forEach((d) => d.removeAttribute("open"));
@@ -4802,7 +4804,7 @@ function bkStandaardGoedkeuring(r) {
 function vernieuwBkTabel() {
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
-  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">Niets in deze lijst.</td></tr>`;
+  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">${document.getElementById("bk-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : "Niets in deze lijst."}</td></tr>`;
   const klap = document.getElementById("bk-klap");
   klap.textContent = bkUitklap ? "◂ Bron & uitleg" : "▸ Bron & uitleg";
   klap.classList.toggle("open", bkUitklap);
@@ -5067,7 +5069,10 @@ kiesTab("inlezen");   // tot de inlog klaar is; daarna opent de app op Twinfield
 /* Administratie kiezen door te typen (Shereen 11 okt): een zoekveld met keuzelijst boven op de
    bestaande <select>, die onzichtbaar blijft en alles blijft doen (waarde, change-event). Typ een stukje
    van de code of de naam; kies uit de lijst. De opties volgen de select vanzelf. */
-function maakZoekbaar(selectId, placeholder) {
+/* Een getypte naam die bij geen enkele administratie past (Shereen 12 okt): de lijst wordt leeg met
+   "Niet gevonden" — niet blijven hangen op de vorige klant. Het filter krijgt dan deze waarde. */
+const GEEN_ADMIN = "__niet_gevonden__";
+function maakZoekbaar(selectId, placeholder, { nietGevonden = false } = {}) {
   const sel = document.getElementById(selectId);
   if (!sel || sel.dataset.zoekbaar) return;
   sel.dataset.zoekbaar = "1";
@@ -5081,11 +5086,23 @@ function maakZoekbaar(selectId, placeholder) {
   veld.autocomplete = "off";
   sel.style.display = "none";
   sel.after(veld, lijst);
-  const opties = () => [...sel.options];
-  const toon = () => { const o = sel.options[sel.selectedIndex]; veld.value = o && o.value ? o.textContent : ""; };
+  const opties = () => [...sel.options].filter(x => x.value !== GEEN_ADMIN);
+  const toon = () => {
+    const o = sel.options[sel.selectedIndex];
+    veld.value = o && o.value ? o.textContent : "";
+    veld.classList.toggle("niet-gevonden", sel.value === GEEN_ADMIN);
+  };
   const vul = () => { lijst.innerHTML = opties().map(o => `<option value="${escapeHtml(o.textContent)}"></option>`).join(""); toon(); };
+  const pastNiets = (t) => t && !opties().some(x => x.value && x.textContent.toLowerCase().includes(t));
+  const zetNietGevonden = (tekst) => {
+    let g = [...sel.options].find(x => x.value === GEEN_ADMIN);
+    if (!g) { g = document.createElement("option"); g.value = GEEN_ADMIN; sel.appendChild(g); }
+    g.textContent = tekst;
+    if (sel.value !== GEEN_ADMIN) { sel.value = GEEN_ADMIN; sel.dispatchEvent(new Event("change")); } else toon();
+  };
   const kies = () => {
     const t = veld.value.trim().toLowerCase();
+    if (nietGevonden && pastNiets(t)) return zetNietGevonden(veld.value.trim());
     let o = opties().find(x => x.textContent.trim().toLowerCase() === t);
     if (!o && t) { const m = opties().filter(x => x.value && x.textContent.toLowerCase().includes(t)); if (m.length === 1) o = m[0]; }
     if (!o && !t) o = opties().find(x => !x.value);   // leeg = "Alle administraties" (waar die bestaat)
@@ -5093,6 +5110,8 @@ function maakZoekbaar(selectId, placeholder) {
     if (o) toon();
   };
   veld.addEventListener("change", kies);
+  // Al tijdens het typen: past het nergens bij, dan meteen een lege lijst met "Niet gevonden".
+  if (nietGevonden) veld.addEventListener("input", () => { const t = veld.value.trim().toLowerCase(); if (pastNiets(t)) zetNietGevonden(veld.value.trim()); });
   veld.addEventListener("focus", () => veld.select());
   veld.addEventListener("keydown", (e) => { if (e.key === "Enter") kies(); if (e.key === "Escape") { toon(); veld.blur(); } });
   veld.addEventListener("blur", () => setTimeout(toon, 150));
@@ -5101,8 +5120,8 @@ function maakZoekbaar(selectId, placeholder) {
   vul();
 }
 maakZoekbaar("klant-select", "🔍 Typ code of naam van de administratie…");
-maakZoekbaar("bk-office", "🔍 Alle administraties — typ om te zoeken");
-maakZoekbaar("fa-office", "🔍 Alle administraties — typ om te zoeken");
+maakZoekbaar("bk-office", "🔍 Alle administraties — typ om te zoeken", { nietGevonden: true });
+maakZoekbaar("fa-office", "🔍 Alle administraties — typ om te zoeken", { nietGevonden: true });
 
 document.getElementById("klant-select").addEventListener("change", e => {
   huidig = profielen[+e.target.value]; regelsSessie = []; allesVernieuwen();

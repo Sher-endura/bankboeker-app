@@ -148,7 +148,7 @@
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   .bk-regel1 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
   .fa-robot button.shai-herstart { padding: 3px 10px; font-size: 12px; margin-right: 6px; }
-  .bk-robot-klein { margin: 0 0 0 auto; padding: 6px 12px; font-size: 13px; max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bk-robot-klein { flex: 1 1 0; min-width: 0; margin: 0 0 0 auto; padding: 6px 12px; font-size: 13px; max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .bk-hoe { position: relative; }
   .bk-hoe summary { cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; }
   .bk-hoe-tekst { position: absolute; right: 0; top: 26px; width: min(560px, 90vw); background: #fff; border: 1px solid var(--rand); border-radius: 10px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.15); z-index: 40; margin: 0; }
@@ -603,15 +603,19 @@
 <!-- ============ TAB: FACTUREN (Basecone-robot) ============ -->
 <section id="tab-facturen" style="display:none">
   <div class="kaart">
-    <h2>Basecone — inkoopfacturen</h2>
-    <div id="fa-robot" class="fa-robot"></div>
-    <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 10px">
+    <!-- Indeling gelijk aan Twinfield Bank (Shereen 12 okt): titel met rechts ▶; zoeken met rechts Shai's
+         status en "Hoe werkt dit?"; daaronder de filters en Verversen. -->
+    <div class="bk-regel1" style="margin-bottom:8px">
+      <h2 style="margin:0">Basecone — inkoopfacturen</h2>
+      <span id="fa-nu-melding" style="font-size:13px; margin-left:auto"></span>
       <button class="knop stil" id="btn-fa-nu" style="padding:6px 12px" title="Shai wacht anders tot zijn volgende ronde (elk uur). Hij begint binnen een halve minuut.">▶ Shai nu laten draaien</button>
+    </div>
+    <div class="bk-regel1">
       <input type="search" id="fa-zoek" placeholder="🔍 Zoek: leverancier, factuurnr, bedrag, datum, rekening…" style="width:380px; max-width:100%" autocomplete="off" title="Zoekt in álle documenten (los van het tabje). Meerdere woorden mag: bv. compra 516">
       <span id="fa-zoek-tal" style="font-size:13px"></span>
-      <span id="fa-nu-melding" style="font-size:13px"></span>
+      <div id="fa-robot" class="fa-robot bk-robot-klein"></div>
+      <details class="bk-hoe"><summary>Hoe werkt dit?</summary><div class="bk-hoe-tekst fa-uitleg">De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</div></details>
     </div>
-    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>De robot leest de scans in Basecone en maakt per document een voorstel. Jij kijkt het na naast de scan en keurt goed (één voor één, of met de vinkjes in één keer) — pas dán vult de robot het in Basecone in, drukt op <b>Opslaan</b>, controleert of alles klopt en Basecone het Boekingsklaar vindt, en drukt dan op <b>Boek</b> (door naar Twinfield). Klopt er iets niet, dan boekt hij niet en zet hij het document op Fout. Staat een leverancier er nog niet in, gebruik dan <b>＋ Nieuwe crediteur</b>: Shai maakt hem aan in Basecone. Wat je goedkeurt, onthoudt Shai voor de volgende keer (zie het tabblad 🧠 Knowledgebase Shai). Sleep de scheidingslijn tussen lijst en document om de breedte aan te passen.</details>
     <div class="fa-balk">
       <select id="fa-office" style="width:auto"></select>
       <select id="fa-zekerheid" style="width:auto" title="Alleen documenten met deze zekerheid tonen">
@@ -748,8 +752,8 @@
 <!-- ============ TAB: KNOWLEDGEBASE SHAI (wat de Basecone-robot weet) ============ -->
 <section id="tab-bank" style="display:none">
   <div class="kaart">
-    <!-- Indeling (Shereen 12 okt): titel met rechts de knop ▶; zoeken met rechts "Hoe werkt dit?";
-         filters met rechts Shai's status. -->
+    <!-- Indeling (Shereen 12 okt, zelfde in Basecone): titel met rechts de knop ▶; zoeken met rechts
+         Shai's status en "Hoe werkt dit?"; daaronder de filters en Verversen. -->
     <div class="bk-regel1" style="margin-bottom:8px">
       <h2 style="margin:0">Twinfield Bank — Shai in de bankmodule</h2>
       <span id="bk-nu-melding" style="font-size:13px; margin-left:auto"></span>
@@ -757,7 +761,8 @@
     </div>
     <div class="bk-regel1">
       <input type="search" id="bk-zoek" placeholder="🔍 Zoek: omschrijving, bedrag, rekening, afschrift…" style="width:380px; max-width:100%" autocomplete="off">
-      <details class="bk-hoe" style="margin-left:auto"><summary>Hoe werkt dit?</summary><div class="bk-hoe-tekst fa-uitleg">Shai leest in Twinfield (Kas &amp; Banken → Bankafschriftverwerking) de uitstaande afschriften. Per bankregel zie je hier wat <b>Twinfield</b> zelf voorstelt en wat Shai in de <b>historie</b> van de bankdagboeken vond (de recentste boeking telt). Zijn die het eens, dan is de zekerheid hoog; spreken ze elkaar tegen, dan legt Shai de regel aan je voor. Jij keurt goed (één voor één of met de vinkjes) — pas dán wijst Shai de regel in Twinfield toe. Is een afschrift helemaal toegewezen, dan drukt hij op <b>Verwerken</b>; het boekstuk blijft <b>concept</b>. Een ontvangst zonder voorstel van Twinfield koppelt Shai waar het kan aan een openstaande factuur (zelfde bedrag, plus factuurnummer of naam) en lettert die af; betalingen via een leverancier wijs je zelf in Twinfield toe. <b>Wanneer?</b> Maandag t/m vrijdag om 10:00 en 17:00. Keur je later op de dag goed, druk dan op <b>▶ Shai nu laten draaien</b>; hij begint binnen een halve minuut.</div></details>
+      <div id="bk-robot" class="fa-robot bk-robot-klein"></div>
+      <details class="bk-hoe"><summary>Hoe werkt dit?</summary><div class="bk-hoe-tekst fa-uitleg">Shai leest in Twinfield (Kas &amp; Banken → Bankafschriftverwerking) de uitstaande afschriften. Per bankregel zie je hier wat <b>Twinfield</b> zelf voorstelt en wat Shai in de <b>historie</b> van de bankdagboeken vond (de recentste boeking telt). Zijn die het eens, dan is de zekerheid hoog; spreken ze elkaar tegen, dan legt Shai de regel aan je voor. Jij keurt goed (één voor één of met de vinkjes) — pas dán wijst Shai de regel in Twinfield toe. Is een afschrift helemaal toegewezen, dan drukt hij op <b>Verwerken</b>; het boekstuk blijft <b>concept</b>. Een ontvangst zonder voorstel van Twinfield koppelt Shai waar het kan aan een openstaande factuur (zelfde bedrag, plus factuurnummer of naam) en lettert die af; betalingen via een leverancier wijs je zelf in Twinfield toe. <b>Wanneer?</b> Maandag t/m vrijdag om 10:00 en 17:00. Keur je later op de dag goed, druk dan op <b>▶ Shai nu laten draaien</b>; hij begint binnen een halve minuut.</div></details>
     </div>
     <div class="fa-balk">
       <select id="bk-office" style="width:auto"></select>
@@ -766,7 +771,6 @@
         <div class="bk-status-lijst" id="bk-filters" style="display:none"></div>
       </div>
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
-      <div id="bk-robot" class="fa-robot bk-robot-klein"></div>
     </div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
@@ -4814,7 +4818,7 @@ document.getElementById("btn-bk-status").addEventListener("click", (e) => {
 });
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#bk-status-keuze")) document.getElementById("bk-filters").style.display = "none";
-  if (!e.target.closest(".bk-hoe")) document.querySelector(".bk-hoe")?.removeAttribute("open");
+  if (!e.target.closest(".bk-hoe")) document.querySelectorAll(".bk-hoe").forEach((d) => d.removeAttribute("open"));
 });
 /* Alleen de regels scrollen: de lijst krijgt de hoogte die onder het vaste deel overblijft. */
 function bkHoogte() {

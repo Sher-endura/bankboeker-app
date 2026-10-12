@@ -148,6 +148,10 @@
   .fa-status.verwijderen { background: #C6F432; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
+  .bk-fzoek { width: 380px; max-width: 100%; margin: 0 0 6px; }
+  .bk-fgrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px 18px; }
+  .bk-fgrid label { font-weight: 400; font-size: 13px; color: var(--tekst); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  @media (max-width: 1100px) { .bk-fgrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .bk-regel1 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
   .fa-robot button.shai-herstart { padding: 3px 10px; font-size: 12px; margin-right: 6px; }
   .bk-robot-klein { flex: 1 1 0; min-width: 0; margin: 0 0 0 auto; padding: 6px 12px; font-size: 13px; max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -4965,8 +4969,16 @@ function bkDetailRij(r) {
     if (aflet.fout) { vak.innerHTML = `<span style="color:var(--rood)">Openstaande facturen ophalen lukte niet: ${escapeHtml(aflet.fout)}</span>`; return; }
     if (!rel) { vak.textContent = "Kies eerst de klant."; somTekst(); return; }
     const lijst = aflet.open.filter(o => o.relatie === rel).sort((a, b) => a.datum.localeCompare(b.datum));
-    vak.innerHTML = lijst.length ? lijst.map(o => `<label style="display:block; font-weight:400"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${startFacturen.has(o.code + "|" + o.nummer) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("")
+    // Veel open facturen (Shereen 12 okt, Miniño): in 5 kolommen over het scherm + zoeken op nummer, datum of bedrag.
+    // Zoeken verbergt alleen; wat aangevinkt is telt mee, ook als het buiten de zoekopdracht valt.
+    vak.innerHTML = lijst.length ? (lijst.length > 5 ? `<input type="search" class="bk-fzoek" placeholder="🔍 Zoek factuur: nummer, datum of bedrag (${lijst.length} open)" autocomplete="off">` : "") +
+      `<div class="bk-fgrid">` + lijst.map(o => `<label data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${startFacturen.has(o.code + "|" + o.nummer) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("") + `</div>`
       : "Deze klant heeft geen openstaande facturen — het hele bedrag wordt dan vooruitbetaling op de klant.";
+    const fzoek = vak.querySelector(".bk-fzoek");
+    if (fzoek) fzoek.addEventListener("input", () => {
+      const w = fzoek.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      vak.querySelectorAll(".bk-fgrid label").forEach(l => { l.style.display = w.every(x => l.dataset.zoek.includes(x)) ? "" : "none"; });
+    });
     vak.querySelectorAll(".bk-fvink").forEach(x => x.addEventListener("change", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; somTekst(); }));
     somTekst();
   };

@@ -155,6 +155,7 @@
   .bk-hoe summary { cursor: pointer; font-weight: 600; font-size: 13px; white-space: nowrap; }
   .bk-hoe-tekst { position: absolute; right: 0; top: 26px; width: min(560px, 90vw); background: #fff; border: 1px solid var(--rand); border-radius: 10px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.15); z-index: 40; margin: 0; }
   /* Status als tabjes (Shereen 12 okt), gelijk in Twinfield Bank en Basecone; selectiestreep zalm. */
+  .status-info { cursor: help; color: var(--blauw); font-size: 17px; margin-left: -2px; user-select: none; }
   .status-tabjes { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--rand); margin: 0 0 10px; }
   .status-tabjes button { background: none; border: none; border-bottom: 3px solid transparent; padding: 6px 6px; font-size: 14px; color: var(--tekst); cursor: pointer; white-space: nowrap; }
   .status-tabjes button:hover { color: var(--blauw); }
@@ -622,6 +623,7 @@
       <select id="fa-substatus" style="width:auto" title="Alleen deze status tonen — de vinkjes bovenaan vinken dan ook voorleggen aan">
         <option value="">Alle statussen</option><option value="shai|voorstel">Shai voorstel</option><option value="shai|voorleggen">Shai voorleggen</option>
       </select>
+      <span class="status-info" id="fa-substatus-info" title="Shai = Shai heeft de factuur gelezen en stelt de boeking voor.&#10;&#10;VOORSTEL = zeker genoeg. Mag je met de vinkjes in één keer goedkeuren.&#10;&#10;VOORLEGGEN = Shai twijfelt: zekerheid laag, iets klopt niet (bv. bedrag, crediteur of rekening), geen echte factuur, of het lijkt al eerder geboekt. Kijk het na vóór je goedkeurt.">ⓘ</span>
       <select id="fa-zekerheid" style="width:auto" title="Alleen documenten met deze zekerheid tonen">
         <option value="">Alle zekerheden</option><option value="hoog">Zekerheid hoog</option><option value="middel">Zekerheid middel</option><option value="laag">Zekerheid laag</option>
       </select>
@@ -771,6 +773,7 @@
         <option value="">Alle statussen</option><option value="tf|voorstel">TF voorstel</option><option value="tf|voorleggen">TF voorleggen</option>
         <option value="shai|voorstel">Shai voorstel</option><option value="shai|voorleggen">Shai voorleggen</option>
       </select>
+      <span class="status-info" id="bk-substatus-info" title="TF = Twinfield stelt het voor (een herkenregel van Twinfield of een gekoppelde factuur).&#10;Shai = Shai stelt het voor (uit de historie, een vaste regel of een openstaande factuur).&#10;&#10;VOORSTEL = zeker genoeg (zekerheid 80 of hoger en niets spreekt het tegen). Mag je met de vinkjes in één keer goedkeuren.&#10;&#10;VOORLEGGEN = Shai twijfelt en wil dat iemand kijkt: Twinfield en de historie spreken elkaar tegen, het voorstel is zwak, er is geen voorstel, of de regel staat in Twinfield op Uitzoeken. Kijk het na vóór je goedkeurt.">ⓘ</span>
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
     <div class="status-tabjes" id="bk-tabjes"></div>
@@ -3590,6 +3593,7 @@ function pastSubstatus(waarde, status, bron) {
 function toonSubstatus(id, zichtbaar) {
   const el = document.getElementById(id);
   el.style.display = zichtbaar ? "" : "none";
+  document.getElementById(id + "-info").style.display = zichtbaar ? "" : "none";   // ⓘ verschil voorstel/voorleggen
   if (!zichtbaar) el.value = "";
 }
 function statusLabel(status, bron) {

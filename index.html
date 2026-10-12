@@ -134,12 +134,14 @@
   .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
   .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
   .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
-  /* Kleuren per bron (Shereen 11 okt): TF voorstel blauw, TF voorleggen lichtblauw, Shai voorstel paars, Shai voorleggen oranje. */
+  /* Statuskleuren — één werkwijze voor Twinfield Bank én Basecone (Shereen 12 okt): verander je hier iets,
+     dan verandert het in beide tabbladen. Per bron (11 okt): TF voorstel turquoise, TF voorleggen lichtblauw,
+     Shai voorstel paars, Shai voorleggen oranje; "wacht op Shai" lichtroze. */
   .fa-status.voorstel.shai { background: #9D00FF; color: #fff; }
   .fa-status.voorleggen.shai { background: #FFA500; color: #1f2937; }
   .fa-status.voorleggen.tf { background: #00BFFF; color: #06263a; }
-  #tabel-bank .fa-status.voorstel.tf { background: #40E0D0; color: #06302d; }   /* TF voorstel turquoise, klantbalk zalm (Shereen 11 okt) */
-  #tabel-bank .fa-status.goedgekeurd { background: #FFB6C1; color: #1f2937; }   /* "wacht op Shai" = lichtroze (Shereen 11 okt) */
+  .fa-status.voorstel.tf { background: #40E0D0; color: #06302d; }
+  .fa-status.goedgekeurd { background: #FFB6C1; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   .bk-regel1 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
   .fa-robot button.shai-herstart { padding: 3px 10px; font-size: 12px; margin-right: 6px; }
@@ -3548,11 +3550,19 @@ function toonMelding(id, soort, tekst) {
    Zie docs/BASECONE-ROBOT-START.md. */
 let faRekNamen = {}, faCrdNamen = {};   // "BINGO|7103" → "Kostprijs food", "BINGO|C0175" → "Compra", voor de lijst
 let faDocs = [], faGekozen = null, faStam = { BAS: [], CRD: [] };
-const FA_STATUS_TEKST = {
-  nieuw: "nieuw", gelezen: "wordt gelezen", voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "goedgekeurd",
-  ingevuld: "ingevuld in Basecone", fout: "fout", geboekt: "geboekt", overgeslagen: "overgeslagen",
-  verwijderen: "wordt verwijderd", verwijderd: "verwijderd", splitsen: "wacht op splitsen",
+/* Statuskolom — één werkwijze voor Twinfield Bank én Basecone (Shereen 12 okt: "een verandering bij de
+   één moet same zijn bij de ander"). Zelfde woorden en (via de CSS .fa-status) zelfde kleuren. Bij voorstel
+   en voorleggen staat erbij wie voorstelt: "TF" (Twinfields eigen herkenning) of "Shai". */
+const SHAI_STATUS_TEKST = {
+  nieuw: "nieuw", gelezen: "wordt gelezen", voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "wacht op Shai",
+  ingevuld: "ingevuld in Basecone", toegewezen: "toegewezen", verwerkt: "verwerkt (concept)", geboekt: "geboekt",
+  fout: "fout", overgeslagen: "overgeslagen", verwijderen: "wordt verwijderd", verwijderd: "verwijderd", splitsen: "wacht op splitsen",
 };
+function statusLabel(status, bron) {
+  const wie = (status === "voorstel" || status === "voorleggen") && bron ? (bron === "twinfield" ? "tf" : "shai") : "";
+  const tekst = (wie ? (wie === "tf" ? "TF " : "Shai ") : "") + (SHAI_STATUS_TEKST[status] || status);
+  return `<span class="fa-status ${escapeHtml(status)}${wie ? " " + wie : ""}">${escapeHtml(tekst)}</span>`;
+}
 const datumNlKort = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? iso.split("-").reverse().join("-") : (iso || ""));   // 2026-10-01 → 01-10-2026
 const faBedrag = (n) => (n === null || n === undefined || n === "" ? "" : Number(n).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 // "1.574,75" → 1574.75. Eén punt met 1–2 cijfers erachter en geen komma (bv. "20749.52", geplakt of
@@ -3701,7 +3711,7 @@ async function faNuDraaien() {
 }
 /* Status als uitklaplijst met vinkjes, net als Twinfield Bank (Shereen 11 okt). Standaard voorstel +
    voorleggen (= het oude "Te beoordelen"); de keuze onthoudt deze browser. */
-const FA_STATUSSEN = [["voorstel", "Voorstel"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Wacht op robot"], ["ingevuld", "Ingevuld in Basecone"],
+const FA_STATUSSEN = [["voorstel", "Voorstel"], ["voorleggen", "Voorleggen"], ["goedgekeurd", "Wacht op Shai"], ["ingevuld", "Ingevuld in Basecone"],
   ["geboekt", "Geboekt"], ["fout", "Fout"], ["overgeslagen", "Overgeslagen"], ["nieuw", "Nieuw"], ["gelezen", "Wordt gelezen"],
   ["splitsen", "Wacht op splitsen"], ["verwijderen", "Wordt verwijderd"]];   // verwijderd: tabje DELETED
 let faStatusSel = new Set(["voorstel", "voorleggen"]);
@@ -3752,7 +3762,7 @@ function vernieuwFaTabel() {
     if (faGekozen && faGekozen.id === d.id) tr.classList.add("gekozen");
     tr.title = `${d.bestandsnaam || d.id} · ${d.office}`;
     const kanVink = FA_BEOORDELEN.includes(d.status);
-    tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="fa-vink-rij"${faVink.has(d.id) ? " checked" : ""}>` : ""}</td><td><span class="fa-status ${escapeHtml(d.status)}">${escapeHtml(FA_STATUS_TEKST[d.status] || d.status)}</span></td>
+    tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="fa-vink-rij"${faVink.has(d.id) ? " checked" : ""}>` : ""}</td><td>${statusLabel(d.status, "shai")}</td>
       <td style="font-size:13px"><b>${escapeHtml(v.crediteur || "")}</b> ${escapeHtml(faCrdNamen[`${d.office}|${v.crediteur}`] || (d.nieuwe_crediteur && (v.crediteur === "NIEUW" || v.crediteur === d.nieuwe_crediteur.code) ? d.nieuwe_crediteur.naam + " (nieuw)" : ""))}</td>
       <td style="font-size:13px">${[...new Set((v.regels || []).map(r => r.grootboek))]
         .map(g => `<b>${escapeHtml(g)}</b> ${escapeHtml(faRekNamen[`${d.office}|${g}`] || "")}`).join("<br>")}</td>
@@ -4628,8 +4638,6 @@ function vernieuwFaKennis() {
    daarna wijst Shai toe in Twinfield en verwerkt het afschrift als het helemaal toegewezen is
    (concept). goedgekeurd = {soort: "twinfield"} (Twinfields voorstel accepteren) of
    {soort: "grootboek", regels: [{rekening, bedrag}], omschrijving}. */
-const BK_STATUS_TEKST = { voorstel: "voorstel", voorleggen: "voorleggen", goedgekeurd: "wacht op Shai", toegewezen: "toegewezen",
-  verwerkt: "verwerkt (concept)", fout: "fout", overgeslagen: "overgeslagen" };
 const BK_BEOORDELEN = ["voorstel", "voorleggen"];
 /* Bron en Uitleg klappen naar rechts open (Shereen 10 okt) — dicht nemen ze bijna geen ruimte in;
    de keuze blijft per computer bewaard. */
@@ -4706,8 +4714,6 @@ function bkGoogleBalk(knop, r) {
 }
 const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.voorstel && r.voorstel.omschrijving) || "";
 /* Wie stelt voor? (Shereen 10 okt) "TF voorstel" = Twinfields eigen herkenning, "Shai voorstel" = historie of vaste regel. */
-const bkStatusTekst = (r) => BK_BEOORDELEN.includes(r.status) && r.voorstel
-  ? (r.voorstel.bron === "twinfield" ? "TF " : "Shai ") + r.status : (BK_STATUS_TEKST[r.status] || r.status);
 let bkRegels = [], bkGekozen = null, bkRekNamen = {};
 let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const bkVink = new Set();
@@ -4861,7 +4867,7 @@ function vernieuwBkTabel() {
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>
-      <td><span class="fa-status ${escapeHtml(r.status)}${BK_BEOORDELEN.includes(r.status) && r.voorstel ? (r.voorstel.bron === "twinfield" ? " tf" : " shai") : ""}">${escapeHtml(bkStatusTekst(r))}</span></td>
+      <td>${statusLabel(r.status, r.voorstel && (r.voorstel.bron === "twinfield" ? "twinfield" : "shai"))}</td>
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="bk-refined">${escapeHtml(bkOmsTekst(r))}</td>

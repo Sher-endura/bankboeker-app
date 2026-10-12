@@ -147,6 +147,7 @@
   .fa-status.splitsen { background: #FFD93D; color: #1f2937; }
   .fa-status.verwijderen { background: #C6F432; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
+  #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
   .bk-regel1 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
   .fa-robot button.shai-herstart { padding: 3px 10px; font-size: 12px; margin-right: 6px; }
   .bk-robot-klein { flex: 1 1 0; min-width: 0; margin: 0 0 0 auto; padding: 6px 12px; font-size: 13px; max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -782,7 +783,7 @@
     <!-- Alleen de regels scrollen; alles hierboven en de kolomkoppen blijven staan (Shereen 11 okt). -->
     <div class="bk-scroll" id="bk-scroll">
       <table id="tabel-bank">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan). Kies je een status in &quot;Alle statussen&quot;, dan vinkt dit alles van die status aan — ook voorleggen."></th><th>Status</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan). Kies je een status in &quot;Alle statussen&quot;, dan vinkt dit alles van die status aan — ook voorleggen."></th><th>Status</th><th>Klant</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -4656,7 +4657,7 @@ function vernieuwFaKennis() {
 const BK_BEOORDELEN = ["voorstel", "voorleggen"];
 /* Bron en Uitleg klappen naar rechts open (Shereen 10 okt) — dicht nemen ze bijna geen ruimte in;
    de keuze blijft per computer bewaard. */
-const BK_KOLOMMEN = 10;
+const BK_KOLOMMEN = 11;
 let bkUitklap = false;
 try { bkUitklap = localStorage.getItem("bankboeker.bank.uitklap") === "1"; } catch (e) { /* geen opslag: dicht */ }
 document.getElementById("bk-klap").addEventListener("click", () => {
@@ -4760,7 +4761,7 @@ async function laadBank() {
   if (offices.length) {
     const { data: st } = await sb.from("twinfield_stamdata").select("office, data").eq("soort", "BAS").in("office", offices);
     bkRekNamen = {};
-    for (const rij of st || []) for (const x of rij.data || []) bkRekNamen[`${rij.office}|${x.code}`] = x.naam;
+    for (const rij of st || []) for (const x of rij.data || []) bkRekNamen[`${rij.office}|${x.code}`] = x.naam || "(zonder naam in Twinfield)";
   }
   const kies = document.getElementById("bk-office"), vorige = kies.value;
   kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
@@ -4868,6 +4869,7 @@ function vernieuwBkTabel() {
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>
       <td>${statusLabel(r.status, r.voorstel && (r.voorstel.bron === "twinfield" ? "twinfield" : "shai"))}</td>
+      <td class="bk-klantcode" title="${escapeHtml(((profielen.find(p => p.code === r.office) || {}).naam || "").trim())}">${escapeHtml(r.office)}</td>
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="bk-refined">${escapeHtml(bkOmsTekst(r))}</td>

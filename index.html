@@ -3830,7 +3830,9 @@ function faSorteerZekerheid() {
 }
 const faVinkbaar = () => faZichtbaar().filter(d => document.getElementById("fa-substatus").value ? FA_BEOORDELEN.includes(d.status) : d.status === "voorstel");
 function faBulkStand() {
-  for (const id of [...faVink]) if (!faDocs.some(d => d.id === id && FA_BEOORDELEN.includes(d.status))) faVink.delete(id);
+  // Alleen wat je ziet blijft aangevinkt (12 okt, zelfde als Twinfield Bank).
+  const zicht = new Set(faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status)).map(d => d.id));
+  for (const id of [...faVink]) if (!zicht.has(id)) faVink.delete(id);
   const voorstellen = faVinkbaar();
   const alles = document.getElementById("fa-vink-alles");
   const aan = voorstellen.filter(d => faVink.has(d.id)).length;
@@ -5001,7 +5003,10 @@ async function bkZetStatus(r, status, actie) {
 }
 const bkVinkbaar = () => bkZichtbaar().filter(r => (document.getElementById("bk-substatus").value ? BK_BEOORDELEN.includes(r.status) : r.status === "voorstel") && bkStandaardGoedkeuring(r));
 function bkBulkStand() {
-  for (const id of [...bkVink]) if (!bkRegels.some(r => r.id === id && BK_BEOORDELEN.includes(r.status))) bkVink.delete(id);
+  // Alleen wat je ziet blijft aangevinkt (Shereen 12 okt: 699 aangevinkt terwijl de zoekopdracht er een paar toonde —
+  // goedkeuren zou dan ook de onzichtbare regels raken).
+  const zicht = new Set(bkZichtbaar().filter(r => BK_BEOORDELEN.includes(r.status)).map(r => r.id));
+  for (const id of [...bkVink]) if (!zicht.has(id)) bkVink.delete(id);
   const voorstellen = bkVinkbaar();
   const alles = document.getElementById("bk-vink-alles");
   const aan = voorstellen.filter(r => bkVink.has(r.id)).length;

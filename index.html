@@ -1377,6 +1377,13 @@ function pasUitlegToe(regels, ruw, bedrag, datum) {
   }
   return null;
 }
+/* Heeft deze regel een vaste schrijfregel van Shereen (salaris, tip, belasting)? Die gaan vóór de historie
+   (Shereen 12 okt: "draai de volgorde om" — vaste regels eerst, dan de historie, dan de opgeschoonde banktekst). */
+function heeftVasteSchrijfregel(ruw, rekeningNaam) {
+  const soort = soortVan((ruw || "").toUpperCase()) || (rekeningNaam ? soortVan(rekeningNaam) : null);
+  if (naamWoorden(ruw).length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) return true;
+  return !!belastingOmschrijving(ruw, null);
+}
 function factuurOmschrijving(facturen, naam) {
   const nrs = [...new Set((facturen || []).filter(Boolean))];
   if (!nrs.length) return "";
@@ -4959,9 +4966,11 @@ function bkOmsTekst(r) {
   if (v.soort === "klant") { const t = factuurOmschrijving((v.regels || []).map(x => x.factuur), regel.relatienaam); if (t) return t; }
   const u = pasUitlegToe(bkUitlegRegels.filter(x => x.office === r.office || x.office === "*"), r.omschrijving, Number(r.bedrag), r.datum);
   if (u && u.omschrijving) return u.omschrijving;
-  const uitHist = omschrijvingUitHistorie(((v.historie || [])[0] || {}).omschrijving, r.omschrijving, r.datum);
+  // Volgorde (Shereen 12 okt): vaste schrijfregels (salaris/tip/belasting) → historie → opgeschoonde banktekst.
+  const rekNaam = regel.naam || bkRekNamen[`${r.office}|${regel.rekening}`];
+  const uitHist = heeftVasteSchrijfregel(r.omschrijving, rekNaam) ? null : omschrijvingUitHistorie(((v.historie || [])[0] || {}).omschrijving, r.omschrijving, r.datum);
   if (uitHist) return uitHist;
-  return netteOmschrijving(r.omschrijving, regel.naam || bkRekNamen[`${r.office}|${regel.rekening}`], r.datum) || v.omschrijving || "";
+  return netteOmschrijving(r.omschrijving, rekNaam, r.datum) || v.omschrijving || "";
 }
 let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [];
 let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)

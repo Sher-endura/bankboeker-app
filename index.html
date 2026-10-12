@@ -1222,6 +1222,8 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
     const titel = naamVoorOmschrijving(ruw, 40 - staart.length);
     return titel.slice(0, 40 - staart.length).trim() + staart;
   }
+  const belasting = belastingOmschrijving(ruw, datum);
+  if (belasting) return belasting;
   // Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste
   // probleem): referenties, rekening-, kaart- en klantnummers, eigen bedrijfsnaam eruit.
   let d = " " + boven + " ";
@@ -1248,6 +1250,34 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   while (woorden.length > 1 && /^[A-Z]$/.test(woorden[woorden.length - 1])) woorden.pop();   // "COMPANY N" (van N.V.)
   const uit = woorden.map(titelKast).join(" ").replace(/\s{2,}/g, " ").trim();
   return (uit || (ruw || "").trim()).slice(0, 40).trim();
+}
+
+/* Belastingen (Shereen 12 okt): "ik kort belastingsoorten af en begin de omschrijving ermee en vervolgens de periode
+   waar ze over betalen — Loonbelasting = LB, en dan heb je nog AOV/AWW, AZV en BBO". Bv. "LB - Aug 2026". Periode uit
+   de omschrijving (maand + jaar); staat die er niet in, dan de maand vóór de bankdatum (je betaalt over de vorige maand). */
+const BELASTINGEN = [[/\bLOONBELASTING\b|\bLB\b|\bLB-?\d/, "LB"], [/\bAOV\b|\bAWW\b/, "AOV/AWW"], [/\bAZV\b/, "AZV"], [/\bBBO\b|\bB\.\s?B\.\s?O\b/, "BBO"]];
+const MAAND_KORT = ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
+function belastingOmschrijving(ruw, datum) {
+  const boven = (ruw || "").toUpperCase();
+  const soorten = BELASTINGEN.filter(([re]) => re.test(boven)).map(([, afk]) => afk);
+  if (!soorten.length) return null;
+  let maand = -1, jaar = null;
+  let m = boven.match(/\b(0?[1-9]|1[0-2])[\/-](20\d{2})\b/) || boven.match(/\b(20\d{2})[\/-](0?[1-9]|1[0-2])\b/);
+  if (m) { const a = Number(m[1]), b = Number(m[2]); if (a > 12) { jaar = a; maand = b - 1; } else { maand = a - 1; jaar = b; } }
+  if (maand < 0) for (const w of boven.replace(/[^A-Z]/g, " ").split(/\s+/)) { const i = maandVanWoord(w); if (i >= 0) { maand = i; break; } }
+  if (!jaar) { const j = boven.match(/\b(20\d{2})\b/); if (j) jaar = Number(j[1]); }
+  const d = String(datum || "").match(/^(\d{4})-(\d{2})/);
+  if (maand < 0 && d) { maand = Number(d[2]) - 2; jaar = Number(d[1]); if (maand < 0) { maand = 11; jaar--; } }
+  if (!jaar && d) { jaar = Number(d[1]); if (maand + 1 > Number(d[2])) jaar--; }
+  const periode = maand >= 0 ? `${MAAND_KORT[maand]}${jaar ? " " + jaar : ""}` : "";
+  return (soorten.join(" + ") + (periode ? " - " + periode : "")).slice(0, 40);
+}
+/* Debiteuren/crediteuren (Shereen 12 okt): "het invoicenr is belangrijk in de omschrijving, en anders zo goed mogelijk
+   de tekst van de raw bankomschrijving". Factuurnummer(s) vooraan, dan de naam. Leeg als er geen factuur is. */
+function factuurOmschrijving(facturen, naam) {
+  const nrs = [...new Set((facturen || []).filter(Boolean))];
+  if (!nrs.length) return "";
+  return (nrs.join(", ") + (naam ? " " + naam : "")).slice(0, 40).trim();
 }
 /* ISO-weeknummer van de week vóór de datum (tip betaald in week 41 → "week 40"). */
 function weekVoorDatum(datum) {
@@ -4742,7 +4772,17 @@ function bkGoogleBalk(knop, r) {
   veld.focus();
   veld.select();
 }
-const bkOmsTekst = (r) => (r.goedgekeurd && r.goedgekeurd.omschrijving) || (r.voorstel && r.voorstel.omschrijving) || "";
+/* REFINED omschrijving. Open regels (voorstel/voorleggen) laten we meteen met de nieuwste schrijfregels zien
+   (Shereen 12 okt: "toegepast op alles wat er staat als ik op verversen klik") — dezelfde netteOmschrijving als Shai,
+   die het in zijn volgende ronde ook zo opslaat. Bij een factuurkoppeling: factuurnummer + naam. */
+function bkOmsTekst(r) {
+  if (r.goedgekeurd && r.goedgekeurd.omschrijving) return r.goedgekeurd.omschrijving;
+  const v = r.voorstel || {};
+  if (!BK_BEOORDELEN.includes(r.status)) return v.omschrijving || "";
+  const regel = (v.regels || [])[0] || {};
+  if (v.soort === "klant") { const t = factuurOmschrijving((v.regels || []).map(x => x.factuur), regel.relatienaam); if (t) return t; }
+  return netteOmschrijving(r.omschrijving, regel.naam || bkRekNamen[`${r.office}|${regel.rekening}`], r.datum) || v.omschrijving || "";
+}
 let bkRegels = [], bkGekozen = null, bkRekNamen = {};
 let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const bkVink = new Set();
@@ -4936,7 +4976,7 @@ function bkDetailRij(r) {
   // bij "Twinfield zegt 4832, eerder 9070" de 9070 al klaar).
   const eigen = g.soort === "grootboek" ? g.regels[0].rekening
     : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : ((v.historie || [])[0] || {}).rekening || "");
-  const eigenOms = g.omschrijving || v.omschrijving || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
+  const eigenOms = g.omschrijving || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
   // Afletteren (11 okt): openstaande facturen met hetzelfde bedrag, voorgekozen wat Shai voorstelt.
   const kandidaten = v.kandidaten || [];
   const keuzeKlant = g.soort === "klant" || (g.soort !== "grootboek" && (v.soort === "klant" || v.soort === "relatie"));
@@ -4980,7 +5020,14 @@ function bkDetailRij(r) {
   let aflet = { klanten: [], open: [], fout: "" };
   const relVeld = tr.querySelector("#bk-relatie");
   const gekozenFacturen = () => [...tr.querySelectorAll(".bk-fvink:checked")].map(x => aflet.open.find(o => o.code + "|" + o.nummer === x.value)).filter(Boolean);
+  let omsZelf = false;   // zelf getypt in het omschrijvingsvak? dan niet meer overschrijven
   const somTekst = () => {
+    const oms = tr.querySelector("#bk-oms");
+    if (oms && !omsZelf && tr.querySelector('input[name="bk-keuze"][value="klant"]')?.checked) {
+      const k = aflet.klanten.find(x => x.code === relVeld.value.trim());
+      const t = factuurOmschrijving(gekozenFacturen().map(o => o.factuur), k && k.naam);
+      if (t) oms.value = t;
+    }
     const el = tr.querySelector("#bk-aflet-som"); if (!el) return;
     const som = Math.round(gekozenFacturen().reduce((t, o) => t + o.open, 0) * 100) / 100, rest = Math.round((Number(r.bedrag) - som) * 100) / 100;
     el.innerHTML = `Aangevinkt <b>${faBedrag(som)}</b> · ontvangen <b>${faBedrag(r.bedrag)}</b> · ` + (rest < -0.004
@@ -5008,6 +5055,7 @@ function bkDetailRij(r) {
     vak.querySelectorAll(".bk-fvink").forEach(x => x.addEventListener("change", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; somTekst(); }));
     somTekst();
   };
+  tr.querySelector("#bk-oms").addEventListener("input", (e) => { if (e.isTrusted) omsZelf = true; });
   if (relVeld) {
     tr.querySelector("#bk-facturen").textContent = "Openstaande facturen ophalen uit Twinfield…";
     bkAfletGegevens(r.office).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });

@@ -176,6 +176,8 @@
   .bk-oms-optie span { display: block; font-size: 11px; color: var(--tekst); }
   .bk-oms-optie.gekozen { background: #e8f1fb; border-width: 2px; }
   .bk-tw-status { flex-basis: 100%; font-size: 12px; color: var(--tekst); }
+  .bk-hist-advies { display: block; margin-top: 4px; background: #fff7e6; border: 1px solid var(--oranje); color: var(--tekst); border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; text-align: left; }
+  .bk-hist-advies.gekozen { background: #e8f1fb; border-color: var(--blauw); }
   /* Ontvangst groen, betaling rood (Shereen 12 okt) — bedrag én het woordje eronder. */
   #tabel-bank td.bk-ontvangst { color: var(--groen); }
   #tabel-bank td.bk-betaling { color: var(--rood); }
@@ -5505,6 +5507,10 @@ function bkDetailRij(r) {
   // Twinfield (Shereen 13 okt: "de boekingsinstructies in Twinfield werken voor zover goed — de grootboekrekening van
   // TF volgen; de omschrijving doet Shai"), anders wat de historie zegt.
   const twRek = twVoorstel && v.regels && v.regels.length === 1 && !v.regels[0].relatie ? v.regels[0].rekening : "";
+  // Wijkt de historie af van Twinfield, dan als advies onder het rekeningvak — één klik (Shereen 13 okt: "jij kan de historie
+  // wel adviseren, dan klik ik daarop als die beter is").
+  const hist0 = (v.historie || [])[0];
+  const histAdvies = BK_BEOORDELEN.includes(r.status) && twRek && hist0 && hist0.rekening && hist0.rekening !== twRek ? hist0 : null;
   const eigen = g.soort === "grootboek" ? g.regels[0].rekening
     : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : twRek || ((v.historie || [])[0] || {}).rekening || "");
   const eigenOms = g.omschrijving || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum, null, bkEigen[r.office]);
@@ -5544,7 +5550,7 @@ function bkDetailRij(r) {
       </div>` : ""}
     <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
     <div class="rij">
-      <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div></div>
+      <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div>${histAdvies ? `<button type="button" class="bk-hist-advies" title="Vult deze rekening in en kiest &quot;Toewijzen aan grootboekrekening&quot;">↳ Historie adviseert: <b>${escapeHtml(histAdvies.rekening)}</b> ${escapeHtml(histAdvies.naam || bkRekNamen[`${r.office}|${histAdvies.rekening}`] || "")} (${escapeHtml(datumNlKort(histAdvies.datum))}) — gebruik deze</button>` : ""}</div>
       <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen || r.status === "fout" ? "" : " disabled"}></div>
     </div>
     ${toonOpties ? `<div class="bk-oms-opties"><b>Kies een omschrijving</b> (of typ zelf in het vak hierboven): ${omsOpties.map((o, i) => `<button type="button" class="bk-oms-optie" data-i="${i}">${escapeHtml(o.t)}<span>${escapeHtml(o.bron)}</span></button>`).join("")}</div>` : ""}
@@ -5564,6 +5570,8 @@ function bkDetailRij(r) {
     el.textContent = c && !zoekt ? (n || "onbekende rekening") : ""; el.classList.toggle("onbekend", !!c && !n && !zoekt);
     tr.querySelector("#bk-rekening").title = n ? `${c} ${n}` : ""; };
   tr.querySelector("#bk-rekening").addEventListener("input", () => { naam(); const rg = tr.querySelector('input[value="grootboek"]'); if (rg) rg.checked = true; });
+  const ha = tr.querySelector(".bk-hist-advies");
+  if (ha) ha.addEventListener("click", (e) => { e.stopPropagation(); const v2 = tr.querySelector("#bk-rekening"); v2.value = histAdvies.rekening; v2.dispatchEvent(new Event("input")); ha.classList.add("gekozen"); });
   if (beoordelen) faKeuzelijst(tr.querySelector("#bk-rekening"), () => rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })));
   let aflet = { klanten: [], open: [], fout: "" };
   const relVeld = tr.querySelector("#bk-relatie");

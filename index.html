@@ -1308,15 +1308,24 @@ function kortOpWoord(t, max) {
   while (/\s(en|of|de|het|in|op|te|aan|met|bij|nr|no|and|for|to|inv|klnr\.)$/.test(uit)) uit = uit.replace(/\s\S+$/, "");   // geen "… en" achteraan
   return uit;
 }
-/* SVB (Shereen 12 okt): "bij SVB altijd alleen klnr en SVB, zonder de naam" — nummers met streepjes blijven vooraan:
+/* SVB (Shereen 12 okt): "bij SVB altijd alleen klnr en SVB, zonder de naam" (de naam van de SVB) — nummers met streepjes blijven vooraan:
    "202609-5469217 klant nr. 190315 I.F.O. S.V.B. Ziekte Verzekering Fond" → "202609-5469217 klnr. 190315-SVB". */
 function svbOmschrijving(ruw) {
   const boven = (ruw || "").toUpperCase();
   if (!/\bS\.?\s?V\.?\s?B\b|\bSOCIALE\s+VERZEKERINGSBANK\b/.test(boven)) return null;
-  if (/\bSVB\s+PAY\b/.test(boven)) return null;   // SVB betaalt ons (vaak met de naam van een werknemer): gewone opschoning
-  const kl = boven.match(/\bKLANT\s*(?:NR|NO|NUMMER)\b\.?\s*[:#]?\s*(\d+)|\bKL\.?\s?NR\b\.?\s*[:#]?\s*(\d+)/);
   const nrs = (boven.match(/(?:^|\s)\d+(?:[\/-]\d+)+(?=\s|$)/g) || []).map((x) => x.trim());
-  return kortOpWoord([...nrs, kl ? `klnr. ${kl[1] || kl[2]}-SVB` : "SVB"].join(" "), 40);
+  // SVB betaalt de klant ("SVB PAY", Shereen 12 okt): "<naam> - SVB pay", bv. "M Dirksz - SVB pay".
+  if (/\bSVB\s+PAY\b/.test(boven)) {
+    const voor = boven.replace(/\bSVB\s+PAY\b.*$/, " ").replace(/\/\/\s*\d+/g, " ").replace(/\bB\.\s*O\.\s*O\b\.?|\bBOO\b/g, " ")
+      .replace(/\bSOCIALE\s+VERZEKERINGSBANK(\s+ARUBA)?\b|\bS\.?\s?V\.?\s?B\b/g, " ");
+    const staart = " - SVB pay";
+    const wie = naamVoorOmschrijving(voor, 40 - staart.length) || nrs.join(" ");
+    return wie ? kortOpWoord(wie, 40 - staart.length) + staart : "SVB pay";
+  }
+  const kl = boven.match(/\bKLANT\s*(?:NR|NO|NUMMER)\b\.?\s*[:#]?\s*(\d+)|\bKL\.?\s?NR\b\.?\s*[:#]?\s*(\d+)/);
+  // "InternetBanking Tfr …" (Shereen 12 okt): "InternetBanking Tfr SVB".
+  const tfr = /^\s*INTERNET\s?BANKING\s+TFR\b/.test(boven) ? ["InternetBanking Tfr"] : [];
+  return kortOpWoord([...tfr, ...nrs, kl ? `klnr. ${kl[1] || kl[2]}-SVB` : "SVB"].join(" "), 40);
 }
 
 /* Belastingen (Shereen 12 okt): "ik kort belastingsoorten af en begin de omschrijving ermee en vervolgens de periode

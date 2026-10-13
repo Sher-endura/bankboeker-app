@@ -5501,10 +5501,12 @@ function bkDetailRij(r) {
   tr.className = "bk-detail";
   const rekeningen = Object.keys(bkRekNamen).filter(k => k.startsWith(r.office + "|")).map(k => k.split("|")[1]).sort();
   const twVoorstel = r.twinfield_bak === "Proposed" && v.bron === "twinfield";
-  // Eigen rekening: wat al goedgekeurd is, anders Shai's voorstel, anders wat de historie zegt (zo staat
-  // bij "Twinfield zegt 4832, eerder 9070" de 9070 al klaar).
+  // Eigen rekening: wat al goedgekeurd is, anders Shai's voorstel, anders bij een Twinfield-voorstel de rekening van
+  // Twinfield (Shereen 13 okt: "de boekingsinstructies in Twinfield werken voor zover goed — de grootboekrekening van
+  // TF volgen; de omschrijving doet Shai"), anders wat de historie zegt.
+  const twRek = twVoorstel && v.regels && v.regels.length === 1 && !v.regels[0].relatie ? v.regels[0].rekening : "";
   const eigen = g.soort === "grootboek" ? g.regels[0].rekening
-    : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : ((v.historie || [])[0] || {}).rekening || "");
+    : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : twRek || ((v.historie || [])[0] || {}).rekening || "");
   const eigenOms = g.omschrijving || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum, null, bkEigen[r.office]);
   // Afletteren (11 okt): openstaande facturen met hetzelfde bedrag, voorgekozen wat Shai voorstelt.
   const kandidaten = v.kandidaten || [];

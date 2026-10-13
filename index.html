@@ -731,6 +731,7 @@
           <button class="knop stil" id="btn-fa-terug" style="display:none">Terug naar beoordelen</button>
           <button class="knop stil" id="btn-fa-overslaan">Overslaan</button>
           <button class="knop stil" id="btn-fa-verwijderen" title="Shai verwijdert dit document bij zijn volgende ronde uit Basecone. De scan blijft bewaard in het tabje DELETED.">Laten verwijderen door Shai</button>
+          <button class="knop stil" id="btn-fa-splitsen" style="display:none" title="Meer documenten in één upload: Shai wijst hem in zijn volgende ronde af in Validatie (dan staat hij weer bij Aangeleverd) en splitst hem daar per factuur.">Laten splitsen door Shai</button>
         </p>
         <div class="fa-verwijder-vak" id="fa-verwijder-vak" style="display:none">
           <label for="fa-verwijder-reden">Waarom verwijderen? (komt in de mail aan de klant)</label>
@@ -4628,7 +4629,10 @@ async function openFactuur(id) {
   document.getElementById("btn-fa-goedkeuren").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-opnieuw").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-overslaan").style.display = beoordelen ? "" : "none";
-  document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "verwijderen"].includes(d.status) ? "" : "none";
+  document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "verwijderen"].includes(d.status)
+    || (d.status === "splitsen" && (d.basecone || {}).besluit === "afwijzen_voor_splitsen") ? "" : "none";
+  // Splitsen van een al getagd document (Shereen 13 okt): alleen bij meer dan één pagina, nog niet geboekt/ingevuld.
+  document.getElementById("btn-fa-splitsen").style.display = (beoordelen || d.status === "overgeslagen") && (d.scan_paden || []).length > 1 ? "" : "none";
   // Verwijderen: alles wat nog niet geboekt of ingevuld is (Shai doet het in Basecone, ook bij Aangeleverd).
   document.getElementById("btn-fa-verwijderen").style.display = beoordelen || ["overgeslagen", "splitsen"].includes(d.status) ? "" : "none";
   document.getElementById("fa-verwijder-vak").style.display = "none";
@@ -4790,6 +4794,7 @@ async function faZetStatus(status, logActie, extra = {}) {
   await laadFacturen();
   if (status === "overgeslagen") faVolgendeOfSluiten(d.office, "Overgeslagen.");
   else if (status === "verwijderen") faVolgendeOfSluiten(d.office, "Shai verwijdert dit document bij zijn volgende ronde uit Basecone (daarna te vinden onder DELETED).");
+  else if (status === "splitsen") faVolgendeOfSluiten(d.office, "Shai wijst dit document in zijn volgende ronde af in Validatie en splitst het bij Aangeleverd; de delen komen daarna als nieuwe documenten terug.");
   else await openFactuur(d.id);
 }
 /* Laten verwijderen door Shai (Shereen 12 okt): eerst de reden vragen — die komt in de mail aan de klant. */
@@ -6867,6 +6872,12 @@ document.getElementById("vw-vink-alles").addEventListener("change", (e) => {
 document.getElementById("vw-groot").addEventListener("click", (e) => { e.currentTarget.style.display = "none"; });
 document.getElementById("btn-fa-terug").addEventListener("click", () => faZetStatus("voorstel", "terug naar beoordelen"));
 document.getElementById("btn-fa-verwijderen").addEventListener("click", faVerwijderVragen);
+metTweedeKlik(document.getElementById("btn-fa-splitsen"), "Zeker? Klik nog eens — Shai wijst hem af en splitst hem", () => {
+  const d = faGekozen; if (!d) return;
+  const wie = gebruiker ? gebruiker.email : null;
+  return faZetStatus("splitsen", "splitsen gevraagd", { basecone: { ...(d.basecone || {}), besluit: "afwijzen_voor_splitsen" },
+    opmerking: `Splitsen gevraagd door ${(wie || "?").split("@")[0]}: Shai wijst hem af in Validatie en splitst hem bij Aangeleverd.` });
+});
 document.getElementById("btn-fa-verwijder-ok").addEventListener("click", faVerwijderBevestigen);
 document.getElementById("btn-fa-verwijder-annuleer").addEventListener("click", () => { document.getElementById("fa-verwijder-vak").style.display = "none"; });
 document.getElementById("fa-verwijder-reden").addEventListener("keydown", (e) => { if (e.key === "Enter") faVerwijderBevestigen(); });

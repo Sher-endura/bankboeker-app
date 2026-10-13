@@ -161,6 +161,7 @@
   .bk-oms-optie { border: 1px solid var(--blauw); background: #fff; color: var(--tekst); border-radius: 6px; padding: 4px 8px; cursor: pointer; text-align: left; }
   .bk-oms-optie span { display: block; font-size: 11px; color: var(--tekst); }
   .bk-oms-optie.gekozen { background: #e8f1fb; border-width: 2px; }
+  .bk-tw-status { flex-basis: 100%; font-size: 12px; color: var(--tekst); }
   /* Ontvangst groen, betaling rood (Shereen 12 okt) — bedrag én het woordje eronder. */
   #tabel-bank td.bk-ontvangst { color: var(--groen); }
   #tabel-bank td.bk-betaling { color: var(--rood); }
@@ -5268,6 +5269,57 @@ function bkOmsOpties(r) {
   voeg(r.omschrijving, "RAW banktekst");
   return uit.slice(0, 10);
 }
+/* De hele Twinfield-historie van één klant (Shereen 13 okt: "kan Shai de hele Twinfield-historie doorzoeken bij
+   klikken? — van die klant"): de bankdagboeken van de afgelopen 24 maanden via DirectLink, zoals Shai's eigen historie
+   (robot/bank-herkenning.mjs bankHistorie): zonder de bankrekening zelf, alleen regels met een omschrijving.
+   Eén keer per klant per bezoek ophalen; mislukt het, dan bij de volgende klik opnieuw. */
+const bkTwHist = {};
+function bkTwinfieldHistorie(office) {
+  if (bkTwHist[office]) return bkTwHist[office];
+  const dagboeken = new Set(bkRegels.filter(x => x.office === office).map(x => x.bank_code));
+  const kol = f => `<column><field>${f}</field><label>${f}</label><visible>true</visible></column>`;
+  const filt = (f, op, van, tot) => `<column><field>${f}</field><label>${f}</label><visible>true</visible><ask>true</ask><operator>${op}</operator><from>${van}</from><to>${tot || ""}</to></column>`;
+  const vanaf = new Date(); vanaf.setMonth(vanaf.getMonth() - 24);
+  const xml = `<columns code="030_3">` + filt("fin.trs.head.office", "equal", office) + filt("fin.trs.line.dim1", "between", "0000", "9999") +
+    filt("fin.trs.head.inpdate", "between", vanaf.toISOString().slice(0, 10).replace(/-/g, "") + "000000", "20991231235959") +
+    ["fin.trs.head.code", "fin.trs.head.number", "fin.trs.head.date", "fin.trs.line.dim1", "fin.trs.line.dim1name", "fin.trs.line.valuesigned", "fin.trs.line.description"].map(kol).join("") +
+    `</columns>`;
+  bkTwHist[office] = (async () => {
+    const doc = await dlLees(xml);
+    const b = doc.getElementsByTagName("browse")[0];
+    if (b && b.getAttribute("msgtype") === "error") throw new Error("Twinfield: " + b.getAttribute("msg"));
+    const rijen = parseBrowse(doc).filter(x => dagboeken.has(x["fin.trs.head.code"]));
+    // De bankrekening zelf = per dagboek de rekening in de meeste boekstukken (zoals bankHistorie).
+    const tel = {};
+    for (const x of rijen) ((tel[x["fin.trs.head.code"]] ??= {})[x["fin.trs.line.dim1"]] ??= new Set()).add(x["fin.trs.head.number"]);
+    const bank = Object.fromEntries(Object.entries(tel).map(([d, t]) => [d, Object.entries(t).sort((a, c) => c[1].size - a[1].size)[0][0]]));
+    return rijen.filter(x => x["fin.trs.line.dim1"] !== bank[x["fin.trs.head.code"]] && (x["fin.trs.line.description"] || "").trim())
+      .map(x => ({ datum: datumUitBrowse(x["fin.trs.head.date"]), rekening: x["fin.trs.line.dim1"], naam: x["fin.trs.line.dim1name"], omschrijving: x["fin.trs.line.description"].trim() }));
+  })();
+  bkTwHist[office].catch(() => { delete bkTwHist[office]; });
+  return bkTwHist[office];
+}
+/* Uit die historie: omschrijvingen bij een vergelijkbare banktekst (dezelfde naamwoorden), beste en nieuwste eerst. */
+function bkTwinfieldOpties(r, hist) {
+  const mijn = new Set(naamWoorden(r.omschrijving));
+  if (!mijn.size) return [];
+  const per = new Map();
+  for (const h of hist) {
+    const w = new Set(naamWoorden(h.omschrijving)), samen = [...w].filter(y => mijn.has(y)).length;
+    if (samen < Math.min(2, mijn.size)) continue;
+    const score = samen / Math.max(1, Math.min(mijn.size, w.size));
+    if (score < 0.5) continue;
+    const k = h.omschrijving.toLowerCase(), oud = per.get(k);
+    if (!oud || score > oud.score || (score === oud.score && h.datum > oud.h.datum)) per.set(k, { h, score });
+  }
+  const uit = [];
+  for (const { h } of [...per.values()].sort((a, b) => b.score - a.score || b.h.datum.localeCompare(a.h.datum)).slice(0, 8)) {
+    const bijgewerkt = omschrijvingUitHistorie(h.omschrijving, r.omschrijving, r.datum);
+    if (bijgewerkt && bijgewerkt.toLowerCase() !== h.omschrijving.slice(0, 40).toLowerCase()) uit.push({ t: bijgewerkt, bron: `Twinfield ${datumNlKort(h.datum)} · ${h.rekening}, periode bijgewerkt` });
+    uit.push({ t: h.omschrijving.slice(0, 40), bron: `Twinfield ${datumNlKort(h.datum)} · ${h.rekening} ${h.naam || ""}`.trim() });
+  }
+  return uit;
+}
 function bkStandaardGoedkeuring(r) {
   const v = r.voorstel || {};
   // De omschrijving die in REFINED staat (Shereen 12 okt) — niet Shai's opgeslagen versie van de vorige ronde,
@@ -5509,11 +5561,33 @@ function bkDetailRij(r) {
     somTekst();
   };
   tr.querySelector("#bk-oms").addEventListener("input", (e) => { if (e.isTrusted) omsZelf = true; });
-  tr.querySelectorAll(".bk-oms-optie").forEach(b => b.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const oms = tr.querySelector("#bk-oms"); oms.value = omsOpties[+b.dataset.i].t; omsZelf = true; oms.focus();
-    tr.querySelectorAll(".bk-oms-optie").forEach(x => x.classList.toggle("gekozen", x === b));
-  }));
+  const optieVak = tr.querySelector(".bk-oms-opties");
+  if (optieVak) {
+    optieVak.addEventListener("click", (e) => {
+      const b = e.target.closest(".bk-oms-optie"); if (!b) return;
+      e.stopPropagation();
+      const oms = tr.querySelector("#bk-oms"); oms.value = omsOpties[+b.dataset.i].t; omsZelf = true; oms.focus();
+      tr.querySelectorAll(".bk-oms-optie").forEach(x => x.classList.toggle("gekozen", x === b));
+    });
+    // Daarna de hele Twinfield-historie van deze klant erbij (DirectLink; eerste keer per klant een paar seconden).
+    const st = document.createElement("span");
+    st.className = "bk-tw-status";
+    st.textContent = `⏳ Hele Twinfield-historie van ${r.office} doorzoeken…`;
+    optieVak.appendChild(st);
+    bkTwinfieldHistorie(r.office).then(hist => {
+      if (!st.isConnected) return;
+      const extra = bkTwinfieldOpties(r, hist).filter(o => !omsOpties.some(x => x.t.toLowerCase() === o.t.toLowerCase()));
+      for (const o of extra) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "bk-oms-optie"; b.dataset.i = omsOpties.length;
+        b.innerHTML = `${escapeHtml(o.t)}<span>${escapeHtml(o.bron)}</span>`;
+        omsOpties.push(o);
+        optieVak.insertBefore(b, st);
+      }
+      st.textContent = extra.length ? `Twinfield: ${extra.length} omschrijving(en) gevonden in ${hist.length} historische bankregels van ${r.office} (24 maanden)`
+        : `Twinfield: geen vergelijkbare omschrijving in ${hist.length} historische regels van ${r.office}`;
+    }, e => { if (st.isConnected) st.textContent = "Twinfield-historie ophalen lukte niet: " + (e.message || e); });
+  }
   if (relVeld) {
     tr.querySelector("#bk-facturen").textContent = "Openstaande facturen ophalen uit Twinfield…";
     bkAfletGegevens(r.office).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });

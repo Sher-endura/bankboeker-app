@@ -1253,7 +1253,10 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   // Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste
   // probleem): referenties, rekening-, kaart- en klantnummers, eigen bedrijfsnaam eruit.
   let d = " " + boven + " ";
-  d = d.replace(/\bI\.?\s*F\.?\s*O\.?/g, " ")
+  // Shereen 12 okt: I.F.O. (in favor of) en B.O.O. (by order of) eruit; factuur/invoice → "inv"; klant nr. → "klnr.".
+  d = d.replace(/\bI\.?\s*F\.?\s*O\b\.?/g, " ").replace(/\bB\.\s*O\.\s*O\b\.?|\bBOO\b/g, " ")
+    .replace(/\b(?:FACTU(?:UR|RA|REN)?|FAKTUUR|FACT|INVOICES?|INV)(?:NR|NO|NUMMER)?\b\.?\s*(?:(?:NR|NO|NUMBER|NUMMER)\b\.?\s*)?[:#]?\s*/g, " INV ")
+    .replace(/\bKLANT\s*(?:NR|NO|NUMMER)\b\.?\s*[:#]?\s*|\bKL\.?\s?NR\b\.?\s*[:#]?\s*/g, " KLNR ")
     .replace(/^\s*ACH\s+TRANSFER\b/, " ")
     .replace(/\/\/\s*\d+/g, " ")
     .replace(/\bCUST(OMER)?\s*[:#.]?\s*\S+/g, " ")
@@ -1262,20 +1265,46 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
     .replace(/\bS\.?\s?AMT\b/g, " ")
     .replace(/\bAUTHORIZAT\w*/g, " AUTHORIZATION ")
     .replace(/\bREV\b/g, " REVERSAL ")
-    .replace(/\bMCDEBIT\b/g, " MC DEBIT ")
-    .replace(/[-\s]?\d{6,}/g, " ")
-    .replace(/(\bPOS\b)[\s\d]+/g, "$1 ");
+    .replace(/\bMCDEBIT\b/g, " MC DEBIT ");
+  // Afkortingen met puntjes worden één woord in hoofdletters: "S.V.B." → "SVB", "N.V." → "NV".
+  const afk = new Set();
+  d = d.replace(/\b(?:[A-Z]\.\s?){2,}(?:[A-Z]\b)?/g, (m) => { const a = m.replace(/[.\s]/g, ""); afk.add(a); return " " + a + " "; });
+  // Niet elk nummer is banknummer (Shereen 12 okt): factuur- en klantnummers en nummers met streepjes
+  // ("202609-5469217", "2026-2-0110") blijven; losse lange getallen en nullen-referenties gaan eruit.
+  let houd = false;
+  d = d.split(" ").map((w) => {
+    const bewaar = houd && /^[\d\-\/]+,?$/.test(w);
+    houd = w === "INV" || w === "KLNR" || (bewaar && w.endsWith(","));
+    if (bewaar) return w;   // ook "INV#000020"
+    if (/^0{3,}\d{7,}$/.test(w)) return "";   // nullen-referentie van de bank
+    if (/^\d+(-\d+)+,?$/.test(w)) return w;
+    return w.replace(/-?\d{6,}/g, " ");
+  }).join(" ").replace(/(\bPOS\b)[\s\d]+/g, "$1 ");
   if (bedrijf) {
     const eerste = String(bedrijf).toUpperCase().split(/[^A-Z]+/).find((w) => w.length >= 4);
     if (eerste) d = d.replace(new RegExp("(^|[^A-Z])" + eerste + "[A-Z0-9]*.*$"), " ");
   }
   // Referentiecodes met letters én cijfers (bv. "*DNTK38N7V4") zeggen de lezer niets.
   d = d.replace(/\*/g, " ").split(" ").filter((w) => !(w.length >= 6 && /^[A-Z0-9]+$/.test(w) && /\d/.test(w) && /[A-Z]/.test(w))).join(" ");
-  const woorden = d.replace(/[^A-Z0-9\/\-.&]+/g, " ").split(" ")
-    .map((w) => w.replace(/^[-\/.]+|[-\/.]+$/g, "")).filter(Boolean);
+  const woorden = d.replace(/[^A-Z0-9\/\-.&,]+/g, " ").split(" ")
+    .map((w) => w.replace(/^[-\/.,]+|[-\/.]+$/g, "")).filter((w) => w && w !== ",");
+  // Komma alleen tussen nummers ("inv 02788538, 02788581").
+  woorden.forEach((w, i) => { if (w.endsWith(",") && !/^\d/.test(woorden[i + 1] || "")) woorden[i] = w.replace(/,+$/, ""); });
   while (woorden.length > 1 && /^[A-Z]$/.test(woorden[woorden.length - 1])) woorden.pop();   // "COMPANY N" (van N.V.)
-  const uit = woorden.map(titelKast).join(" ").replace(/\s{2,}/g, " ").trim();
-  return (uit || (ruw || "").trim()).slice(0, 40).trim();
+  while (woorden.length && /^(INV|KLNR)$/.test(woorden[woorden.length - 1])) woorden.pop();
+  const KLEIN = new Set(["EN", "OF", "DE", "HET", "IN", "OP", "TE", "AAN", "MET", "BIJ", "NR", "NO", "AND", "FOR", "TO"]);
+  const uit = woorden.map((w, i) => w === "INV" ? "inv" : w === "KLNR" ? "klnr." : afk.has(w) ? w
+    : KLEIN.has(w) ? (i > 0 ? w.toLowerCase() : w.charAt(0) + w.slice(1).toLowerCase()) : titelKast(w)).join(" ").replace(/\s{2,}/g, " ").trim();
+  return kortOpWoord(uit || (ruw || "").trim(), 40);
+}
+/* Afkappen op 40 tekens, maar op een heel woord (geen "Boogaa"). */
+function kortOpWoord(t, max) {
+  if (t.length <= max) return t;
+  const k = t.slice(0, max + 1);
+  const spatie = k.lastIndexOf(" ");
+  let uit = (spatie > max / 2 ? k.slice(0, spatie) : t.slice(0, max)).replace(/[\s,\-–]+$/, "").trim();
+  while (/\s(en|of|de|het|in|op|te|aan|met|bij|nr|no|and|for|to|inv|klnr\.)$/.test(uit)) uit = uit.replace(/\s\S+$/, "");   // geen "… en" achteraan
+  return uit;
 }
 
 /* Belastingen (Shereen 12 okt): "ik kort belastingsoorten af en begin de omschrijving ermee en vervolgens de periode

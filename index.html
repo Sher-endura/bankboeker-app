@@ -5479,7 +5479,7 @@ function vernieuwBkTabel() {
       const klaar = n.filter(x => ["goedgekeurd", "toegewezen", "verwerkt"].includes(x.status)).length;
       // Vinkje per afschrift (Shereen 12 okt: "zodat het niet alles of niks is").
       const afsSleutel = `${r.office}|${r.bank_code}|${r.afschrift}|${r.sub_id}`;
-      const vinkbaarAfs = lijst.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === afsSleutel && BK_BEOORDELEN.includes(x.status));
+      const vinkbaarAfs = lijst.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === afsSleutel && bkMagVinken(x));
       const afsVink = vinkbaarAfs.length ? `<input type="checkbox" class="bk-vink-afs" data-afs="${escapeHtml(afsSleutel)}" title="Alle te beoordelen regels van dit afschrift aanvinken"${vinkbaarAfs.every(x => bkVink.has(x.id)) ? " checked" : ""}${vinkbaarAfs.some(x => bkVink.has(x.id)) && !vinkbaarAfs.every(x => bkVink.has(x.id)) ? " data-half=\"1\"" : ""}> ` : "";
       tbody.insertAdjacentHTML("beforeend", `<tr class="bk-kop"><td colspan="${BK_KOLOMMEN}">${afsVink}Afschrift ${escapeHtml(afs)} — ${klaar} van ${n.length} regels goedgekeurd of toegewezen${n.find(x => x.boekstuk) ? ` · boekstuk ${escapeHtml(n.find(x => x.boekstuk).boekstuk)}` : ""}</td></tr>`);
     }
@@ -5522,7 +5522,7 @@ function vernieuwBkTabel() {
   tbody.querySelectorAll(".bk-vink-afs").forEach(v => {
     if (v.dataset.half) v.indeterminate = true;
     v.addEventListener("change", () => {
-      for (const x of lijst.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === v.dataset.afs && BK_BEOORDELEN.includes(x.status))) v.checked ? bkVink.add(x.id) : bkVink.delete(x.id);
+      for (const x of lijst.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === v.dataset.afs && bkMagVinken(x))) v.checked ? bkVink.add(x.id) : bkVink.delete(x.id);
       vernieuwBkTabel();
     });
   });
@@ -6120,12 +6120,17 @@ async function bkZetStatus(r, status, actie) {
   laadBank();
 }
 // Alles aanvinken pakt ook "voorleggen" (Shereen 13 okt) — alleen regels met een voorstel (anders valt er niets goed te keuren).
-const bkVinkbaar = () => bkZichtbaar().filter(r => BK_BEOORDELEN.includes(r.status) && bkStandaardGoedkeuring(r));
+// Aan te vinken (alles aanvinken én het vinkje per afschrift): een voorstel dat Shai precies zo kan uitvoeren, of helemaal
+// GEEN voorstel — dat gaat bij goedkeuren naar Vraagposten (Shereen 13 okt). Niet: een half voorstel (klant zonder
+// factuur, meer facturen) — die moet je openen; en niet wat in Twinfield al toegewezen is.
+const bkGeenVoorstel = (r) => { const v = r.voorstel || {}; return v.soort !== "twinfield" && !(v.regels || []).length; };
+const bkMagVinken = (r) => BK_BEOORDELEN.includes(r.status) && r.twinfield_bak !== "Assigned" && (!!bkStandaardGoedkeuring(r) || bkGeenVoorstel(r));
+const bkVinkbaar = () => bkZichtbaar().filter(bkMagVinken);
 function bkBulkStand() {
   // Vinkje per afschrift bijwerken: aan als alles aangevinkt is, half als een deel (12 okt).
   const zichtbaarNu = bkZichtbaar();
   document.querySelectorAll("#tabel-bank .bk-vink-afs").forEach(v => {
-    const rijen = zichtbaarNu.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === v.dataset.afs && BK_BEOORDELEN.includes(x.status));
+    const rijen = zichtbaarNu.filter(x => `${x.office}|${x.bank_code}|${x.afschrift}|${x.sub_id}` === v.dataset.afs && bkMagVinken(x));
     const aan = rijen.filter(x => bkVink.has(x.id)).length;
     v.checked = rijen.length > 0 && aan === rijen.length;
     v.indeterminate = aan > 0 && aan < rijen.length;

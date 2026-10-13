@@ -5363,8 +5363,13 @@ function bkDetailRij(r) {
   // is de betaling hoger dan de facturen samen, dan blijft het verschil als vooruitbetaling op de klant staan.
   const toonKlant = Number(r.bedrag) > 0 || kandidaten.length > 0 || g.soort === "klant";
   const startRelatie = (g.soort === "klant" && (g.relatie || (g.regels[0] || {}).relatie))
-    || ((v.soort === "klant" || v.soort === "relatie") && v.regels && v.regels[0] && v.regels[0].relatie) || (kandidaten[0] || {}).relatie || "";
+    || ((v.soort === "klant" || v.soort === "relatie") && v.regels && v.regels[0] && v.regels[0].relatie)
+    || (twVoorstel && ((v.regels || []).find(x => x.relatie && x.factuur) || {}).relatie) || (kandidaten[0] || {}).relatie || "";
   const startFacturen = new Set(g.soort === "klant" ? (g.regels || []).map(x => x.boekstuk) : (v.soort === "klant" && v.regels ? v.regels.map(x => x.boekstuk) : []));
+  // Twinfields voorstel op een klantfactuur (Shereen 12 okt: "altijd de open facturen zien, met het vinkje bij de
+  // selectie"): die klant en die factuur (op factuurnummer — Twinfield geeft geen boekstuk) staan klaar in de lijst.
+  const twKlant = g.soort !== "klant" && twVoorstel ? (v.regels || []).filter(x => x.relatie && x.factuur) : [];
+  const startTwFacturen = new Set(twKlant.map(x => x.relatie + "|" + x.factuur));
   tr.innerHTML = `<td></td><td colspan="${BK_KOLOMMEN - 1}">
     ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
     ${twVoorstel ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="twinfield"${keuzeTw ? " checked" : ""}${beoordelen ? "" : " disabled"}> Twinfields voorstel accepteren: ${(v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + ")}</label>` : ""}
@@ -5417,7 +5422,10 @@ function bkDetailRij(r) {
       ? `<b>onderbetaling ${faBedrag(-rest)}</b> — waar gaat het verschil heen?`
       : rest > 0.004 ? `<b>overbetaling ${faBedrag(rest)}</b> — waar gaat het verschil heen?` : "past precies");
     const vak = tr.querySelector("#bk-verschil");
-    vak.style.display = Math.abs(rest) > 0.004 ? "" : "none";
+    // Alleen bij zelf afletteren op klant (Shereen 12 okt: bij Twinfields voorstel leek het een overboeking).
+    const opKlant = !!tr.querySelector('input[name="bk-keuze"][value="klant"]')?.checked && !!relVeld.value.trim();
+    if (!relVeld.value.trim()) el.innerHTML = "";
+    vak.style.display = opKlant && Math.abs(rest) > 0.004 ? "" : "none";
     vak.querySelector('[data-verschil="vooruitbetaling"]').style.display = rest > 0.004 ? "" : "none";
     const vb = vak.querySelector('input[value="vooruitbetaling"]');
     if (rest < -0.004 && vb.checked) vb.checked = false;
@@ -5450,7 +5458,7 @@ function bkDetailRij(r) {
     // Veel open facturen (Shereen 12 okt, Miniño): in 5 kolommen over het scherm + zoeken op nummer, datum of bedrag.
     // Zoeken verbergt alleen; wat aangevinkt is telt mee, ook als het buiten de zoekopdracht valt.
     vak.innerHTML = lijst.length ? (lijst.length > 5 ? `<input type="search" class="bk-fzoek" placeholder="🔍 Zoek factuur: nummer, datum of bedrag (${lijst.length} open)" autocomplete="off">` : "") +
-      `<div class="bk-fgrid">` + lijst.map(o => `<label data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${startFacturen.has(o.code + "|" + o.nummer) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("") + `</div>`
+      `<div class="bk-fgrid">` + lijst.map(o => `<label data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${startFacturen.has(o.code + "|" + o.nummer) || startTwFacturen.has(o.relatie + "|" + o.factuur) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("") + `</div>`
       : "Deze klant heeft geen openstaande facturen — het hele bedrag wordt dan vooruitbetaling op de klant.";
     const fzoek = vak.querySelector(".bk-fzoek");
     if (fzoek) fzoek.addEventListener("input", () => {
@@ -5466,6 +5474,7 @@ function bkDetailRij(r) {
     bkAfletGegevens(r.office).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });
     relVeld.addEventListener("input", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; toonFacturen(); });
     if (beoordelen) faKeuzelijst(relVeld, () => aflet.klanten);
+    tr.querySelectorAll('input[name="bk-keuze"]').forEach(x => x.addEventListener("change", somTekst));
     tr.querySelectorAll('input[name="bk-verschil"]').forEach(x => x.addEventListener("change", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; verschilRek(); }));
     const vrek = tr.querySelector("#bk-verschil-rek");
     vrek.addEventListener("input", () => { verschilRekZelf = !!vrek.value.trim(); verschilRek(); });

@@ -98,6 +98,7 @@
   .fa-verwijder-vak input { width: 100%; margin: 4px 0 8px; }
   #tabel-verwijderd img.vw-mini { width: 70px; height: 90px; object-fit: cover; object-position: top; border: 1px solid var(--rand); border-radius: 3px; cursor: zoom-in; background: #fff; display: block; }
   #tabel-verwijderd td { vertical-align: top; }
+  #tabel-verwijderd tr.vw-klant td { background: var(--zacht, #f3f4f6); vertical-align: middle; padding-top: 8px; padding-bottom: 8px; }
   .vw-mail { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--rand); border-radius: 8px; }
   .vw-mail .vw-voorbeeld { border: 1px solid var(--rand); border-radius: 6px; padding: 10px 12px; background: #fff; color: #1f2937; max-height: 360px; overflow: auto; margin: 8px 0; }
   .vw-mail label.vw-ontvanger { display: block; font-weight: normal; margin: 2px 0; }
@@ -6700,9 +6701,10 @@ async function laadVerwijderd() {
   const kies = document.getElementById("vw-office"), vorige = kies.value;
   const offices = [...new Set(vwDocs.map(d => d.office))].sort();
   kies.innerHTML = `<option value="">Alle administraties</option>` + offices.map(o => `<option${o === vorige ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
-  for (const id of [...vwVink]) if (!vwDocs.some(d => d.id === id && d.status === "verwijderd")) vwVink.delete(id);
+  for (const id of [...vwVink]) if (!vwDocs.some(d => d.id === id)) vwVink.delete(id);
   vernieuwVerwijderd();
 }
+const vwNaam = (office) => { const p = profielen.find(x => x.code === office); return p && p.naam ? p.naam : ""; };
 function vwZichtbaar() {
   const office = document.getElementById("vw-office").value, ook = document.getElementById("vw-ook-gemaild").checked;
   return vwDocs.filter(d => (!office || d.office === office) && (ook || !d.klant_gemaild_op));
@@ -6711,24 +6713,46 @@ function vernieuwVerwijderd() {
   const lijst = vwZichtbaar();
   const tbody = document.querySelector("#tabel-verwijderd tbody");
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="8" style="padding:14px">Niets om te tonen.</td></tr>`;
-  for (const d of lijst) {
-    const tr = document.createElement("tr");
-    const isPdf = /\.pdf$/i.test((d.scan_paden || [])[0] || "");
-    const scan = !d._mini ? "—" : isPdf ? `<a href="${escapeHtml(d._mini)}" target="_blank" rel="noopener">PDF</a>` : `<img class="vw-mini" src="${escapeHtml(d._mini)}" alt="eerste pagina">`;
-    const weg = d.status === "verwijderen"
-      ? `${statusLabel("verwijderen")}${d.opmerking ? `<br><span style="font-size:12px">${escapeHtml(d.opmerking)}</span>` : ""}`
-      : `${escapeHtml(vwDatum(d.verwijderd_op))}${d.verwijderd_door ? `<br><span style="font-size:12px">${escapeHtml(d.verwijderd_door)}</span>` : ""}`;
-    const gemaild = d.klant_gemaild_op ? `${escapeHtml(vwDatum(d.klant_gemaild_op))}<br><span style="font-size:12px">${escapeHtml(d.klant_gemaild_aan || "")}</span>` : "";
-    tr.innerHTML = `<td class="fa-vink">${d.status === "verwijderd" ? `<input type="checkbox"${vwVink.has(d.id) ? " checked" : ""}>` : ""}</td>
-      <td>${scan}</td><td>${escapeHtml(d.office)}</td><td>${escapeHtml(d.bestandsnaam || "")}</td><td>${escapeHtml(vwDatum(d.geupload_op))}</td>
-      <td>${escapeHtml(d.verwijder_reden || "")}</td><td>${weg}</td><td>${gemaild}</td>`;
-    const vak = tr.querySelector("input[type=checkbox]");
-    if (vak) vak.addEventListener("change", () => { vak.checked ? vwVink.add(d.id) : vwVink.delete(d.id); vwKnoppen(); });
-    const img = tr.querySelector("img.vw-mini");
-    if (img) img.addEventListener("click", () => { const g = document.getElementById("vw-groot"); g.querySelector("img").src = d._mini; g.style.display = "flex"; });
-    tbody.appendChild(tr);
+  // Per klant een kopregel met "alles van deze klant" (Shereen 13 okt: "het moet per klant selecteerbaar zijn voor de mail").
+  // Ook documenten die nog op "wordt verwijderd" staan zijn aan te vinken: wanneer we mailen kiezen we zelf.
+  const offices = [...new Set(lijst.map(d => d.office))].sort();
+  for (const office of offices) {
+    const vanKlant = lijst.filter(d => d.office === office);
+    const kop = document.createElement("tr");
+    kop.className = "vw-klant";
+    kop.innerHTML = `<td class="fa-vink"><input type="checkbox" title="Alle documenten van ${escapeHtml(office)} aanvinken"${vanKlant.every(d => vwVink.has(d.id)) ? " checked" : ""}></td>
+      <td colspan="7"><b>${escapeHtml(office)}</b>${vwNaam(office) ? ` · ${escapeHtml(vwNaam(office))}` : ""} — ${vanKlant.length} document${vanKlant.length === 1 ? "" : "en"}</td>`;
+    kop.querySelector("input").addEventListener("change", (e) => {
+      // Eén mail per klant: een andere klant aanvinken haalt de vinkjes van de vorige weg.
+      if (e.target.checked) { for (const id of [...vwVink]) if (!vanKlant.some(d => d.id === id)) vwVink.delete(id); vanKlant.forEach(d => vwVink.add(d.id)); }
+      else vanKlant.forEach(d => vwVink.delete(d.id));
+      vernieuwVerwijderd();
+    });
+    tbody.appendChild(kop);
+    for (const d of vanKlant) {
+      const tr = document.createElement("tr");
+      const isPdf = /\.pdf$/i.test((d.scan_paden || [])[0] || "");
+      const scan = !d._mini ? "—" : isPdf ? `<a href="${escapeHtml(d._mini)}" target="_blank" rel="noopener">PDF</a>` : `<img class="vw-mini" src="${escapeHtml(d._mini)}" alt="eerste pagina">`;
+      // "wordt verwijderd" = gevraagd, Shai doet het in zijn volgende Basecone-ronde (niet de leesopmerking van Shai tonen).
+      const weg = d.status === "verwijderen"
+        ? `${statusLabel("verwijderen")}<br><span style="font-size:12px">gevraagd door ${escapeHtml((d.verwijderd_door || "?").split("@")[0])} — Shai haalt hem in zijn volgende Basecone-ronde weg</span>`
+        : `${escapeHtml(vwDatum(d.verwijderd_op))}${d.verwijderd_door ? `<br><span style="font-size:12px">${escapeHtml(d.verwijderd_door)}</span>` : ""}`;
+      const gemaild = d.klant_gemaild_op ? `${escapeHtml(vwDatum(d.klant_gemaild_op))}<br><span style="font-size:12px">${escapeHtml(d.klant_gemaild_aan || "")}</span>` : "";
+      tr.innerHTML = `<td class="fa-vink"><input type="checkbox"${vwVink.has(d.id) ? " checked" : ""}></td>
+        <td>${scan}</td><td>${escapeHtml(d.office)}</td><td>${escapeHtml(d.bestandsnaam || "")}</td><td>${escapeHtml(vwDatum(d.geupload_op))}</td>
+        <td>${d.verwijder_reden ? escapeHtml(d.verwijder_reden) : `<span style="color:var(--rood); font-size:12px">geen reden — komt leeg in de mail</span>`}</td><td>${weg}</td><td>${gemaild}</td>`;
+      const vak = tr.querySelector("input[type=checkbox]");
+      vak.addEventListener("change", () => {
+        if (vak.checked) { for (const id of [...vwVink]) if (!vanKlant.some(x => x.id === id)) vwVink.delete(id); vwVink.add(d.id); }
+        else vwVink.delete(d.id);
+        vernieuwVerwijderd();
+      });
+      const img = tr.querySelector("img.vw-mini");
+      if (img) img.addEventListener("click", () => { const g = document.getElementById("vw-groot"); g.querySelector("img").src = d._mini; g.style.display = "flex"; });
+      tbody.appendChild(tr);
+    }
   }
-  document.getElementById("vw-vink-alles").checked = lijst.some(d => d.status === "verwijderd") && lijst.filter(d => d.status === "verwijderd").every(d => vwVink.has(d.id));
+  document.getElementById("vw-vink-alles").checked = lijst.length > 0 && lijst.every(d => vwVink.has(d.id));
   vwKnoppen();
 }
 function vwKnoppen() {
@@ -6743,7 +6767,7 @@ function vwKnoppen() {
 /* Het mailvenster: E-Board-klant (eenmalig koppelen), ontvangers, taal, toelichting, voorbeeld, proef, versturen. */
 let vwMail = null;   // { office, ids, klant, contacten }
 async function vwMailOpenen() {
-  const gekozen = vwDocs.filter(d => vwVink.has(d.id) && d.status === "verwijderd");
+  const gekozen = vwDocs.filter(d => vwVink.has(d.id));
   const office = gekozen[0]?.office;
   if (!gekozen.length || gekozen.some(d => d.office !== office)) return;
   vwMail = { office, ids: gekozen.map(d => d.id), klant: null, contacten: [] };
@@ -6837,7 +6861,7 @@ document.getElementById("vw-ook-gemaild").addEventListener("change", vernieuwVer
 document.getElementById("btn-vw-ververs").addEventListener("click", laadVerwijderd);
 document.getElementById("btn-vw-mail").addEventListener("click", vwMailOpenen);
 document.getElementById("vw-vink-alles").addEventListener("change", (e) => {
-  for (const d of vwZichtbaar()) if (d.status === "verwijderd") e.target.checked ? vwVink.add(d.id) : vwVink.delete(d.id);
+  for (const d of vwZichtbaar()) e.target.checked ? vwVink.add(d.id) : vwVink.delete(d.id);
   vernieuwVerwijderd();
 });
 document.getElementById("vw-groot").addEventListener("click", (e) => { e.currentTarget.style.display = "none"; });

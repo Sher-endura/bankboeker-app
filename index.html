@@ -673,7 +673,7 @@
     </div>
     <div class="fa-balk">
       <select id="fa-office" style="width:auto"></select>
-      <select id="fa-substatus" style="width:auto" title="Alleen deze status tonen — de vinkjes bovenaan vinken dan ook voorleggen aan">
+      <select id="fa-substatus" style="width:auto" title="Alleen deze status tonen">
         <option value="">Alle statussen</option><option value="shai|voorstel">Shai voorstel</option><option value="shai|voorleggen">Shai voorleggen</option>
       </select>
       <span class="status-info" id="fa-substatus-info" title="Shai = Shai heeft de factuur gelezen en stelt de boeking voor.&#10;&#10;VOORSTEL = zeker genoeg. Mag je met de vinkjes in één keer goedkeuren.&#10;&#10;VOORLEGGEN = Shai twijfelt: zekerheid laag, iets klopt niet (bv. bedrag, crediteur of rekening), geen echte factuur, of het lijkt al eerder geboekt. Kijk het na vóór je goedkeurt.">ⓘ</span>
@@ -693,7 +693,7 @@
   <div class="fa-split" id="fa-split">
     <div class="kaart">
       <table id="tabel-facturen">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan). Kies je een status in &quot;Alle statussen&quot;, dan vinkt dit alles van die status aan — ook voorleggen."></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th id="fa-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde">Zekerheid <span id="fa-sorteer-pijl"></span></th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alles in deze lijst aanvinken — voorstel én voorleggen. Kies een status in &quot;Alle statussen&quot; om alleen die aan te vinken."></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th id="fa-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde">Zekerheid <span id="fa-sorteer-pijl"></span></th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -822,7 +822,7 @@
     </div>
     <div class="fa-balk">
       <select id="bk-office" style="width:auto"></select>
-      <select id="bk-substatus" style="width:auto" title="Alleen deze status tonen — de vinkjes bovenaan vinken dan ook voorleggen aan">
+      <select id="bk-substatus" style="width:auto" title="Alleen deze status tonen">
         <option value="">Alle statussen</option><option value="tf|voorstel">TF voorstel</option><option value="tf|voorleggen">TF voorleggen</option>
         <option value="shai|voorstel">Shai voorstel</option><option value="shai|voorleggen">Shai voorleggen</option>
       </select>
@@ -842,7 +842,7 @@
     <!-- Alleen de regels scrollen; alles hierboven en de kolomkoppen blijven staan (Shereen 11 okt). -->
     <div class="bk-scroll" id="bk-scroll">
       <table id="tabel-bank">
-        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alle voorstellen in deze lijst aanvinken (voorleggen vink je zelf los aan). Kies je een status in &quot;Alle statussen&quot;, dan vinkt dit alles van die status aan — ook voorleggen."></th><th>Status</th><th>Klant</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
+        <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alles in deze lijst aanvinken — voorstel én voorleggen. Kies een status in &quot;Alle statussen&quot; om alleen die aan te vinken."></th><th>Status</th><th>Klant</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -4191,7 +4191,8 @@ function faSorteerZekerheid() {
   faSorteer = faSorteer === null ? "af" : faSorteer === "af" ? "op" : null;
   vernieuwFaTabel();
 }
-const faVinkbaar = () => faZichtbaar().filter(d => document.getElementById("fa-substatus").value ? FA_BEOORDELEN.includes(d.status) : d.status === "voorstel");
+// Alles aanvinken pakt ook "voorleggen" (Shereen 13 okt, zelfde als Twinfield Bank).
+const faVinkbaar = () => faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status));
 function faBulkStand() {
   // Alleen wat je ziet blijft aangevinkt (12 okt, zelfde als Twinfield Bank).
   const zicht = new Set(faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status)).map(d => d.id));
@@ -5895,7 +5896,8 @@ async function bkZetStatus(r, status, actie) {
   bkGekozen = null;
   laadBank();
 }
-const bkVinkbaar = () => bkZichtbaar().filter(r => (document.getElementById("bk-substatus").value ? BK_BEOORDELEN.includes(r.status) : r.status === "voorstel") && bkStandaardGoedkeuring(r));
+// Alles aanvinken pakt ook "voorleggen" (Shereen 13 okt) — alleen regels met een voorstel (anders valt er niets goed te keuren).
+const bkVinkbaar = () => bkZichtbaar().filter(r => BK_BEOORDELEN.includes(r.status) && bkStandaardGoedkeuring(r));
 function bkBulkStand() {
   // Vinkje per afschrift bijwerken: aan als alles aangevinkt is, half als een deel (12 okt).
   const zichtbaarNu = bkZichtbaar();

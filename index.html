@@ -1158,7 +1158,7 @@ const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND",
   // werden herkend op "INTERNETBANKING TFR DEBIT" → 4831 Telefoon/Fax/Internet.
   "INTERNETBANKING", "INTERNET", "TFR", "DEBIT", "CREDIT", "CMS", "REF", "DC", "MOBILEWEB", "MOBILEIOS", "NETTO", "OUTWARD", "LOC", "CLEARING", "PARTIAL",
   // RBC (Shereen 13 okt): "Sundry Debtor … Wash Thru PCN … PCN-Processed Transaction", "POS Suspense".
-  "SUNDRY", "DEBTOR", "WASH", "THRU", "PCN", "PROCESSED", "TRANSACTION", "SUSPENSE"]);
+  "SUNDRY", "DEBTOR", "WASH", "THRU", "PCN", "PROCESSED", "TRANSACTION", "SUSPENSE", "INTERBANK"]);
 function soortVan(omschrijving) {
   const b = (omschrijving || "").toUpperCase();
   return SOORTEN.find(s => s.her.test(b)) || null;
@@ -1283,6 +1283,8 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf, eigen = []) {   //
   if (belasting) return belasting;
   const svb = svbOmschrijving(origineel);
   if (svb) return svb;
+  const lening = leningOmschrijving(ruw);
+  if (lening) return lening;
   return algemeen(ruw, bedrijf);
 }
 /* Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste
@@ -1295,7 +1297,7 @@ function algemeen(ruw, bedrijf) {
   let d = " " + boven + " ";
   // Shereen 12 okt: I.F.O. (in favor of) en B.O.O. (by order of) eruit; factuur/invoice → "inv"; klant nr. → "klnr.".
   // RBC-banktekst, harde regel (Shereen 13 okt): nooit in de omschrijving. "INV465353" → "INV 465353" (nummer blijft).
-  d = d.replace(/\bSUNDRY\s+DEBTOR\b|\bWASH\s+THRU(\s+PCN)?\b|\bPOS\s+SUSPENSE\b|\bPCN\s*-?\s*PROCESSED\s+TRANSACTION\b|\bPCN\b|\bFT\d{2,}[A-Z0-9]*\b/g, " ")
+  d = d.replace(/\bSUNDRY\s+DEBTOR\b|\bWASH\s+THRU(\s+PCN)?\b|\bPOS\s+SUSPENSE(\s+LC)?\b|\bPOS\s+INTERBANK\s+DEBIT\b|\bORIGINAL\s+\d{1,2}\s+\d{1,2}\s+\d{4}\b|\bVISA\s+DEBIT\b|\bPCN\s*-?\s*PROCESSED\s+TRANSACTION\b|\bPCN\b|\bFT\d{2,}[A-Z0-9]*\b/g, " ")
     .replace(/\bINV(?=\d)/g, "INV ");
   d = d.replace(/\bI\.?\s*F\.?\s*O\b\.?/g, " ").replace(/\bB\.\s*O\.\s*O\b\.?|\bBOO\b/g, " ")
     .replace(/\b(?:FACTU(?:UR|RA|REN)?|FAKTUUR|FACT|INVOICES?|INV)(?:NR|NO|NUMMER)?\b\.?\s*(?:(?:NR|NO|NUMBER|NUMMER)\b\.?\s*)?[:#]?\s*/g, " INV ")
@@ -1427,6 +1429,13 @@ function kortOpWoord(t, max) {
   let uit = (spatie > max / 2 ? k.slice(0, spatie) : t.slice(0, max)).replace(/[\s,\-–]+$/, "").trim();
   while (/\s(en|of|de|het|in|op|te|aan|met|bij|nr|no|and|for|to|inv|klnr\.)$/.test(uit)) uit = uit.replace(/\s\S+$/, "");   // geen "… en" achteraan
   return uit;
+}
+/* Leningen (Shereen 13 okt): "LOAN INTERES093026-25775871000107505" → "Loan Interest 093026-25775871000107505",
+   "LOAN PRINCIP…" → "Loan Principal …". De cijfers onderscheiden de leningen en blijven dus altijd staan
+   ("Interest" staat soms zonder t). Telt als vaste schrijfregel: een historie-omschrijving zonder cijfers gaat er niet overheen. */
+function leningOmschrijving(ruw) {
+  const m = String(ruw || "").toUpperCase().match(/\bLOAN\s*(INTEREST|INTERES|INTERE|PRINCIPAL|PRINCIPA|PRINCIP)\s*(\d[\d\-\/]*)/);
+  return m ? kortOpWoord(`Loan ${m[1].startsWith("INT") ? "Interest" : "Principal"} ${m[2].replace(/[-\/]+$/, "")}`, 40) : null;
 }
 /* SVB (Shereen 12 okt): "bij SVB altijd alleen klnr en SVB, zonder de naam" (de naam van de SVB) — nummers met streepjes blijven vooraan:
    "202609-5469217 klant nr. 190315 I.F.O. S.V.B. Ziekte Verzekering Fond" → "202609-5469217 klnr. 190315-SVB". */
@@ -1562,7 +1571,7 @@ function heeftVasteSchrijfregel(ruw, rekeningNaam) {
   if (/^\s*FEES\s+DEBITED\b/i.test(ruw || "")) return false;   // bankkosten, geen salaris
   const soort = soortVan((ruw || "").toUpperCase()) || (rekeningNaam ? soortVan(rekeningNaam) : null);
   if (naamWoorden(ruw).length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) return true;
-  return !!belastingOmschrijving(ruw, null) || !!svbOmschrijving(ruw);
+  return !!belastingOmschrijving(ruw, null) || !!svbOmschrijving(ruw) || !!leningOmschrijving(ruw);
 }
 function factuurOmschrijving(facturen, naam) {
   const nrs = [...new Set((facturen || []).filter(Boolean))];

@@ -1240,7 +1240,7 @@ const OMS_KAPITALEN = new Set(["ACH", "MBA", "POS", "ATM", "FX", "AMEX", "BAZV",
 /* rekeningNaam meegeven laat het soort ook uit het rekeningschema komen: een
    batchbetaling die alleen "I.F.O. CESAR" heet, wordt op rekening "Te betalen
    Tips" leesbaar als "Tips Cesar". */
-function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
+function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf, eigen = []) {   // eigen: namen van de klant zelf — alleen voor werknemersnamen (knipBijEigen)
   const origineel = ruw;
   ruw = zonderBankstaart(ruw);
   // Bankkosten van een overboeking (1,75) dragen de tekst van die overboeking: nooit als salaris/belasting omschrijven.
@@ -1254,7 +1254,7 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   // Deelbetaling (Shereen 12 okt): "2nd Partial Payment Netto salaris september … Allan Franz Kuster" →
   // "Allan Kuster - September 2nd prt".
   const deel = boven.match(/\b(\d{1,2})\s?(ST|ND|RD|TH|STE|DE|E)\s+(?:PARTIAL\s+PAYMENT|DEEL\s?BETAL\s?ING|TERMIJN)\b/);
-  const bron = naamBron(deel ? ruw.slice(0, deel.index) + " " + ruw.slice(deel.index + deel[0].length) : ruw);
+  const bron = naamBron(knipBijEigen(deel ? ruw.slice(0, deel.index) + " " + ruw.slice(deel.index + deel[0].length) : ruw, eigen));
   const naam = [...new Set(naamWoorden(bron))];
   if (naam.length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) {
     const wanneer = soort.label === "SALARIS"
@@ -1350,6 +1350,51 @@ function naamBron(ruw) {
     uit.push(w[i]);
   }
   return uit.join(" ");
+}
+/* De eigen naam van de klant (Shereen 12 okt: "bouw dat Shai de klantnaam kent"). Twee bronnen:
+   - de naam in het klantprofiel / Twinfield ("Advocatenpraktijk Mr Allan Franz Kuster");
+   - de naam die de bank (CMB) vóór MOBILEWEB plakt — de rekeninghouder ("… Kuster LawMOBILEWEB"). Die leert Shai uit
+     alle regels van de klant: het langste stuk (letters, zonder spaties) waarmee minstens de helft van de regels vóór
+     MOBILEWEB eindigt ("KUSTERLAW"). De bank breekt woorden af ("K uster L aw"), daarom zonder spaties vergelijken. */
+const MOBIEL = /M\s?O\s?B\s?I\s?L\s?E\s?(?:W\s?E\s?B|I\s?O\s?S)/i;
+function rekeninghouderUit(teksten) {
+  const staarten = [];
+  for (const t of teksten || []) {
+    const s = String(t || ""), i = s.search(MOBIEL);
+    if (i > 0) staarten.push(s.slice(Math.max(0, i - 60), i).toUpperCase().replace(/[^A-Z]/g, ""));
+  }
+  if (staarten.length < 3) return null;
+  // Niet elke regel draagt de naam (InternetBanking-regels niet): genoeg = minstens 3 en een kwart. Langer maken tot
+  // het aantal ineens zakt — dan begint het woord ervóór ("…KUSTER|LAW" → "KUSTERLAW", niet "RKUSTERLAW").
+  let beste = null, vorig = 0;
+  for (let n = 5; n <= 40; n++) {
+    const tel = new Map();
+    for (const s of staarten) if (s.length >= n) tel.set(s.slice(-n), (tel.get(s.slice(-n)) || 0) + 1);
+    const top = [...tel].sort((a, b) => b[1] - a[1])[0];
+    // Ook ≥ 15% van álle regels: bij ENDURA betaalt "Kuster Law" facturen — dat is niet de rekeninghouder van ENDURA.
+    if (!top || top[1] < Math.max(3, staarten.length / 4, (teksten || []).length * 0.15) || (vorig && top[1] < vorig * 0.8)) break;
+    beste = top[0]; vorig = top[1];
+  }
+  return beste;
+}
+/* Een eigen naam als zoekpatroon, ongevoelig voor spaties en hoofdletters ("Kuster L aw" = KUSTERLAW). */
+function eigenPatroon(naam) {
+  const letters = String(naam || "").toUpperCase().replace(/\b(N\.?\s?V|B\.?\s?V|V\.?\s?B\.?\s?A|INC|LTD)\.?\s*$/, "").replace(/[^A-Z]/g, "");
+  return letters.length >= 5 ? new RegExp("(^|[^A-Za-z])" + letters.split("").join("\\s*"), "i") : null;
+}
+/* Bij de naam van een werknemer: de tekst vanaf de eigen naam van de klant afknippen — wat erna komt is van de
+   rekeninghouder ("Nubia Ojeda Lozano Kuster Law", "Elton S Paskel Kuster Law minus 88ste aflossing Lening").
+   Alleen als er vóór de eigen naam nog een naam staat. Niet in andere omschrijvingen: daar sloopte het te veel
+   ("Discover Cafe Restaurant Bingo" → "Discover", factuurnummer "Endura-2026-0266"). */
+function knipBijEigen(tekst, eigen) {
+  let t = String(tekst || "");
+  for (const naam of eigen || []) {
+    const p = eigenPatroon(naam), m = p && t.match(p);
+    if (!m) continue;
+    const voor = t.slice(0, m.index + m[1].length);
+    if (naamWoorden(voor).length) t = voor;
+  }
+  return t.replace(/\s{2,}/g, " ").trim();
 }
 /* Afkappen op 40 tekens, maar op een heel woord (geen "Boogaa"). */
 function kortOpWoord(t, max) {
@@ -5080,9 +5125,9 @@ function bkOmsTekst(r) {
   const rekNaam = regel.naam || bkRekNamen[`${r.office}|${regel.rekening}`];
   const uitHist = heeftVasteSchrijfregel(r.omschrijving, rekNaam) ? null : omschrijvingUitHistorie(((v.historie || [])[0] || {}).omschrijving, r.omschrijving, r.datum);
   if (uitHist) return uitHist;
-  return netteOmschrijving(r.omschrijving, rekNaam, r.datum) || v.omschrijving || "";
+  return netteOmschrijving(r.omschrijving, rekNaam, r.datum, null, bkEigen[r.office]) || v.omschrijving || "";
 }
-let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [];
+let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [], bkEigen = {};
 let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const bkVink = new Set();
 const bkZeker = (z) => (z >= 85 ? "hoog" : z >= 60 ? "middel" : "laag");
@@ -5118,6 +5163,12 @@ async function laadBank() {
   }
   const { data: ur } = await sb.from("bank_uitleg_regels").select("*").eq("actief", true);
   bkUitlegRegels = ur || [];
+  // Eigen namen per klant (Shereen 12 okt): profielnaam + de rekeninghouder die de bank achter de regels plakt.
+  bkEigen = {};
+  for (const o of offices) {
+    const naam = ((profielen.find(p => p.code === o) || {}).naam || "").trim();
+    bkEigen[o] = [rekeninghouderUit(bkRegels.filter(r => r.office === o).map(r => r.omschrijving)), naam].filter(Boolean);
+  }
   vernieuwBkFilters();
   vernieuwBkTabel();
 }
@@ -5296,7 +5347,7 @@ function bkDetailRij(r) {
   // bij "Twinfield zegt 4832, eerder 9070" de 9070 al klaar).
   const eigen = g.soort === "grootboek" ? g.regels[0].rekening
     : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : ((v.historie || [])[0] || {}).rekening || "");
-  const eigenOms = g.omschrijving || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum);
+  const eigenOms = g.omschrijving || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum, null, bkEigen[r.office]);
   // Afletteren (11 okt): openstaande facturen met hetzelfde bedrag, voorgekozen wat Shai voorstelt.
   const kandidaten = v.kandidaten || [];
   const keuzeKlant = g.soort === "klant" || (g.soort !== "grootboek" && (v.soort === "klant" || v.soort === "relatie"));
@@ -5624,7 +5675,7 @@ function bkNaarVraagposten(regels, meldingId = "melding-bank", reden) {
   return bkGoedkeuren(regels, (r) => {
     const vp = vpVan(r.office);
     return { soort: "grootboek", vraagposten: true, regels: [{ rekening: vp, bedrag: Number(r.bedrag) }],
-      omschrijving: (bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum)).slice(0, 40), reden };
+      omschrijving: (bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum, null, bkEigen[r.office])).slice(0, 40), reden };
   }, meldingId);
 }
 document.getElementById("btn-bk-vraagposten").addEventListener("click", () => bkNaarVraagposten(bkRegels.filter(r => bkVink.has(r.id))));

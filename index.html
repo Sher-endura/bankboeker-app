@@ -5391,7 +5391,7 @@ function bkDetailRij(r) {
     <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
     <div class="rij">
       <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div></div>
-      <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen ? "" : " disabled"}></div>
+      <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen || r.status === "fout" ? "" : " disabled"}></div>
     </div>
     ${beoordelen ? `<label style="display:block; margin:8px 0 3px; font-size:12px; font-weight:600">Waarom verbeter je dit? (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</label>
       <input type="text" id="bk-reden" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%">` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}

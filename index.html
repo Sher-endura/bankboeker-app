@@ -213,7 +213,9 @@
   .bk-scroll { overflow: auto; }
   #tabel-bank thead th { position: sticky; top: 0; z-index: 5; background: var(--grijs); }
   #tabel-bank tr.bk-kop td { background: var(--grijs); color: var(--tekst); font-weight: 600; font-size: 13px; }
-  #tabel-bank tr.bk-klant { cursor: pointer; user-select: none; }
+  #tabel-bank tr.bk-klant, #tabel-facturen tr.fa-klant { cursor: pointer; user-select: none; }
+  #tabel-facturen .bk-klap-pijl { display: inline-block; width: 16px; }
+  #tabel-facturen tr.fa-klant td { background: var(--zalm); color: #1f2937; font-weight: 700; font-size: 15px; padding-top: 10px; padding-bottom: 10px; }
   #tabel-bank .bk-klap-pijl { display: inline-block; width: 16px; }
   #tabel-bank tr.bk-klant td { background: var(--zalm); color: #1f2937; font-weight: 700; font-size: 15px; padding-top: 10px; padding-bottom: 10px; }   /* één felle balk per administratie (Shereen 11 okt) */
   #tabel-bank tr.bk-rij { cursor: pointer; } #tabel-bank tr.bk-rij:hover td { background: #f3f6fa; }
@@ -4120,10 +4122,12 @@ async function faNuDraaien() {
   setTimeout(() => { knop.disabled = false; laadRobotStatus(); }, 30000);
 }
 /* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Twinfield Bank. */
-const FA_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
-  ["ingevuld", "Ingevuld in Basecone", ["ingevuld"]], ["geboekt", "Geboekt", ["geboekt"]], ["fout", "Fout", ["fout"]],
-  ["overgeslagen", "Overgeslagen", ["overgeslagen"]], ["nieuw", "Nieuw", ["nieuw"]], ["gelezen", "Wordt gelezen", ["gelezen"]],
-  ["splitsen", "Wacht op splitsen", ["splitsen"]], ["verwijderen", "Wordt verwijderd", ["verwijderen"]]];   // verwijderd: tabje DELETED
+// Minder tabjes (Shereen 13 okt: "het is beoordelen, goedkeuren, geboekt, fout, overgeslagen"): tussenstanden horen
+// bij een tabje — nieuw/wordt gelezen bij Te beoordelen (komt er zo aan, met hun eigen statuslabel; niet aan te vinken),
+// ingevuld bij Goedgekeurd (Shai boekt hem zo door). Wordt verwijderd staat in het tabje DELETED.
+const FA_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen", "nieuw", "gelezen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd", "ingevuld"]],
+  ["geboekt", "Geboekt", ["geboekt"]], ["fout", "Fout", ["fout"]], ["overgeslagen", "Overgeslagen", ["overgeslagen"]],
+  ["splitsen", "Wacht op splitsen", ["splitsen"]]];
 let faTabje = leesTabje("bankboeker.basecone.tabje", FA_TABJES);
 let faStatusSel = new Set(FA_TABJES.find(t => t[0] === faTabje)[2]);
 function vernieuwFaFilters() {
@@ -4144,7 +4148,19 @@ function vernieuwFaTabel() {
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
   const zoekt = document.getElementById("fa-zoek").value.trim();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${document.getElementById("fa-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
-  for (const d of lijst) {
+  // Per klant (Shereen 13 okt: "tab Fout in Basecone moet per klant"), zoals Twinfield Bank: een kopbalk per
+  // administratie, klik = in-/uitklappen. Binnen een klant blijft de volgorde (of de sortering op zekerheid).
+  const faOffices = [...new Set(lijst.map(d => d.office))].sort();
+  const faGesorteerd = faOffices.flatMap(o => lijst.filter(d => d.office === o));
+  let faVorigeKlant = null;
+  for (const d of faGesorteerd) {
+    if (d.office !== faVorigeKlant) {
+      faVorigeKlant = d.office;
+      const naam = (profielen.find(p => p.code === d.office) || {}).naam || "";
+      const n = lijst.filter(x => x.office === d.office).length, dicht = faDicht.has(d.office);
+      tbody.insertAdjacentHTML("beforeend", `<tr class="fa-klant" data-office="${escapeHtml(d.office)}" title="Klik om ${dicht ? "uit" : "in"} te klappen"><td colspan="9"><span class="bk-klap-pijl">${dicht ? "▸" : "▾"}</span> ${escapeHtml(d.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${n} document${n === 1 ? "" : "en"}</span></td></tr>`);
+    }
+    if (faDicht.has(d.office)) continue;
     const v = d.goedgekeurd || d.voorstel || {};
     const pnt = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
     const alle = [...(pnt.voorleg ? [pnt.voorleg] : []), ...pnt.lijst];
@@ -4173,6 +4189,7 @@ function vernieuwFaTabel() {
    de voorstellen in de huidige lijst; een document op "voorleggen" vink je bewust los aan. */
 const FA_BEOORDELEN = ["voorstel", "voorleggen"];
 const faVink = new Set();
+const faDicht = new Set();   // ingeklapte administraties in de Basecone-lijst (klik op de kopbalk)
 /* Wat de lijst links toont: administratie + statusfilter + zekerheidsfilter, eventueel gesorteerd op
    zekerheid (Shereen 10 okt). Zonder sortering blijft de volgorde van de database (laatst bijgewerkt eerst). */
 let faSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
@@ -4208,7 +4225,7 @@ function faSorteerZekerheid() {
   vernieuwFaTabel();
 }
 // Alles aanvinken pakt ook "voorleggen" (Shereen 13 okt, zelfde als Twinfield Bank).
-const faVinkbaar = () => faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status));
+const faVinkbaar = () => faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status) && !faDicht.has(d.office));   // ingeklapt = niet mee aanvinken
 function faBulkStand() {
   // Alleen wat je ziet blijft aangevinkt (12 okt, zelfde als Twinfield Bank).
   const zicht = new Set(faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status)).map(d => d.id));
@@ -4632,7 +4649,9 @@ async function openFactuur(id) {
   document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "verwijderen"].includes(d.status)
     || (d.status === "splitsen" && (d.basecone || {}).besluit === "afwijzen_voor_splitsen") ? "" : "none";
   // Splitsen van een al getagd document (Shereen 13 okt): alleen bij meer dan één pagina, nog niet geboekt/ingevuld.
-  document.getElementById("btn-fa-splitsen").style.display = (beoordelen || d.status === "overgeslagen") && (d.scan_paden || []).length > 1 ? "" : "none";
+  // Niet bij een origineel dat Shai al bij Aangeleverd splitste (bestaat niet meer in Basecone; geen boeking = nooit getagd).
+  document.getElementById("btn-fa-splitsen").style.display = (beoordelen || d.status === "overgeslagen") && (d.scan_paden || []).length > 1
+    && (d.basecone || {}).boeking && !/^Door Shai gesplitst/.test(d.opmerking || "") ? "" : "none";
   // Verwijderen: alles wat nog niet geboekt of ingevuld is (Shai doet het in Basecone, ook bij Aangeleverd).
   document.getElementById("btn-fa-verwijderen").style.display = beoordelen || ["overgeslagen", "splitsen"].includes(d.status) ? "" : "none";
   document.getElementById("fa-verwijder-vak").style.display = "none";
@@ -6182,6 +6201,13 @@ function bkRichtingPast(r) {
   const f = document.getElementById("bk-richting-filter").value;
   return !f || (f === "in" ? Number(r.bedrag) > 0 : Number(r.bedrag) < 0);
 }
+document.querySelector("#tabel-facturen tbody").addEventListener("click", (e) => {
+  const kop = e.target.closest("tr.fa-klant");
+  if (!kop || !kop.dataset.office) return;
+  const o = kop.dataset.office;
+  faDicht.has(o) ? faDicht.delete(o) : faDicht.add(o);
+  vernieuwFaTabel();
+});
 document.querySelector("#tabel-bank tbody").addEventListener("click", (e) => {
   const kop = e.target.closest("tr.bk-klant");
   if (!kop || !kop.dataset.office) return;

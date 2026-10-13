@@ -4715,8 +4715,10 @@ async function openFactuur(id) {
   // t kan right here") — behalve een origineel dat Shai al splitste (bestaat niet meer in Basecone).
   const beoordelen = ["voorstel", "voorleggen", "fout"].includes(d.status)
     || (d.status === "overgeslagen" && !/^Door Shai gesplitst/.test(d.opmerking || ""));
-  document.getElementById("btn-fa-goedkeuren").style.display = beoordelen ? "" : "none";
-  document.getElementById("btn-fa-opnieuw").style.display = beoordelen ? "" : "none";
+  // Door Shai afgeknipte onbruikbare foto (13 okt): niets te boeken, alleen verwijderen.
+  const onbruikbaar = (d.basecone || {}).besluit === "onbruikbaar";
+  document.getElementById("btn-fa-goedkeuren").style.display = beoordelen && !onbruikbaar ? "" : "none";
+  document.getElementById("btn-fa-opnieuw").style.display = beoordelen && !onbruikbaar ? "" : "none";
   document.getElementById("btn-fa-overslaan").style.display = beoordelen && d.status !== "overgeslagen" ? "" : "none";
   document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "verwijderen"].includes(d.status)
     || (d.status === "splitsen" && (d.basecone || {}).besluit === "afwijzen_voor_splitsen") ? "" : "none";

@@ -1156,7 +1156,9 @@ const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND",
   "POS", "MAESTRO", "ACH", "TRANSFER", "PAYMENT", "PURCHASE", "MCDT", "EDC",
   // "InternetBanking Tfr Debit CMS REF-DC…" is alleen de manier van betalen (Shereen 12 okt): KUSTER-verzekeringen
   // werden herkend op "INTERNETBANKING TFR DEBIT" → 4831 Telefoon/Fax/Internet.
-  "INTERNETBANKING", "INTERNET", "TFR", "DEBIT", "CREDIT", "CMS", "REF", "DC", "MOBILEWEB", "MOBILEIOS", "NETTO", "OUTWARD", "LOC", "CLEARING", "PARTIAL"]);
+  "INTERNETBANKING", "INTERNET", "TFR", "DEBIT", "CREDIT", "CMS", "REF", "DC", "MOBILEWEB", "MOBILEIOS", "NETTO", "OUTWARD", "LOC", "CLEARING", "PARTIAL",
+  // RBC (Shereen 13 okt): "Sundry Debtor … Wash Thru PCN … PCN-Processed Transaction", "POS Suspense".
+  "SUNDRY", "DEBTOR", "WASH", "THRU", "PCN", "PROCESSED", "TRANSACTION", "SUSPENSE"]);
 function soortVan(omschrijving) {
   const b = (omschrijving || "").toUpperCase();
   return SOORTEN.find(s => s.her.test(b)) || null;
@@ -1292,8 +1294,12 @@ function algemeen(ruw, bedrijf) {
   const titelKast = (w) => w.split(/([\/\-])/).map((x) => (x === "/" || x === "-" ? x : kast(x))).join("");
   let d = " " + boven + " ";
   // Shereen 12 okt: I.F.O. (in favor of) en B.O.O. (by order of) eruit; factuur/invoice → "inv"; klant nr. → "klnr.".
+  // RBC-banktekst, harde regel (Shereen 13 okt): nooit in de omschrijving. "INV465353" → "INV 465353" (nummer blijft).
+  d = d.replace(/\bSUNDRY\s+DEBTOR\b|\bWASH\s+THRU(\s+PCN)?\b|\bPOS\s+SUSPENSE\b|\bPCN\s*-?\s*PROCESSED\s+TRANSACTION\b|\bPCN\b|\bFT\d{2,}[A-Z0-9]*\b/g, " ")
+    .replace(/\bINV(?=\d)/g, "INV ");
   d = d.replace(/\bI\.?\s*F\.?\s*O\b\.?/g, " ").replace(/\bB\.\s*O\.\s*O\b\.?|\bBOO\b/g, " ")
     .replace(/\b(?:FACTU(?:UR|RA|REN)?|FAKTUUR|FACT|INVOICES?|INV)(?:NR|NO|NUMMER)?\b\.?\s*(?:(?:NR|NO|NUMBER|NUMMER)\b\.?\s*)?[:#]?\s*/g, " INV ")
+    .replace(/\bINV(\s+INV\b)+/g, "INV")   // "INVOICES INV465353" → één keer inv
     .replace(/\bKLANT\s*(?:NR|NO|NUMMER)\b\.?\s*[:#]?\s*|\bKL\.?\s?NR\b\.?\s*[:#]?\s*/g, " KLNR ")
     .replace(/^\s*ACH\s+TRANSFER\b/, " ")
     .replace(/\/\/\s*\d+/g, " ")
@@ -1474,7 +1480,7 @@ function belastingOmschrijving(ruw, datum) {
    omschrijvingen gebruikt heb"). De omschrijving van de eerdere boeking van dezelfde naam, met de periode bijgewerkt
    ("LB - Aug 2026" → "LB - Sep 2026"). Veilig: niet als het nog de ruwe banktekst is (alleen hoofdletters, lange
    nummers) en niet als er na de periode nog cijfers in staan (bv. een oud factuurnummer). Anders null. */
-const HIST_BANKRUIS = /\b(MAESTRO|POS|TFR|TRANSFER|PAYMENT|ACH|MC ?DEBIT|MCDEBIT|VS-?MC|SALE|INTERNET ?BANKING|DEBIT|CREDIT|REF|I\.?F\.?O|B\.?\s?O\.?\s?O|AUTHORI[SZ]ATION|AUTHORIZAT|CMS|MOBILEWEB|MOBILEIOS|INSTANT|ONLINE BANKING|REVERSAL|CHEQUE)\b/i;   // bankwoorden: nooit uit de historie overnemen (B.O.O. = by order of, Shereen 12 okt)
+const HIST_BANKRUIS = /\b(MAESTRO|POS|TFR|TRANSFER|PAYMENT|ACH|MC ?DEBIT|MCDEBIT|VS-?MC|SALE|INTERNET ?BANKING|DEBIT|CREDIT|REF|I\.?F\.?O|B\.?\s?O\.?\s?O|SUNDRY DEBTOR|WASH THRU|PCN|SUSPENSE|AUTHORI[SZ]ATION|AUTHORIZAT|CMS|MOBILEWEB|MOBILEIOS|INSTANT|ONLINE BANKING|REVERSAL|CHEQUE)\b/i;   // bankwoorden: nooit uit de historie overnemen (B.O.O. = by order of, Shereen 12 okt)
 function omschrijvingUitHistorie(hist, ruw, datum) {
   const h = String(hist || "").trim();
   if (!h || h.length > 40 || !/[a-z]/.test(h) || /\d{6,}/.test(h)) return null;

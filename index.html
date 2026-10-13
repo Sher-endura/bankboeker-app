@@ -726,7 +726,7 @@
         <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alles in deze lijst aanvinken — voorstel én voorleggen. Kies een status in &quot;Alle statussen&quot; om alleen die aan te vinken."></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th id="fa-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde">Zekerheid <span id="fa-sorteer-pijl"></span></th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
         <tbody></tbody>
       </table>
-      <div class="woot" id="fa-woot" hidden><img data-src="woot-woot-fuchsia-street-art.png" alt="WOOT WOOT! Alle bankafschriften en Basecone-facturen zijn geboekt."><p>Alles geboekt. Bank én Basecone zijn helemaal bijgewerkt.</p></div>
+      <div class="woot" id="fa-woot" hidden><img data-src="woot-woot-fuchsia-street-art.png" alt="WOOT WOOT! Niets meer te beoordelen."><p>Alles beoordeeld. Shai doet de rest in Basecone.</p></div>
     </div>
     <div class="fa-scheiding" id="fa-scheiding" title="Sleep om de breedte aan te passen (dubbelklik = terug naar standaard)"></div>
     <div class="kaart" id="kaart-fa-detail">
@@ -880,7 +880,7 @@
         <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alles in deze lijst aanvinken — voorstel én voorleggen. Kies een status in &quot;Alle statussen&quot; om alleen die aan te vinken."></th><th>Status</th><th>Klant</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
       </table>
-      <div class="woot" id="bk-woot" hidden><img data-src="woot-woot-fuchsia-street-art.png" alt="WOOT WOOT! Alle bankafschriften en Basecone-facturen zijn geboekt."><p>Alles geboekt. Bank én Basecone zijn helemaal bijgewerkt.</p></div>
+      <div class="woot" id="bk-woot" hidden><img data-src="woot-woot-fuchsia-street-art.png" alt="WOOT WOOT! Niets meer te beoordelen."><p>Alles beoordeeld. Shai doet de rest in Twinfield.</p></div>
     </div>
   </div>
 </section>
@@ -4189,7 +4189,8 @@ function vernieuwFaTabel() {
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
   const zoekt = document.getElementById("fa-zoek").value.trim();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${document.getElementById("fa-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
-  toonWoot("fa-woot", document.getElementById("fa-office").value, !lijst.length && !zoekt);
+  { const o = document.getElementById("fa-office").value, open = FA_TABJES[0][2];
+    toonWoot("fa-woot", o, faTabje === "beoordelen" && !zoekt && !faDocs.some(d => (!o || d.office === o) && open.includes(d.status))); }
   // Per klant (Shereen 13 okt: "tab Fout in Basecone moet per klant"), zoals Twinfield Bank: een kopbalk per
   // administratie, klik = in-/uitklappen. Binnen een klant blijft de volgorde (of de sortering op zekerheid).
   const faOffices = [...new Set(lijst.map(d => d.office))].sort();
@@ -5517,7 +5518,8 @@ function vernieuwBkTabel() {
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">${document.getElementById("bk-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : "Niets in deze lijst."}</td></tr>`;
-  toonWoot("bk-woot", document.getElementById("bk-office").value, !lijst.length);
+  { const o = document.getElementById("bk-office").value, open = BK_TABJES[0][2];
+    toonWoot("bk-woot", o, bkTabje === "beoordelen" && !document.getElementById("bk-zoek").value.trim() && !bkRegels.some(r => (!o || r.office === o) && open.includes(r.status))); }
   const klap = document.getElementById("bk-klap");
   klap.textContent = bkUitklap ? "◂ Bron & uitleg" : "▸ Bron & uitleg";
   klap.classList.toggle("open", bkUitklap);
@@ -7055,44 +7057,16 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
 });
 document.getElementById("btn-uitloggen").addEventListener("click", () => sb.auth.signOut());
 
-/* Feestelijke eindstatus (Shereen 13 okt): de WOOT WOOT-afbeelding alleen als voor de gekozen administratie (leeg = alle)
-   BEIDE klaar zijn, gecontroleerd op de statusgegevens in de database (niet op de lijst op het scherm):
-   1. bank: geen regel meer op voorstel/voorleggen/goedgekeurd/toegewezen/fout, geen overgeslagen regel die geen DUBBEL is,
-      en minstens één regel geboekt (verwerkt);
-   2. Basecone: geen document meer op beoordelen/nieuw/gelezen/goedgekeurd/ingevuld/fout/splitsen/wordt verwijderd, en
-      geen overgeslagen document dat nog in Basecone staat (een origineel dat Shai splitste telt niet).
-   Standaard verborgen; de PNG (1,4 MB) wordt pas geladen als beide kloppen en pas getoond als hij binnen is (geen flits).
-   Uitkomst 30 s onthouden per administratie, zodat hij bij elke klik niet even verdwijnt. */
-const WOOT_BANK_OPEN = ["voorstel", "voorleggen", "goedgekeurd", "toegewezen", "fout"];
-const WOOT_BC_OPEN = ["voorstel", "voorleggen", "nieuw", "gelezen", "goedgekeurd", "ingevuld", "fout", "splitsen", "verwijderen"];
-const wootUitkomst = {}, wootNr = {};
-async function wootAllesGeboekt(office) {
-  const o = (q) => office ? q.eq("office", office) : q;
-  const tel = async (q) => { const { count, error } = await q; if (error) throw error; return count || 0; };
-  // Overgeslagen: de opmerkingen ophalen en hier filteren (een "begint niet met"-filter in de query telde 13 okt alles weg).
-  const over = async (q, telt) => { const { data, error } = await q.limit(5000); if (error) throw error; return (data || []).filter(x => telt(String(x.opmerking || ""))).length; };
-  const hoofd = { count: "exact", head: true };
-  const [bankOpen, bankOver, bankGeboekt, bcOpen, bcOver] = await Promise.all([
-    tel(o(sb.from("bank_regels").select("id", hoofd).in("status", WOOT_BANK_OPEN))),
-    over(o(sb.from("bank_regels").select("opmerking").eq("status", "overgeslagen")), (t) => !t.startsWith("DUBBEL:")),
-    tel(o(sb.from("bank_regels").select("id", hoofd).eq("status", "verwerkt"))),
-    tel(o(sb.from("basecone_documenten").select("id", hoofd).in("status", WOOT_BC_OPEN))),
-    over(o(sb.from("basecone_documenten").select("opmerking").eq("status", "overgeslagen")), (t) => !t.startsWith("Door Shai gesplitst")),
-  ]);
-  return bankGeboekt > 0 && !bankOpen && !bankOver && !bcOpen && !bcOver;
-}
-async function toonWoot(id, office, lijstLeeg) {
+/* Feestelijke eindstatus (Shereen 13 okt): de WOOT WOOT-afbeelding als er voor de gekozen administratie (leeg = alle)
+   niets meer te beoordelen is. Eerst gold "alles geboekt" (bank én Basecone), maar een administratie zonder regels staat
+   niet in de keuzelijst, dus die zag je nooit — Shereen 13 okt: "ik wil hem zien wanneer te beoordelen 0 is".
+   Alleen in het tabje Te beoordelen, zonder zoekterm; geteld op alle geladen regels van dat tabje (niet op de filters
+   richting/zekerheid, die maken de lijst ook leeg). De PNG (1,4 MB) wordt pas geladen als hij getoond wordt (geen flits). */
+const wootNr = {};
+async function toonWoot(id, office, nietsTeBeoordelen) {
   const el = document.getElementById(id); if (!el) return;
   const nr = wootNr[id] = (wootNr[id] || 0) + 1;
-  const sleutel = office || "*";
-  const bekend = wootUitkomst[sleutel];
-  if (!lijstLeeg || office === GEEN_ADMIN) { el.hidden = true; return; }
-  if (!(bekend && bekend.ok && Date.now() - bekend.t < 30000)) el.hidden = true;   // nog niet zeker: niets tonen
-  let ok = false;
-  if (bekend && Date.now() - bekend.t < 30000) ok = bekend.ok;
-  else { try { ok = await wootAllesGeboekt(office); } catch (e) { ok = false; } wootUitkomst[sleutel] = { ok, t: Date.now() }; }
-  if (nr !== wootNr[id]) return;   // intussen een nieuwere lijst
-  if (!ok) { el.hidden = true; return; }
+  if (!nietsTeBeoordelen || office === GEEN_ADMIN) { el.hidden = true; return; }
   const img = el.querySelector("img");
   if (!img.getAttribute("src")) {
     await new Promise((klaar) => { img.onload = klaar; img.onerror = klaar; img.src = img.dataset.src; });

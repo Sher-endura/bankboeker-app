@@ -98,6 +98,14 @@
   .fa-verwijder-vak input { width: 100%; margin: 4px 0 8px; }
   #tabel-verwijderd img.vw-mini { width: 70px; height: 90px; object-fit: cover; object-position: top; border: 1px solid var(--rand); border-radius: 3px; cursor: zoom-in; background: #fff; display: block; }
   #tabel-verwijderd td { vertical-align: top; }
+  .online-wrap { position: relative; margin-right: 10px; }
+  #btn-online { padding: 5px 10px; font-size: 12px; }
+  .online-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .online-dot.groen { background: #16a34a; } .online-dot.rood { background: #dc2626; }
+  .online-lijst { position: absolute; right: 0; top: calc(100% + 4px); min-width: 280px; max-width: 90vw; background: var(--kaart, #fff); color: var(--tekst, #1f2937);
+    border: 1px solid var(--rand); border-radius: 8px; padding: 6px 0; z-index: 60; box-shadow: 0 6px 18px rgba(0,0,0,.14); }
+  .online-lijst div { padding: 5px 12px; font-size: 13px; white-space: nowrap; }
+  .online-lijst .waar { color: #6b7280; font-size: 12px; margin-left: 4px; }
   #tabel-verwijderd tr.vw-klant td { background: var(--zacht, #f3f4f6); vertical-align: middle; padding-top: 8px; padding-bottom: 8px; }
   .vw-mail { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--rand); border-radius: 8px; }
   .vw-mail .vw-voorbeeld { border: 1px solid var(--rand); border-radius: 6px; padding: 10px 12px; background: #fff; color: #1f2937; max-height: 360px; overflow: auto; margin: 8px 0; }
@@ -257,6 +265,10 @@
 <header>
   <h1><img src="shai-logo.png" alt="Shai Booking by Endura"></h1>
   <span style="flex:1"></span>
+  <div class="online-wrap" id="online-wrap" style="display:none">
+    <button class="knop stil" id="btn-online" title="Wie werkt er nu in Shai Booking?"><span class="online-dot groen"></span><span id="online-tal">online</span> ▾</button>
+    <div class="online-lijst" id="online-lijst" style="display:none"></div>
+  </div>
   <span class="sub" id="kop-gebruiker" style="display:none"></span>
   <button class="knop stil" id="btn-uitloggen" style="display:none; padding:5px 10px; font-size:12px;">Uitloggen</button>
 </header>
@@ -991,6 +1003,7 @@ async function initAuth() {
   document.getElementById("kop-gebruiker").style.display = "";
   setTimeout(laadAiStand, 1500);
   setInterval(laadAiStand, 10 * 60 * 1000);
+  startOnline();
   document.getElementById("btn-uitloggen").style.display = "";
   return true;
 }
@@ -6248,6 +6261,7 @@ function kiesTab(naam) {
   const groep = groepVan(naam);
   if (groep) laatsteInGroep[groep] = naam;
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === (groep || naam)));
+  setTimeout(onlineWaarBijwerken, 50);   // collega's zien op welk tabblad je zit
   const sub = document.getElementById("subnav");
   sub.style.display = groep ? "" : "none";
   sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "") +
@@ -6965,6 +6979,46 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   }
 });
 document.getElementById("btn-uitloggen").addEventListener("click", () => sb.auth.signOut());
+
+/* Wie is er online (Shereen 13 okt: "zodat mensen niet dubbel werken"): Supabase Realtime presence — elke open
+   Shai Booking meldt zich in het kanaal "shai-booking-online" met het tabblad waar je op staat. Groen = nu online,
+   rood = collega die de afgelopen 30 dagen iets deed in Shai Booking (bank_log/basecone_log) maar nu niet online is. */
+let onlineKanaal = null, onlineBekend = [], onlineNu = {}, onlineSinds = new Date().toISOString();
+const onlineWaar = () => [...document.querySelectorAll("nav button.actief, #subnav button.actief")].map(b => b.textContent.trim()).filter(Boolean).join(" › ");
+const onlineIk = () => (gebruiker && gebruiker.email || "").toLowerCase();
+async function startOnline() {
+  if (onlineKanaal || !gebruiker) return;
+  document.getElementById("online-wrap").style.display = "";
+  try {
+    const sinds = new Date(Date.now() - 30 * 864e5).toISOString();
+    const [a, b] = await Promise.all([sb.from("bank_log").select("door").gte("at", sinds).limit(5000), sb.from("basecone_log").select("door").gte("at", sinds).limit(5000)]);
+    onlineBekend = [...new Set([...(a.data || []), ...(b.data || [])].map(x => String(x.door || "").toLowerCase())
+      .filter(e => /@endura-aruba\.com$/.test(e) && e !== "robot@endura-aruba.com"))];
+  } catch (e) { /* dan alleen wie online is */ }
+  onlineKanaal = sb.channel("shai-booking-online", { config: { presence: { key: onlineIk() } } });
+  onlineKanaal.on("presence", { event: "sync" }, () => { onlineNu = onlineKanaal.presenceState(); toonOnline(); })
+    .subscribe(async (s) => { if (s === "SUBSCRIBED") await onlineKanaal.track({ email: onlineIk(), waar: onlineWaar(), sinds: onlineSinds }); });
+  toonOnline();
+}
+function onlineWaarBijwerken() { if (onlineKanaal) onlineKanaal.track({ email: onlineIk(), waar: onlineWaar(), sinds: onlineSinds }).catch(() => {}); }
+function toonOnline() {
+  const online = Object.keys(onlineNu);
+  const wie = (e) => e.split("@")[0];
+  const alle = [...new Set([...online, ...onlineBekend, onlineIk()].filter(Boolean))]
+    .sort((x, y) => (online.includes(y) - online.includes(x)) || x.localeCompare(y));
+  document.getElementById("online-tal").textContent = `${Math.max(online.length, 1)} online`;
+  document.getElementById("online-lijst").innerHTML = alle.map(e => {
+    const aan = online.includes(e) || e === onlineIk();
+    const info = (onlineNu[e] || [])[0] || {};
+    const waar = aan ? (e === onlineIk() ? "jij" + (info.waar ? " · " + info.waar : "") : info.waar || "") : "offline";
+    return `<div><span class="online-dot ${aan ? "groen" : "rood"}"></span>${escapeHtml(wie(e))}<span class="waar">${escapeHtml(waar)}</span></div>`;
+  }).join("") || `<div>Nog niemand gezien.</div>`;
+}
+document.getElementById("btn-online").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const l = document.getElementById("online-lijst"); l.style.display = l.style.display === "none" ? "" : "none";
+});
+document.addEventListener("click", (e) => { if (!e.target.closest("#online-wrap")) document.getElementById("online-lijst").style.display = "none"; });
 document.getElementById("wachtwoord-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const nieuw = document.getElementById("ww-nieuw").value;

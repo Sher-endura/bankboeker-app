@@ -5330,6 +5330,8 @@ function bkTwinfieldOpties(r, hist) {
   return uit;
 }
 function bkStandaardGoedkeuring(r) {
+  // Opgeslagen keuze (💾 Opslaan, 13 okt) gaat voor Shai's voorstel.
+  if (r.goedgekeurd && r.goedgekeurd.concept && r.goedgekeurd.soort) { const { concept, opgeslagen_door, opgeslagen_op, ...g } = r.goedgekeurd; return g; }
   const v = r.voorstel || {};
   // De omschrijving die in REFINED staat (Shereen 12 okt) — niet Shai's opgeslagen versie van de vorige ronde,
   // die nog met oudere regels gemaakt kan zijn ("… B.O.O. Sera Fina Tradin").
@@ -5490,9 +5492,10 @@ function bkDetailRij(r) {
     </div>
     ${toonOpties ? `<div class="bk-oms-opties"><b>Kies een omschrijving</b> (of typ zelf in het vak hierboven): ${omsOpties.map((o, i) => `<button type="button" class="bk-oms-optie" data-i="${i}">${escapeHtml(o.t)}<span>${escapeHtml(o.bron)}</span></button>`).join("")}</div>` : ""}
     ${beoordelen ? `<label style="display:block; margin:8px 0 3px; font-size:12px; font-weight:600">Waarom verbeter je dit? (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</label>
-      <input type="text" id="bk-reden" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%">` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
+      <input type="text" id="bk-reden" value="${escapeHtml(g.concept && g.reden || "")}" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%">` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
     <p style="margin:10px 0 4px">
-      ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}
+      ${beoordelen ? `<button class="knop" id="btn-bk-opslaan" title="Bewaart je keuze bij deze regel, zonder goed te keuren. De regel blijft in Te beoordelen.">💾 Opslaan</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button> <button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button>` : ""}
+      ${beoordelen && g.concept ? `<span style="font-size:13px">💾 Opgeslagen door ${escapeHtml(g.opgeslagen_door || "?")} — nog niet goedgekeurd</span>` : ""}
       ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
       ${r.status === "fout" ? ` <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button>` : ""}
       ${r.goedgekeurd_door ? `<span style="font-size:13px">Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}</span>` : ""}
@@ -5618,10 +5621,10 @@ function bkDetailRij(r) {
     const klaar = await bkGoedkeurUitVak(reden);
     if (klaar && reden) await bkUitlegVerwerken(r, reden);
   });
-  // Het eigenlijke goedkeuren vanuit het uitklapvak (keuze twinfield / klant / grootboek); geeft het aantal terug.
-  const bkGoedkeurUitVak = (reden) => {
+  // De keuze in het uitklapvak (twinfield / klant / grootboek) als goedkeuring — of een melding en niets (Opslaan en Goedkeuren).
+  const bkKeuzeUitVak = (reden) => {
     const keuze = (tr.querySelector('input[name="bk-keuze"]:checked') || {}).value;
-    if (keuze === "twinfield") return bkGoedkeuren([r], () => ({ soort: "twinfield", omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
+    if (keuze === "twinfield") return ({ soort: "twinfield", omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
     if (keuze === "klant") {
       const rel = relVeld.value.trim();
       const k = aflet.klanten.find(x => x.code === rel);
@@ -5641,14 +5644,34 @@ function bkDetailRij(r) {
           verschil = { soort, bedrag: rest, rekening: vr, naam: bkRekNamen[`${r.office}|${vr}`] };
         }
       }
-      return bkGoedkeuren([r], () => ({ soort: "klant", relatie: k.code, relatienaam: k.naam,
+      return ({ soort: "klant", relatie: k.code, relatienaam: k.naam,
         regels: facturen.map(o => ({ ...bkKlantRegel(o, r), bedrag: o.open })), vooruitbetaling: vooruit, ...(verschil ? { verschil } : {}),
-        omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
+        omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
     }
     const rek = tr.querySelector("#bk-rekening").value.trim();
     if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
-    return bkGoedkeuren([r], () => ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden }), "melding-bk-detail");
+    return ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
   };
+  const bkGoedkeurUitVak = (reden) => { const g = bkKeuzeUitVak(reden); return g ? bkGoedkeuren([r], () => g, "melding-bk-detail") : 0; };
+  // Opslaan zonder goedkeuren (Shereen 13 okt: "zodat de transactie wordt bijgewerkt en niet gelijk naar goedkeuren gaat
+  // en ik weer opnieuw moet scrollen"): de keuze blijft als concept bij de regel (goedgekeurd.concept = true). Shai doet
+  // er niets mee zolang de status niet "goedgekeurd" is; het uitklapvak blijft open en de lijst springt niet weg.
+  knop("btn-bk-opslaan", async () => {
+    const reden = (tr.querySelector("#bk-reden") || {}).value?.trim() || undefined;
+    const g = bkKeuzeUitVak(reden);
+    if (!g) return;
+    const door = gebruiker ? gebruiker.email : null;
+    const concept = { ...g, concept: true, opgeslagen_door: door, opgeslagen_op: new Date().toISOString() };
+    const { data, error } = await sb.from("bank_regels").update({ goedgekeurd: concept, updated_by: door }).eq("id", r.id).in("status", BK_BEOORDELEN).select("id");
+    if (error) return toonMelding("melding-bk-detail", "fout", escapeHtml(error.message));
+    if (!data || !data.length) return toonMelding("melding-bk-detail", "fout", "Niet opgeslagen (regel is intussen veranderd — ververs de pagina).");
+    await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie: "opgeslagen", details: concept, door });
+    r.goedgekeurd = concept;   // hetzelfde object als in bkRegels
+    const sc = document.getElementById("bk-scroll"), boven = sc ? sc.scrollTop : 0;
+    vernieuwBkTabel();
+    if (sc) sc.scrollTop = boven;
+    toonMelding("melding-bk-detail", "ok", "✓ Opgeslagen — nog niet goedgekeurd. Keur goed wanneer je klaar bent (hier, of met de vinkjes bovenaan).");
+  });
   knop("btn-bk-naar-vp", () => {
     const oms = tr.querySelector("#bk-oms").value.trim().slice(0, 40);
     const reden = (tr.querySelector("#bk-reden") || {}).value?.trim() || undefined;

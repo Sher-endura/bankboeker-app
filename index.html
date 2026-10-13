@@ -98,6 +98,11 @@
   .fa-verwijder-vak input { width: 100%; margin: 4px 0 8px; }
   #tabel-verwijderd img.vw-mini { width: 70px; height: 90px; object-fit: cover; object-position: top; border: 1px solid var(--rand); border-radius: 3px; cursor: zoom-in; background: #fff; display: block; }
   #tabel-verwijderd td { vertical-align: top; }
+  /* Feestelijke eindstatus (13 okt): transparante PNG, geen kaart/kader/achtergrond, gecentreerd onder de tabbladen. */
+  .woot { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px 16px 40px; text-align: center; background: transparent; }
+  .woot[hidden] { display: none; }
+  .woot img { display: block; width: min(70vw, 700px); max-width: min(700px, 100%); height: auto; }
+  .woot p { margin: 12px 0 0; color: #4b5563; font-size: 15px; }
   .online-wrap { position: relative; margin-right: 10px; }
   #btn-online { padding: 5px 10px; font-size: 12px; }
   .online-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
@@ -721,6 +726,7 @@
         <thead><tr><th class="fa-vink"><input type="checkbox" id="fa-vink-alles" title="Alles in deze lijst aanvinken — voorstel én voorleggen. Kies een status in &quot;Alle statussen&quot; om alleen die aan te vinken."></th><th>Status</th><th>Crediteur</th><th>Grootboek</th><th>Omschrijving</th><th>Datum</th><th class="num">Bedrag</th><th id="fa-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde">Zekerheid <span id="fa-sorteer-pijl"></span></th><th title="Wat Shai erbij schreef: wat hij rechtzette t.o.v. Basecone, twijfels of afwijkingen. Ga erop staan om ze te lezen.">Opmerkingen</th></tr></thead>
         <tbody></tbody>
       </table>
+      <div class="woot" id="fa-woot" hidden><img data-src="woot-woot-fuchsia-street-art.png" alt="WOOT WOOT! Alle bankafschriften en Basecone-facturen zijn geboekt."><p>Alles geboekt. Bank én Basecone zijn helemaal bijgewerkt.</p></div>
     </div>
     <div class="fa-scheiding" id="fa-scheiding" title="Sleep om de breedte aan te passen (dubbelklik = terug naar standaard)"></div>
     <div class="kaart" id="kaart-fa-detail">
@@ -874,6 +880,7 @@
         <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alles in deze lijst aanvinken — voorstel én voorleggen. Kies een status in &quot;Alle statussen&quot; om alleen die aan te vinken."></th><th>Status</th><th>Klant</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
       </table>
+      <div class="woot" id="bk-woot" hidden><img data-src="woot-woot-fuchsia-street-art.png" alt="WOOT WOOT! Alle bankafschriften en Basecone-facturen zijn geboekt."><p>Alles geboekt. Bank én Basecone zijn helemaal bijgewerkt.</p></div>
     </div>
   </div>
 </section>
@@ -4182,6 +4189,7 @@ function vernieuwFaTabel() {
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
   const zoekt = document.getElementById("fa-zoek").value.trim();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${document.getElementById("fa-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
+  toonWoot("fa-woot", document.getElementById("fa-office").value, !lijst.length && !zoekt);
   // Per klant (Shereen 13 okt: "tab Fout in Basecone moet per klant"), zoals Twinfield Bank: een kopbalk per
   // administratie, klik = in-/uitklappen. Binnen een klant blijft de volgorde (of de sortering op zekerheid).
   const faOffices = [...new Set(lijst.map(d => d.office))].sort();
@@ -5482,6 +5490,7 @@ function vernieuwBkTabel() {
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">${document.getElementById("bk-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : "Niets in deze lijst."}</td></tr>`;
+  toonWoot("bk-woot", document.getElementById("bk-office").value, !lijst.length);
   const klap = document.getElementById("bk-klap");
   klap.textContent = bkUitklap ? "◂ Bron & uitleg" : "▸ Bron & uitleg";
   klap.classList.toggle("open", bkUitklap);
@@ -7007,6 +7016,52 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   }
 });
 document.getElementById("btn-uitloggen").addEventListener("click", () => sb.auth.signOut());
+
+/* Feestelijke eindstatus (Shereen 13 okt): de WOOT WOOT-afbeelding alleen als voor de gekozen administratie (leeg = alle)
+   BEIDE klaar zijn, gecontroleerd op de statusgegevens in de database (niet op de lijst op het scherm):
+   1. bank: geen regel meer op voorstel/voorleggen/goedgekeurd/toegewezen/fout, geen overgeslagen regel die geen DUBBEL is,
+      en minstens één regel geboekt (verwerkt);
+   2. Basecone: geen document meer op beoordelen/nieuw/gelezen/goedgekeurd/ingevuld/fout/splitsen/wordt verwijderd, en
+      geen overgeslagen document dat nog in Basecone staat (een origineel dat Shai splitste telt niet).
+   Standaard verborgen; de PNG (1,4 MB) wordt pas geladen als beide kloppen en pas getoond als hij binnen is (geen flits).
+   Uitkomst 30 s onthouden per administratie, zodat hij bij elke klik niet even verdwijnt. */
+const WOOT_BANK_OPEN = ["voorstel", "voorleggen", "goedgekeurd", "toegewezen", "fout"];
+const WOOT_BC_OPEN = ["voorstel", "voorleggen", "nieuw", "gelezen", "goedgekeurd", "ingevuld", "fout", "splitsen", "verwijderen"];
+const wootUitkomst = {}, wootNr = {};
+async function wootAllesGeboekt(office) {
+  const o = (q) => office ? q.eq("office", office) : q;
+  const tel = async (q) => { const { count, error } = await q; if (error) throw error; return count || 0; };
+  // Overgeslagen: de opmerkingen ophalen en hier filteren (een "begint niet met"-filter in de query telde 13 okt alles weg).
+  const over = async (q, telt) => { const { data, error } = await q.limit(5000); if (error) throw error; return (data || []).filter(x => telt(String(x.opmerking || ""))).length; };
+  const hoofd = { count: "exact", head: true };
+  const [bankOpen, bankOver, bankGeboekt, bcOpen, bcOver] = await Promise.all([
+    tel(o(sb.from("bank_regels").select("id", hoofd).in("status", WOOT_BANK_OPEN))),
+    over(o(sb.from("bank_regels").select("opmerking").eq("status", "overgeslagen")), (t) => !t.startsWith("DUBBEL:")),
+    tel(o(sb.from("bank_regels").select("id", hoofd).eq("status", "verwerkt"))),
+    tel(o(sb.from("basecone_documenten").select("id", hoofd).in("status", WOOT_BC_OPEN))),
+    over(o(sb.from("basecone_documenten").select("opmerking").eq("status", "overgeslagen")), (t) => !t.startsWith("Door Shai gesplitst")),
+  ]);
+  return bankGeboekt > 0 && !bankOpen && !bankOver && !bcOpen && !bcOver;
+}
+async function toonWoot(id, office, lijstLeeg) {
+  const el = document.getElementById(id); if (!el) return;
+  const nr = wootNr[id] = (wootNr[id] || 0) + 1;
+  const sleutel = office || "*";
+  const bekend = wootUitkomst[sleutel];
+  if (!lijstLeeg || office === GEEN_ADMIN) { el.hidden = true; return; }
+  if (!(bekend && bekend.ok && Date.now() - bekend.t < 30000)) el.hidden = true;   // nog niet zeker: niets tonen
+  let ok = false;
+  if (bekend && Date.now() - bekend.t < 30000) ok = bekend.ok;
+  else { try { ok = await wootAllesGeboekt(office); } catch (e) { ok = false; } wootUitkomst[sleutel] = { ok, t: Date.now() }; }
+  if (nr !== wootNr[id]) return;   // intussen een nieuwere lijst
+  if (!ok) { el.hidden = true; return; }
+  const img = el.querySelector("img");
+  if (!img.getAttribute("src")) {
+    await new Promise((klaar) => { img.onload = klaar; img.onerror = klaar; img.src = img.dataset.src; });
+    if (nr !== wootNr[id] || !img.naturalWidth) return;
+  }
+  el.hidden = false;
+}
 
 /* Wie is er online (Shereen 13 okt: "zodat mensen niet dubbel werken"): Supabase Realtime presence — elke open
    Shai Booking meldt zich in het kanaal "shai-booking-online" met het tabblad waar je op staat. Groen = nu online,

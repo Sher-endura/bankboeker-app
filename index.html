@@ -5398,6 +5398,7 @@ function bkDetailRij(r) {
     <p style="margin:10px 0 4px">
       ${beoordelen ? `<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button>` : ""}
       ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
+      ${r.status === "fout" ? ` <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button>` : ""}
       ${r.goedgekeurd_door ? `<span style="font-size:13px">Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}</span>` : ""}
     </p>
     ${bkVerwijderBlok(r)}
@@ -5645,7 +5646,7 @@ function bkKlantRegel(k, r) {
 }
 /* Goedkeuren. Elke fout komt in beeld (onder de knop én bovenaan); een update die 0 rijen raakt telt
    als mislukt — de database geeft dan geen foutmelding (bv. als de regel intussen veranderd is). */
-async function bkGoedkeuren(regels, goedkeuring, meldingId = "melding-bank") {
+async function bkGoedkeuren(regels, goedkeuring, meldingId = "melding-bank", vanStatus = BK_BEOORDELEN) {
   const door = gebruiker ? gebruiker.email : null, op = new Date().toISOString();
   const mis = [];
   let gelukt = 0;
@@ -5655,7 +5656,7 @@ async function bkGoedkeuren(regels, goedkeuring, meldingId = "melding-bank") {
       const g = goedkeuring(r);
       if (!g) { mis.push(`${r.afschrift}/${r.regel}: geen voorstel om goed te keuren`); continue; }
       const { data, error } = await sb.from("bank_regels").update({ status: "goedgekeurd", goedgekeurd: g, goedgekeurd_door: door, goedgekeurd_op: op, opmerking: null, updated_by: door })
-        .eq("id", r.id).in("status", BK_BEOORDELEN).select("id");
+        .eq("id", r.id).in("status", vanStatus).select("id");
       if (error) { mis.push(`${r.afschrift}/${r.regel}: ${error.message}`); continue; }
       if (!data || !data.length) { mis.push(`${r.afschrift}/${r.regel}: niet opgeslagen (regel is intussen veranderd, of geen schrijfrechten — ververs de pagina)`); continue; }
       await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie: "goedgekeurd", details: g, door });
@@ -5738,7 +5739,7 @@ function bkNaarVraagposten(regels, meldingId = "melding-bank", reden) {
     const vp = vpVan(r.office);
     return { soort: "grootboek", vraagposten: true, regels: [{ rekening: vp, bedrag: Number(r.bedrag) }],
       omschrijving: (bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum, null, bkEigen[r.office])).slice(0, 40), reden };
-  }, meldingId);
+  }, meldingId, [...BK_BEOORDELEN, "fout"]);   // ook vanuit Fout (Shereen 13 okt)
 }
 document.getElementById("btn-bk-vraagposten").addEventListener("click", () => bkNaarVraagposten(bkRegels.filter(r => bkVink.has(r.id))));
 document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);

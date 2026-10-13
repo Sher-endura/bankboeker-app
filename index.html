@@ -1250,6 +1250,8 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   }
   const belasting = belastingOmschrijving(ruw, datum);
   if (belasting) return belasting;
+  const svb = svbOmschrijving(ruw);
+  if (svb) return svb;
   // Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste
   // probleem): referenties, rekening-, kaart- en klantnummers, eigen bedrijfsnaam eruit.
   let d = " " + boven + " ";
@@ -1305,6 +1307,16 @@ function kortOpWoord(t, max) {
   let uit = (spatie > max / 2 ? k.slice(0, spatie) : t.slice(0, max)).replace(/[\s,\-–]+$/, "").trim();
   while (/\s(en|of|de|het|in|op|te|aan|met|bij|nr|no|and|for|to|inv|klnr\.)$/.test(uit)) uit = uit.replace(/\s\S+$/, "");   // geen "… en" achteraan
   return uit;
+}
+/* SVB (Shereen 12 okt): "bij SVB altijd alleen klnr en SVB, zonder de naam" — nummers met streepjes blijven vooraan:
+   "202609-5469217 klant nr. 190315 I.F.O. S.V.B. Ziekte Verzekering Fond" → "202609-5469217 klnr. 190315-SVB". */
+function svbOmschrijving(ruw) {
+  const boven = (ruw || "").toUpperCase();
+  if (!/\bS\.?\s?V\.?\s?B\b|\bSOCIALE\s+VERZEKERINGSBANK\b/.test(boven)) return null;
+  if (/\bSVB\s+PAY\b/.test(boven)) return null;   // SVB betaalt ons (vaak met de naam van een werknemer): gewone opschoning
+  const kl = boven.match(/\bKLANT\s*(?:NR|NO|NUMMER)\b\.?\s*[:#]?\s*(\d+)|\bKL\.?\s?NR\b\.?\s*[:#]?\s*(\d+)/);
+  const nrs = (boven.match(/(?:^|\s)\d+(?:[\/-]\d+)+(?=\s|$)/g) || []).map((x) => x.trim());
+  return kortOpWoord([...nrs, kl ? `klnr. ${kl[1] || kl[2]}-SVB` : "SVB"].join(" "), 40);
 }
 
 /* Belastingen (Shereen 12 okt): "ik kort belastingsoorten af en begin de omschrijving ermee en vervolgens de periode
@@ -1420,7 +1432,7 @@ function pasUitlegToe(regels, ruw, bedrag, datum) {
 function heeftVasteSchrijfregel(ruw, rekeningNaam) {
   const soort = soortVan((ruw || "").toUpperCase()) || (rekeningNaam ? soortVan(rekeningNaam) : null);
   if (naamWoorden(ruw).length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) return true;
-  return !!belastingOmschrijving(ruw, null);
+  return !!belastingOmschrijving(ruw, null) || !!svbOmschrijving(ruw);
 }
 function factuurOmschrijving(facturen, naam) {
   const nrs = [...new Set((facturen || []).filter(Boolean))];

@@ -4013,7 +4013,9 @@ async function laadFacturen() {
   }
   document.getElementById("melding-facturen").innerHTML = "";
   requestAnimationFrame(faHoogte);
-  faDocs = data || [];
+  // Originelen die Shai al bij Aangeleverd heeft gesplitst bestaan niet meer in Basecone (de delen zijn gewone
+  // documenten) — niet tonen in Overgeslagen (Shereen 13 okt: "deze heeft geen laten splitsen button").
+  faDocs = (data || []).filter(d => !(d.status === "overgeslagen" && /^Door Shai gesplitst/.test(d.opmerking || "")));
   // Namen van de grootboekrekeningen (uit de Twinfield-cache van de leesfunctie).
   const faOffices = [...new Set(faDocs.map(d => d.office))];
   if (faOffices.length) {

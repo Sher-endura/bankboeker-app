@@ -4437,7 +4437,7 @@ function faNieuwCrdToon() {
   const d = faGekozen; if (!d) return;
   const nc = d.nieuwe_crediteur;
   const paneel = document.getElementById("fa-nieuw-crd"), stand = document.getElementById("fa-nc-stand");
-  const beoordelen = ["voorstel", "voorleggen", "fout"].includes(d.status);
+  const beoordelen = ["voorstel", "voorleggen", "fout", "overgeslagen"].includes(d.status);
   document.getElementById("btn-fa-crd-nieuw").style.display = beoordelen && !nc ? "" : "none";
   document.getElementById("fa-nc-velden").style.display = "none";
   stand.innerHTML = "";
@@ -4657,10 +4657,13 @@ async function openFactuur(id) {
     <dt>Model</dt><dd>${escapeHtml(a.model || "")}</dd></dl>` : `<p>Nog niet gelezen.</p>`;
 
   // Knoppen per status
-  const beoordelen = ["voorstel", "voorleggen", "fout"].includes(d.status);
+  // Ook vanuit Overgeslagen meteen invullen en goedkeuren (Shereen 13 okt: "hoeft niet per se weer naar beoordelen,
+  // t kan right here") — behalve een origineel dat Shai al splitste (bestaat niet meer in Basecone).
+  const beoordelen = ["voorstel", "voorleggen", "fout"].includes(d.status)
+    || (d.status === "overgeslagen" && !/^Door Shai gesplitst/.test(d.opmerking || ""));
   document.getElementById("btn-fa-goedkeuren").style.display = beoordelen ? "" : "none";
   document.getElementById("btn-fa-opnieuw").style.display = beoordelen ? "" : "none";
-  document.getElementById("btn-fa-overslaan").style.display = beoordelen ? "" : "none";
+  document.getElementById("btn-fa-overslaan").style.display = beoordelen && d.status !== "overgeslagen" ? "" : "none";
   document.getElementById("btn-fa-terug").style.display = ["goedgekeurd", "overgeslagen", "verwijderen"].includes(d.status)
     || (d.status === "splitsen" && (d.basecone || {}).besluit === "afwijzen_voor_splitsen") ? "" : "none";
   // Splitsen van een al getagd document (Shereen 13 okt): alleen bij meer dan één pagina, nog niet geboekt/ingevuld.

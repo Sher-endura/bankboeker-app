@@ -834,6 +834,9 @@
       <select id="bk-richting-filter" style="width:auto" title="Alleen ontvangsten (geld komt binnen) of alleen betalingen (geld gaat eraf) tonen — ook de tellers en de vinkjes volgen dit">
         <option value="">Ontvangsten en betalingen</option><option value="in">Alleen ontvangsten</option><option value="uit">Alleen betalingen</option>
       </select>
+      <select id="bk-zekerheid" style="width:auto" title="Alleen regels met deze zekerheid tonen (hoog = 85 of meer, middel = 60–84, laag = minder dan 60 of geen voorstel) — ook de tellers en de vinkjes volgen dit">
+        <option value="">Alle zekerheden</option><option value="hoog">Zekerheid hoog</option><option value="middel">Zekerheid middel</option><option value="laag">Zekerheid laag</option>
+      </select>
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
     <div class="status-tabjes" id="bk-tabjes"></div>
@@ -5264,7 +5267,7 @@ function bkZichtbaar() {
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
   const sub = document.getElementById("bk-substatus").value;
-  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) &&
+  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
     pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron) &&   // zoeken blijft binnen tabje + status (12 okt)
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
@@ -5276,7 +5279,7 @@ let bkTabje = leesTabje("bankboeker.bank.tabje", BK_TABJES);
 let bkStatusSel = new Set(BK_TABJES.find(t => t[0] === bkTabje)[2]);
 function vernieuwBkFilters() {
   const office = document.getElementById("bk-office").value;
-  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s && bkRecentVerwerkt(r) && bkRichtingPast(r)).length, (t) => {
+  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r)).length, (t) => {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
   });
@@ -5400,7 +5403,7 @@ function vernieuwBkTabel() {
   // Keuzelijst: weer per tabje (Shereen 13 okt: "ik klikte OUTSTANDING_HOME bij te beoordelen omdat dat getal in de zoekbox
   // stond, en alles was al goedgekeurd") — alleen administraties met regels in dit tabje, het getal = regels in dit tabje.
   const bkSub = document.getElementById("bk-substatus").value;
-  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) &&
+  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
     pastSubstatus(bkSub, r.status, r.voorstel && r.voorstel.bron)).map(r => r.office));
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
@@ -6058,6 +6061,12 @@ document.querySelector("#tabel-bank tbody").addEventListener("click", (e) => {
   vernieuwBkTabel();
 });
 document.getElementById("bk-richting-filter").addEventListener("change", () => { bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel(); });
+/* Filter op zekerheid (Shereen 13 okt), zoals bij Basecone: hoog ≥ 85, middel ≥ 60, laag daaronder (ook zonder voorstel). */
+function bkZekerPast(r) {
+  const f = document.getElementById("bk-zekerheid").value;
+  return !f || bkZeker(Number((r.voorstel || {}).zekerheid || 0)) === f;
+}
+document.getElementById("bk-zekerheid").addEventListener("change", () => { bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel(); });
 
 /* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de
    Boekingsregels onder de Knowledgebase. Een groep onthoudt welk sub-tabblad laatst open stond. */

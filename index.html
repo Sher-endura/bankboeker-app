@@ -1293,10 +1293,13 @@ function algemeen(ruw, bedrijf) {
   const boven = (ruw || "").toUpperCase();
   // Hoofdletters per stukje: "VS-MC", "Maestro/POS", "Aug-2026"; afkortingen van 1-2 letters blijven groot.
   const kast = (w) => OMS_KAPITALEN.has(w) || /^[A-Z]{1,2}$/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase();
-  const titelKast = (w) => w.split(/([\/\-])/).map((x) => (x === "/" || x === "-" ? x : kast(x))).join("");
+  // Ook na een punt een hoofdletter ("P.Lasten"), maar niet bij een webadres (".com", ".aw", ".nl" blijven klein).
+  const titelKast = (w) => w.split(/([\/\-.])/).map((x, i, a) => (x === "/" || x === "-" || x === "." ? x
+    : a[i - 1] === "." && x.length <= 3 ? x.toLowerCase() : kast(x))).join("");
   let d = " " + boven + " ";
   // Shereen 12 okt: I.F.O. (in favor of) en B.O.O. (by order of) eruit; factuur/invoice → "inv"; klant nr. → "klnr.".
   // RBC-banktekst, harde regel (Shereen 13 okt): nooit in de omschrijving. "INV465353" → "INV 465353" (nummer blijft).
+  d = afkortingen(d);
   d = d.replace(/\bSUNDRY\s+DEBTOR\b|\bWASH\s+THRU(\s+PCN)?\b|\bPOS\s+SUSPENSE(\s+LC)?\b|\bPOS\s+INTERBANK\s+DEBIT\b|\bORIGINAL\s+\d{1,2}\s+\d{1,2}\s+\d{4}\b|\bVISA\s+DEBIT\b|\bPCN\s*-?\s*PROCESSED\s+TRANSACTION\b|\bPCN\b|\bFT\d{2,}[A-Z0-9]*\b/g, " ")
     .replace(/\bINV(?=\d)/g, "INV ");
   d = d.replace(/\bI\.?\s*F\.?\s*O\b\.?/g, " ").replace(/\bB\.\s*O\.\s*O\b\.?|\bBOO\b/g, " ")
@@ -1421,6 +1424,10 @@ function knipBijEigen(tekst, eigen) {
   }
   return t.replace(/\s{2,}/g, " ").trim();
 }
+/* Vaste afkortingen van Shereen in de omschrijving (13 okt: "Huisartsenpraktijk" → "HP"). Hier aanvullen. */
+function afkortingen(t) {
+  return String(t || "").replace(/\bhuisartsen\s*-?\s*praktijk\b/gi, "HP");
+}
 /* Afkappen op 40 tekens, maar op een heel woord (geen "Boogaa"). */
 function kortOpWoord(t, max) {
   if (t.length <= max) return t;
@@ -1522,7 +1529,7 @@ function omschrijvingUitHistorie(hist, ruw, datum) {
   uit = uit.replace(/\bweek\s*\d{1,2}\b/gi, () => { periodeGevonden = true; return weekVoorDatum(datum) || "week"; });
   const zonderPeriode = uit.replace(/\b(0?[1-9]|1[0-2])[\/-]20\d{2}\b|\b20\d{2}[\/-](0?[1-9]|1[0-2])\b/g, "").replace(/\b20\d{2}\b/g, "").replace(/\bweek\s*\d{1,2}\b/gi, "");
   if (/\d/.test(zonderPeriode)) return null;   // nog andere cijfers (bv. een oud factuurnummer): niet kopiëren
-  return uit.slice(0, 40).trim() || null;
+  return afkortingen(uit).slice(0, 40).trim() || null;
 }
 /* Regels uit de uitleg (database-update 11; Shereen 12 okt: "laat het vak werken met AI"). Haiku maakt van een uitleg
    een regel {office ('*' = alle klanten), zoek: {een_van, alle, richting}, zet: {rekening, omschrijving}}; deze code

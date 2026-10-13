@@ -1141,7 +1141,10 @@ const SOORTEN = [
    aanspreektitels en betaalwijze-afkortingen. */
 const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND", "VAN", "DEN", "DER", "WEEK",
   // Betaalwijze-woorden van de bank zijn geen naam: anders werd "POS BIX BRANDSIMPORT" herkend als "POS PONSON S" (11 okt).
-  "POS", "MAESTRO", "ACH", "TRANSFER", "PAYMENT", "PURCHASE", "MCDT", "EDC"]);
+  "POS", "MAESTRO", "ACH", "TRANSFER", "PAYMENT", "PURCHASE", "MCDT", "EDC",
+  // "InternetBanking Tfr Debit CMS REF-DC…" is alleen de manier van betalen (Shereen 12 okt): KUSTER-verzekeringen
+  // werden herkend op "INTERNETBANKING TFR DEBIT" → 4831 Telefoon/Fax/Internet.
+  "INTERNETBANKING", "TFR", "DEBIT", "CREDIT", "CMS", "REF", "DC", "MOBILEWEB", "MOBILEIOS", "NETTO"]);
 function soortVan(omschrijving) {
   const b = (omschrijving || "").toUpperCase();
   return SOORTEN.find(s => s.her.test(b)) || null;
@@ -1231,12 +1234,14 @@ const OMS_KAPITALEN = new Set(["ACH", "MBA", "POS", "ATM", "FX", "AMEX", "BAZV",
    batchbetaling die alleen "I.F.O. CESAR" heet, wordt op rekening "Te betalen
    Tips" leesbaar als "Tips Cesar". */
 function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
+  const origineel = ruw;
+  ruw = zonderBankstaart(ruw);
+  // Bankkosten van een overboeking (1,75) dragen de tekst van die overboeking: nooit als salaris/belasting omschrijven.
+  const fees = String(ruw || "").match(/^\s*FEES\s+DEBITED\b\s*/i);
+  if (fees) return kortOpWoord(("Fees Debited " + algemeen(ruw.slice(fees[0].length), bedrijf)).trim(), 40);
   const boven = (ruw || "").toUpperCase();
   const soort = soortVan(boven) || (rekeningNaam ? soortVan(rekeningNaam) : null);
   const week = boven.match(/\bWEEK\s*(\d{1,2})\b/);
-  // Hoofdletters per stukje: "VS-MC", "Maestro/POS", "Aug-2026"; afkortingen van 1-2 letters blijven groot.
-  const kast = (w) => OMS_KAPITALEN.has(w) || /^[A-Z]{1,2}$/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase();
-  const titelKast = (w) => w.split(/([\/\-])/).map((x) => (x === "/" || x === "-" ? x : kast(x))).join("");
   // Salaris en tips (Shereen 10 okt): "<Naam> - <Maand> salaris" en "<Naam> - week <nr> tip";
   // een tip gaat over de week vóór de betaling.
   const naam = [...new Set(naamWoorden(ruw))];
@@ -1250,10 +1255,17 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   }
   const belasting = belastingOmschrijving(ruw, datum);
   if (belasting) return belasting;
-  const svb = svbOmschrijving(ruw);
+  const svb = svbOmschrijving(origineel);
   if (svb) return svb;
-  // Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste
-  // probleem): referenties, rekening-, kaart- en klantnummers, eigen bedrijfsnaam eruit.
+  return algemeen(ruw, bedrijf);
+}
+/* Alle andere regels (Shereen 10 okt: "onnodige bankinfo in de omschrijving" is het grootste
+   probleem): referenties, rekening-, kaart- en klantnummers, eigen bedrijfsnaam eruit. */
+function algemeen(ruw, bedrijf) {
+  const boven = (ruw || "").toUpperCase();
+  // Hoofdletters per stukje: "VS-MC", "Maestro/POS", "Aug-2026"; afkortingen van 1-2 letters blijven groot.
+  const kast = (w) => OMS_KAPITALEN.has(w) || /^[A-Z]{1,2}$/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase();
+  const titelKast = (w) => w.split(/([\/\-])/).map((x) => (x === "/" || x === "-" ? x : kast(x))).join("");
   let d = " " + boven + " ";
   // Shereen 12 okt: I.F.O. (in favor of) en B.O.O. (by order of) eruit; factuur/invoice → "inv"; klant nr. → "klnr.".
   d = d.replace(/\bI\.?\s*F\.?\s*O\b\.?/g, " ").replace(/\bB\.\s*O\.\s*O\b\.?|\bBOO\b/g, " ")
@@ -1298,6 +1310,17 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   const uit = woorden.map((w, i) => w === "INV" ? "inv" : w === "KLNR" ? "klnr." : afk.has(w) ? w
     : KLEIN.has(w) ? (i > 0 ? w.toLowerCase() : w.charAt(0) + w.slice(1).toLowerCase()) : titelKast(w)).join(" ").replace(/\s{2,}/g, " ").trim();
   return kortOpWoord(uit || (ruw || "").trim(), 40);
+}
+/* CMB-bankteksten (KUSTER, 12 okt): "InternetBanking Tfr Debit CMS REF-DC67251890 <eigen tekst> Kuster LawMO BILEWEB
+   <ontvanger> FT26266K8320". Kop, referentie en alles vanaf MOBILEWEB/MOBILEIOS (de bank breekt het woord soms af)
+   is bankinfo. "InternetBanking Tfr" = alleen de manier van betalen (Shereen 12 okt). "Fees Debited" blijft staan:
+   dat is de bankkosten-regel (1,75) bij een overboeking. */
+function zonderBankstaart(ruw) {
+  const t = String(ruw || "");
+  if (!/\bCMS\s+REF\b/i.test(t)) return t;
+  return t.replace(/M\s?O\s?B\s?I\s?L\s?E\s?(?:W\s?E\s?B|I\s?O\s?S)[\s\S]*$/i, " ")
+    .replace(/^\s*(?:INTERNET\s?BANKING\s+TFR\s+DEBIT|INTERNET\s+TRANSFER\s+CREDIT|OUTWARD\s+LOC\s+CLEARING\s+PAYMENT)\b/i, " ")
+    .replace(/\bCMS\s+REF-?[A-Z]{0,3}\d*/gi, " ").replace(/\s{2,}/g, " ").trim();
 }
 /* Afkappen op 40 tekens, maar op een heel woord (geen "Boogaa"). */
 function kortOpWoord(t, max) {
@@ -1439,6 +1462,7 @@ function pasUitlegToe(regels, ruw, bedrag, datum) {
 /* Heeft deze regel een vaste schrijfregel van Shereen (salaris, tip, belasting)? Die gaan vóór de historie
    (Shereen 12 okt: "draai de volgorde om" — vaste regels eerst, dan de historie, dan de opgeschoonde banktekst). */
 function heeftVasteSchrijfregel(ruw, rekeningNaam) {
+  if (/^\s*FEES\s+DEBITED\b/i.test(ruw || "")) return false;   // bankkosten, geen salaris
   const soort = soortVan((ruw || "").toUpperCase()) || (rekeningNaam ? soortVan(rekeningNaam) : null);
   if (naamWoorden(ruw).length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) return true;
   return !!belastingOmschrijving(ruw, null) || !!svbOmschrijving(ruw);

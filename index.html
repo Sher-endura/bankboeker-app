@@ -6841,7 +6841,7 @@ function vwBody(modus) {
 }
 async function vwVoorbeeld() {
   const vak = document.getElementById("vw-voorbeeld"); if (!vak) return;
-  try { const r = await vwMailFunctie(vwBody("voorbeeld")); vak.innerHTML = `<div style="font-weight:600; margin-bottom:6px">Onderwerp: ${escapeHtml(r.onderwerp)}</div>${r.html}`; }
+  try { const r = await vwMailFunctie(vwBody("voorbeeld")); vak.innerHTML = (r.waarschuwing ? `<div style="color:var(--rood); font-weight:600; margin-bottom:6px">⚠ ${escapeHtml(r.waarschuwing)}</div>` : "") + `<div style="font-weight:600; margin-bottom:6px">Onderwerp: ${escapeHtml(r.onderwerp)}</div>${r.html}`; }
   catch (e) { vak.textContent = "Voorbeeld lukte niet: " + e.message; }
 }
 async function vwVersturen(modus) {

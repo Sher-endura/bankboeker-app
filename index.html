@@ -154,7 +154,10 @@
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
   /* Onder het bedrag: ontvangst of betaling vanuit de bankrekening (Shereen 12 okt) — klein, maar niet grijs. */
-  #tabel-bank .bk-richting { font-size: 12px; font-weight: 400; color: var(--tekst); margin-top: 2px; }
+  #tabel-bank .bk-richting { font-size: 12px; font-weight: 400; margin-top: 2px; }
+  /* Ontvangst groen, betaling rood (Shereen 12 okt) — bedrag én het woordje eronder. */
+  #tabel-bank td.bk-ontvangst { color: var(--groen); }
+  #tabel-bank td.bk-betaling { color: var(--rood); }
   #tabel-bank tr.bk-rij.gekozen td.bk-oms, #tabel-bank tr.bk-rij.gekozen td.bk-refined { cursor: text; }
   #tabel-bank .bk-vink-afs { margin: 0 8px 0 2px; vertical-align: middle; }
   .bk-verwijder-blok { margin: 8px 0; padding: 8px 12px; border: 1px solid #f3c4c0; background: #fdf1f0; border-radius: 8px; font-size: 13px; color: var(--tekst); }
@@ -5304,7 +5307,7 @@ function vernieuwBkTabel() {
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(r.datum))}</td>
       <td class="bk-oms">${escapeHtml(r.omschrijving || "")}</td>
       <td class="bk-refined">${escapeHtml(bkOmsTekst(r))}</td>
-      <td class="num" style="white-space:nowrap">${faBedrag(r.bedrag)}<div class="bk-richting">${Number(r.bedrag) < 0 ? "betaling" : "ontvangst"}</div></td>
+      <td class="num ${Number(r.bedrag) < 0 ? "bk-betaling" : "bk-ontvangst"}" style="white-space:nowrap">${faBedrag(r.bedrag)}<div class="bk-richting">${Number(r.bedrag) < 0 ? "betaling" : "ontvangst"}</div></td>
       <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
       ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`

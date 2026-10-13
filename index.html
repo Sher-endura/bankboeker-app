@@ -1463,7 +1463,7 @@ function belastingOmschrijving(ruw, datum) {
    omschrijvingen gebruikt heb"). De omschrijving van de eerdere boeking van dezelfde naam, met de periode bijgewerkt
    ("LB - Aug 2026" → "LB - Sep 2026"). Veilig: niet als het nog de ruwe banktekst is (alleen hoofdletters, lange
    nummers) en niet als er na de periode nog cijfers in staan (bv. een oud factuurnummer). Anders null. */
-const HIST_BANKRUIS = /\b(MAESTRO|POS|TFR|TRANSFER|PAYMENT|ACH|MC ?DEBIT|MCDEBIT|VS-?MC|SALE|INTERNET ?BANKING|DEBIT|CREDIT|REF|I\.?F\.?O|AUTHORI[SZ]ATION|AUTHORIZAT|CMS|MOBILEWEB|MOBILEIOS|INSTANT|ONLINE BANKING|REVERSAL|CHEQUE)\b/i;   // bankwoorden: nooit uit de historie overnemen
+const HIST_BANKRUIS = /\b(MAESTRO|POS|TFR|TRANSFER|PAYMENT|ACH|MC ?DEBIT|MCDEBIT|VS-?MC|SALE|INTERNET ?BANKING|DEBIT|CREDIT|REF|I\.?F\.?O|B\.?\s?O\.?\s?O|AUTHORI[SZ]ATION|AUTHORIZAT|CMS|MOBILEWEB|MOBILEIOS|INSTANT|ONLINE BANKING|REVERSAL|CHEQUE)\b/i;   // bankwoorden: nooit uit de historie overnemen (B.O.O. = by order of, Shereen 12 okt)
 function omschrijvingUitHistorie(hist, ruw, datum) {
   const h = String(hist || "").trim();
   if (!h || h.length > 40 || !/[a-z]/.test(h) || /\d{6,}/.test(h)) return null;
@@ -5241,10 +5241,13 @@ addEventListener("resize", bkHoogte);
 /* Wat goedgekeurd zou worden als je het voorstel ongewijzigd overneemt (ook bij de vinkjes). */
 function bkStandaardGoedkeuring(r) {
   const v = r.voorstel || {};
-  if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield", omschrijving: v.omschrijving || "" };
-  if (v.soort === "klant" && v.regels && v.regels.length === 1 && v.regels[0].boekstuk) return { soort: "klant", regels: [v.regels[0]], omschrijving: v.omschrijving || "" };
+  // De omschrijving die in REFINED staat (Shereen 12 okt) — niet Shai's opgeslagen versie van de vorige ronde,
+  // die nog met oudere regels gemaakt kan zijn ("… B.O.O. Sera Fina Tradin").
+  const oms = (bkOmsTekst(r) || v.omschrijving || "").slice(0, 40);
+  if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield", omschrijving: oms };
+  if (v.soort === "klant" && v.regels && v.regels.length === 1 && v.regels[0].boekstuk) return { soort: "klant", regels: [v.regels[0]], omschrijving: oms };
   if (v.soort === "grootboek" && v.regels && v.regels.length === 1 && v.regels[0].rekening)
-    return { soort: "grootboek", regels: [{ rekening: v.regels[0].rekening, bedrag: Number(r.bedrag) }], omschrijving: v.omschrijving || "" };
+    return { soort: "grootboek", regels: [{ rekening: v.regels[0].rekening, bedrag: Number(r.bedrag) }], omschrijving: oms };
   return null;
 }
 function vernieuwBkTabel() {

@@ -5129,9 +5129,9 @@ function bkHerkomst(r) {
     uitleg = `Eerder zo geboekt: "${h.omschrijving}"`;
   } else if (v.bron === "regel") {
     tekst = "📏 vaste regel";
-  } else if (v.bron === "debiteur") {
-    const f = (v.regels || [])[0];
-    tekst = f ? `🧾 openstaande factuur ${f.factuur} · ${f.relatienaam || f.relatie}` : `🧾 openstaande facturen (${(v.kandidaten || []).length} met dit bedrag)`;
+  } else if (v.bron === "debiteur" || v.bron === "crediteur") {
+    const f = (v.regels || [])[0], soortF = v.bron === "crediteur" ? "inkoopfactuur" : "factuur";
+    tekst = f ? `🧾 openstaande ${soortF} ${f.factuur} · ${f.relatienaam || f.relatie}` : `🧾 openstaande ${soortF === "factuur" ? "facturen" : "inkoopfacturen"} (${(v.kandidaten || []).length} met dit bedrag)`;
   } else if (v.bron === "internet") {
     tekst = "🌐 internet";
     uitleg = v.internet || "";
@@ -5394,7 +5394,7 @@ function bkStandaardGoedkeuring(r) {
   // die nog met oudere regels gemaakt kan zijn ("… B.O.O. Sera Fina Tradin").
   const oms = (bkOmsTekst(r) || v.omschrijving || "").slice(0, 40);
   if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield", omschrijving: oms };
-  if (v.soort === "klant" && v.regels && v.regels.length === 1 && v.regels[0].boekstuk) return { soort: "klant", regels: [v.regels[0]], omschrijving: oms };
+  if (v.soort === "klant" && v.regels && v.regels.length === 1 && v.regels[0].boekstuk) return { soort: "klant", ...(v.kant === "crediteur" ? { kant: v.kant } : {}), regels: [v.regels[0]], omschrijving: oms };
   if (v.soort === "grootboek" && v.regels && v.regels.length === 1 && v.regels[0].rekening)
     return { soort: "grootboek", regels: [{ rekening: v.regels[0].rekening, bedrag: Number(r.bedrag) }], omschrijving: oms };
   return null;
@@ -5526,7 +5526,10 @@ function bkDetailRij(r) {
   const beoordelen = BK_BEOORDELEN.includes(r.status);
   // Afletteren op klant (Shereen 12 okt): elke ontvangst kan op een klant, met één of meer openstaande facturen;
   // is de betaling hoger dan de facturen samen, dan blijft het verschil als vooruitbetaling op de klant staan.
-  const toonKlant = Number(r.bedrag) > 0 || kandidaten.length > 0 || g.soort === "klant";
+  // Crediteuren (Shereen 13 okt, "dezelfde werkwijze"): elke betaling op een leverancier met openstaande inkoopfacturen.
+  // Bedragen in het afletter-vak zijn zonder teken; in de goedkeuring krijgen de facturen het teken van de bankregel.
+  const kant = bkKant(r, g), K = BK_KANT[kant], absBedrag = Math.abs(Number(r.bedrag));
+  const toonKlant = Number(r.bedrag) !== 0 || kandidaten.length > 0 || g.soort === "klant";
   const startRelatie = (g.soort === "klant" && (g.relatie || (g.regels[0] || {}).relatie))
     || ((v.soort === "klant" || v.soort === "relatie") && v.regels && v.regels[0] && v.regels[0].relatie)
     || (twVoorstel && ((v.regels || []).find(x => x.relatie && x.factuur) || {}).relatie) || (kandidaten[0] || {}).relatie || "";
@@ -5541,15 +5544,15 @@ function bkDetailRij(r) {
     ${/^Niet gelukt in Twinfield/.test(r.opmerking || "") && BK_BEOORDELEN.includes(r.status) ? `<p style="margin:4px 0 8px; color:var(--rood); font-weight:600">⚠ ${escapeHtml(r.opmerking)}</p>` : ""}
     ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
     ${twVoorstel ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="twinfield"${keuzeTw ? " checked" : ""}${beoordelen ? "" : " disabled"}> Twinfields voorstel accepteren: ${(v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + ")}</label>` : ""}
-    ${toonKlant ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="klant"${keuzeKlant ? " checked" : ""}${beoordelen ? "" : " disabled"}> Op klant boeken — met een of meer openstaande facturen, of zonder factuur (rest = vooruitbetaling op de klant):</label>
+    ${toonKlant ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="klant"${keuzeKlant ? " checked" : ""}${beoordelen ? "" : " disabled"}> Op ${K.relatie} boeken — met een of meer ${K.facturen}, of zonder factuur (rest = vooruitbetaling op de ${K.relatie}):</label>
       <div class="bk-aflet" style="margin:0 0 8px 24px">
-        <div class="fa-crd-vak" style="max-width:460px"><input type="text" id="bk-relatie" value="${escapeHtml(startRelatie)}" placeholder="klant: nummer of naam" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-relatie-naam" class="fa-crd-naam"></span></div>
+        <div class="fa-crd-vak" style="max-width:460px"><input type="text" id="bk-relatie" value="${escapeHtml(startRelatie)}" placeholder="${K.relatie}: nummer of naam" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-relatie-naam" class="fa-crd-naam"></span></div>
         <div id="bk-niet-open" style="margin:6px 0 2px; color:var(--rood); font-weight:600"></div>
-        <label style="display:block; margin:6px 0 2px; font-size:13px"><input type="checkbox" id="bk-zonder-factuur"${g.soort === "klant" && !(g.regels || []).length ? " checked" : ""}${beoordelen ? "" : " disabled"}> <b>Zonder factuur op de klant boeken</b> — het hele bedrag komt open op de debiteur; afletteren kan later in Twinfield</label>
+        <label style="display:block; margin:6px 0 2px; font-size:13px"><input type="checkbox" id="bk-zonder-factuur"${g.soort === "klant" && !(g.regels || []).length ? " checked" : ""}${beoordelen ? "" : " disabled"}> <b>Zonder factuur op de ${K.relatie} boeken</b> — het hele bedrag komt open op de ${kant}; afletteren kan later in Twinfield</label>
         <div id="bk-facturen" class="fa-uitleg" style="margin:6px 0"></div>
         <div id="bk-aflet-som" style="font-size:13px"></div>
         <div id="bk-verschil" style="display:none; margin-top:6px; font-size:13px">
-          ${[["vooruitbetaling", "vooruitbetaling op de klant"], ["deelbetaling", "deelbetaling — restant blijft open op de factuur"],["afboeking", "op-/afboeking"], ["bankkosten", "bankkosten"], ["koersverschil", "koersverschil"]].map(([w, t]) =>
+          ${[["vooruitbetaling", `vooruitbetaling op de ${K.relatie}`], ["deelbetaling", "deelbetaling — restant blijft open op de factuur"],["afboeking", "op-/afboeking"], ["bankkosten", "bankkosten"], ["koersverschil", "koersverschil"]].map(([w, t]) =>
             `<label style="display:inline-block; margin:2px 14px 2px 0; white-space:nowrap" data-verschil="${w}"><input type="radio" name="bk-verschil" value="${w}"${(g.verschil || {}).soort === w || (w === "vooruitbetaling" && Number(g.vooruitbetaling) > 0.004) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${t}</label>`).join("")}
           <div class="fa-crd-vak" id="bk-verschil-rekvak" style="max-width:460px; margin-top:4px; display:none"><input type="text" id="bk-verschil-rek" value="${escapeHtml((g.verschil || {}).rekening || "")}" placeholder="grootboekrekening voor het verschil" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-verschil-rek-naam" class="fa-crd-naam"></span></div>
         </div>
@@ -5585,7 +5588,7 @@ function bkDetailRij(r) {
   // Deelbetaling: oudste factuur eerst helemaal betalen; het restant blijft open op de laatste (Shereen 13 okt: "van de
   // 1000 600 afletteren op de 1e inv en die 400 aanbetalen op de 2e").
   const deelVerdeling = (facturen) => {
-    let over = Number(r.bedrag);
+    let over = absBedrag;   // zonder teken: ook voor betalingen aan een leverancier
     return [...facturen].sort((a, b) => String(a.datum).localeCompare(String(b.datum)))
       .map(o => { const b = Math.round(Math.max(0, Math.min(o.open, over)) * 100) / 100; over = Math.round((over - b) * 100) / 100; return { o, b }; });
   };
@@ -5601,13 +5604,13 @@ function bkDetailRij(r) {
       else if (k && relVeld.value.trim() !== startRelatie) oms.value = netteOmschrijving(r.omschrijving, null, r.datum, null, bkEigen[r.office]).slice(0, 40);
     }
     const el = tr.querySelector("#bk-aflet-som"); if (!el) return;
-    const som = Math.round(gekozenFacturen().reduce((t, o) => t + o.open, 0) * 100) / 100, rest = Math.round((Number(r.bedrag) - som) * 100) / 100;
+    const som = Math.round(gekozenFacturen().reduce((t, o) => t + o.open, 0) * 100) / 100, rest = Math.round((absBedrag - som) * 100) / 100;
     const zf = tr.querySelector("#bk-zonder-factuur");
     if (zf && som > 0.004) zf.checked = false;   // een factuur aangevinkt = niet meer zonder factuur
     // Over- of onderbetaling (Shereen 12 okt): zoals in Twinfield kiezen waar het verschil heen gaat.
-    el.innerHTML = som < 0.005 ? (zf && zf.checked ? `<b>Zonder factuur</b> — het hele bedrag ${faBedrag(r.bedrag)} komt open op de debiteur; afletteren later in Twinfield`
-        : `<b>geen factuur aangevinkt</b> — vink een factuur aan, of kies "Zonder factuur op de klant boeken"`)
-      : `Aangevinkt <b>${faBedrag(som)}</b> · ontvangen <b>${faBedrag(r.bedrag)}</b> · ` + (rest < -0.004
+    el.innerHTML = som < 0.005 ? (zf && zf.checked ? `<b>Zonder factuur</b> — het hele bedrag ${faBedrag(absBedrag)} komt open op de ${kant}; afletteren later in Twinfield`
+        : `<b>geen factuur aangevinkt</b> — vink een factuur aan, of kies "Zonder factuur op de ${K.relatie} boeken"`)
+      : `Aangevinkt <b>${faBedrag(som)}</b> · ${K.ontvangen} <b>${faBedrag(absBedrag)}</b> · ` + (rest < -0.004
       ? `<b>onderbetaling ${faBedrag(-rest)}</b> — waar gaat het verschil heen?`
       : rest > 0.004 ? `<b>overbetaling ${faBedrag(rest)}</b> — waar gaat het verschil heen?` : "past precies");
     const vak = tr.querySelector("#bk-verschil");
@@ -5651,21 +5654,21 @@ function bkDetailRij(r) {
     const vak = tr.querySelector("#bk-facturen"); if (!vak) return;
     const rel = relVeld.value.trim();
     const k = aflet.klanten.find(x => x.code === rel);
-    const naamEl = tr.querySelector("#bk-relatie-naam"); naamEl.textContent = rel && k ? k.naam : rel && !/[a-z]/i.test(rel) && aflet.klanten.length ? "onbekende klant" : "";
-    if (aflet.fout) { vak.innerHTML = `<span style="color:var(--rood)">Openstaande facturen ophalen lukte niet: ${escapeHtml(aflet.fout)}</span>`; return; }
+    const naamEl = tr.querySelector("#bk-relatie-naam"); naamEl.textContent = rel && k ? k.naam : rel && !/[a-z]/i.test(rel) && aflet.klanten.length ? `onbekende ${K.relatie}` : "";
+    if (aflet.fout) { vak.innerHTML = `<span style="color:var(--rood)">${K.facturen[0].toUpperCase() + K.facturen.slice(1)} ophalen lukte niet: ${escapeHtml(aflet.fout)}</span>`; return; }
     // Factuurnummer uit de banktekst dat niet openstaat (Shereen 13 okt): melden, en nooit zelf een andere factuur kiezen.
     const nietOpen = aflet.fout ? [] : [...bkFactuurNrs(r.omschrijving)].filter(n => !aflet.open.some(o => o.factuur === n || bkFactuurNrs(o.factuur).has(n)));
     const no = tr.querySelector("#bk-niet-open");
-    if (no) no.textContent = nietOpen.length ? `⚠ Factuur ${nietOpen.join(", ")} uit de banktekst staat niet open. Kies "Zonder factuur op de klant boeken" (het bedrag komt open op de debiteur), of kies een andere openstaande factuur.` : "";
-    if (!rel) { vak.textContent = "Kies eerst de klant."; somTekst(); return; }
+    if (no) no.textContent = nietOpen.length ? `⚠ Factuur ${nietOpen.join(", ")} uit de banktekst staat niet open. Kies "Zonder factuur op de ${K.relatie} boeken" (het bedrag komt open op de ${kant}), of kies een andere openstaande factuur.` : "";
+    if (!rel) { vak.textContent = `Kies eerst de ${K.relatie}.`; somTekst(); return; }
     // Halverwege typen ("D1012", "island"): nog geen klant — niet doen alsof die geen open facturen heeft.
-    if (!k && aflet.klanten.length) { vak.textContent = "Kies de klant uit de lijst (zoek op naam of nummer)."; somTekst(); return; }
+    if (!k && aflet.klanten.length) { vak.textContent = `Kies de ${K.relatie} uit de lijst (zoek op naam of nummer).`; somTekst(); return; }
     const lijst = aflet.open.filter(o => o.relatie === rel).sort((a, b) => a.datum.localeCompare(b.datum));
     // Veel open facturen (Shereen 12 okt, Miniño): in 5 kolommen over het scherm + zoeken op nummer, datum of bedrag.
     // Zoeken verbergt alleen; wat aangevinkt is telt mee, ook als het buiten de zoekopdracht valt.
     vak.innerHTML = lijst.length ? (lijst.length > 5 ? `<input type="search" class="bk-fzoek" placeholder="🔍 Zoek factuur: nummer, datum of bedrag (${lijst.length} open)" autocomplete="off">` : "") +
       `<div class="bk-fgrid">` + lijst.map(o => `<label data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${startFacturen.has(o.code + "|" + o.nummer) || startTwFacturen.has(o.relatie + "|" + o.factuur) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("") + `</div>`
-      : "Deze klant heeft geen openstaande facturen — het hele bedrag komt open op de debiteur, zonder factuur.";
+      : `Deze ${K.relatie} heeft geen ${K.facturen} — het hele bedrag komt open op de ${kant}, zonder factuur.`;
     const zf = tr.querySelector("#bk-zonder-factuur");
     if (zf && !lijst.length) zf.checked = true;
     const fzoek = vak.querySelector(".bk-fzoek");
@@ -5705,8 +5708,8 @@ function bkDetailRij(r) {
     }, e => { if (st.isConnected) st.textContent = "Twinfield-historie ophalen lukte niet: " + (e.message || e); });
   }
   if (relVeld) {
-    tr.querySelector("#bk-facturen").textContent = "Openstaande facturen ophalen uit Twinfield…";
-    bkAfletGegevens(r.office).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });
+    tr.querySelector("#bk-facturen").textContent = `${K.facturen[0].toUpperCase() + K.facturen.slice(1)} ophalen uit Twinfield…`;
+    bkAfletGegevens(r.office, kant).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });
     relVeld.addEventListener("input", () => {
       const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true;
       const zf = tr.querySelector("#bk-zonder-factuur"); if (zf) zf.checked = false;   // nieuwe klant: opnieuw kiezen
@@ -5744,19 +5747,19 @@ function bkDetailRij(r) {
     if (keuze === "klant") {
       const rel = relVeld.value.trim();
       const k = aflet.klanten.find(x => x.code === rel);
-      if (!k) return toonMelding("melding-bk-detail", "fout", "Kies eerst een bestaande klant (nummer of naam).");
+      if (!k) return toonMelding("melding-bk-detail", "fout", `Kies eerst een bestaande ${K.relatie} (nummer of naam).`);
       const facturen = gekozenFacturen();
       if (!facturen.length) {
         // Zonder factuur: het hele bedrag op de debiteurenrekening van deze klant, afletteren later in Twinfield.
-        if (!tr.querySelector("#bk-zonder-factuur").checked) return toonMelding("melding-bk-detail", "fout", 'Vink een factuur aan, of kies "Zonder factuur op de klant boeken".');
+        if (!tr.querySelector("#bk-zonder-factuur").checked) return toonMelding("melding-bk-detail", "fout", `Vink een factuur aan, of kies "Zonder factuur op de ${K.relatie} boeken".`);
         const debRek = (aflet.open.find(o => o.relatie === k.code) || aflet.open[0] || {}).rekening
-          || rekeningen.find(c => /debiteur/i.test(bkRekNamen[`${r.office}|${c}`] || ""));
-        if (!debRek) return toonMelding("melding-bk-detail", "fout", "Geen debiteurenrekening gevonden in het rekeningschema van " + escapeHtml(r.office) + ".");
-        return ({ soort: "klant", zonder_factuur: true, relatie: k.code, relatienaam: k.naam, rekening: debRek, regels: [],
-          vooruitbetaling: Number(r.bedrag), omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
+          || rekeningen.find(c => new RegExp(kant, "i").test(bkRekNamen[`${r.office}|${c}`] || ""));
+        if (!debRek) return toonMelding("melding-bk-detail", "fout", `Geen ${kant}enrekening gevonden in het rekeningschema van ` + escapeHtml(r.office) + ".");
+        return ({ soort: "klant", ...(kant === "crediteur" ? { kant } : {}), zonder_factuur: true, relatie: k.code, relatienaam: k.naam, rekening: debRek, regels: [],
+          vooruitbetaling: absBedrag, omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
       }
       const som = Math.round(facturen.reduce((t, o) => t + o.open, 0) * 100) / 100;
-      const rest = Math.round((Number(r.bedrag) - som) * 100) / 100;
+      const rest = Math.round((absBedrag - som) * 100) / 100;   // zonder teken: > 0 = meer betaald/ontvangen dan de facturen
       // Over-/onderbetaling: vooruitbetaling op de klant, of het verschil op een grootboekrekening (Shereen 12 okt).
       let verschil = null, vooruit = 0;
       if (Math.abs(rest) > 0.004) {
@@ -5767,17 +5770,17 @@ function bkDetailRij(r) {
           // Oudste factuur eerst helemaal betalen; het restant blijft open op de laatste (Shereen 13 okt).
           const betaald = deelVerdeling(facturen);
           verschil = { soort: "deelbetaling", bedrag: rest };
-          return ({ soort: "klant", relatie: k.code, relatienaam: k.naam,
-            regels: betaald.filter(x => x.b > 0.004).map(({ o, b }) => ({ ...bkKlantRegel(o, r), bedrag: b, open: o.open })), vooruitbetaling: 0, verschil,
+          return ({ soort: "klant", ...(kant === "crediteur" ? { kant } : {}), relatie: k.code, relatienaam: k.naam,
+            regels: betaald.filter(x => x.b > 0.004).map(({ o, b }) => ({ ...bkKlantRegel(o, r), bedrag: Math.sign(Number(r.bedrag)) * b, open: o.open })), vooruitbetaling: 0, verschil,
             omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
         } else {
           const vr = tr.querySelector("#bk-verschil-rek").value.trim();
           if (!bkRekNamen[`${r.office}|${vr}`]) return toonMelding("melding-bk-detail", "fout", "Kies de grootboekrekening voor het verschil uit het rekeningschema van " + escapeHtml(r.office) + ".");
-          verschil = { soort, bedrag: rest, rekening: vr, naam: bkRekNamen[`${r.office}|${vr}`] };
+          verschil = { soort, bedrag: Math.sign(Number(r.bedrag)) * rest, rekening: vr, naam: bkRekNamen[`${r.office}|${vr}`] };   // betaling − facturen, met teken
         }
       }
-      return ({ soort: "klant", relatie: k.code, relatienaam: k.naam,
-        regels: facturen.map(o => ({ ...bkKlantRegel(o, r), bedrag: o.open })), vooruitbetaling: vooruit, ...(verschil ? { verschil } : {}),
+      return ({ soort: "klant", ...(kant === "crediteur" ? { kant } : {}), relatie: k.code, relatienaam: k.naam,
+        regels: facturen.map(o => ({ ...bkKlantRegel(o, r), bedrag: Math.sign(Number(r.bedrag)) * o.open })), vooruitbetaling: vooruit, ...(verschil ? { verschil } : {}),
         omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
     }
     const rek = tr.querySelector("#bk-rekening").value.trim();
@@ -5843,34 +5846,42 @@ function bkDetailRij(r) {
   return tr;
 }
 /* Klanten en openstaande verkoopfacturen van een administratie, live via DirectLink (zelfde browse 130_3 als
-   bank-herkenning.mjs openDebiteuren). Eén keer per administratie per bezoek aan het tabblad. */
+   bank-herkenning.mjs openPosten). Crediteuren (Shereen 13 okt: "dezelfde werkwijze als debiteuren"): leveranciers
+   en openstaande inkoopfacturen uit browse 230_2 — daar is het open bedrag negatief. "open" is altijd zonder teken.
+   Eén keer per administratie en kant per bezoek aan het tabblad. */
 const bkAfletCache = {};
-function bkAfletGegevens(office) {
-  if (bkAfletCache[office]) return bkAfletCache[office];
-  bkAfletCache[office] = (async () => {
+const BK_KANT = {
+  debiteur: { rapport: "130_3", dim: "DEB", teken: 1, relatie: "klant", relaties: "klanten", facturen: "openstaande facturen", ontvangen: "ontvangen", rekening: "0300", rekNaam: "Debiteuren" },
+  crediteur: { rapport: "230_2", dim: "CRD", teken: -1, relatie: "leverancier", relaties: "leveranciers", facturen: "openstaande inkoopfacturen", ontvangen: "betaald", rekening: "1600", rekNaam: "Crediteuren" },
+};
+const bkKant = (r, g) => (g && g.kant) || (Number(r.bedrag) < 0 ? "crediteur" : "debiteur");
+function bkAfletGegevens(office, kant = "debiteur") {
+  const sleutel = office + "|" + kant, K = BK_KANT[kant];
+  if (bkAfletCache[sleutel]) return bkAfletCache[sleutel];
+  bkAfletCache[sleutel] = (async () => {
     const kol = (f) => `<column><field>${f}</field><label>${f}</label><visible>true</visible></column>`;
     const velden = ["fin.trs.head.code", "fin.trs.head.number", "fin.trs.head.date", "fin.trs.line.dim1", "fin.trs.line.dim1name",
       "fin.trs.line.dim2", "fin.trs.line.dim2name", "fin.trs.line.invnumber", "fin.trs.line.openbasevaluesigned", "fin.trs.line.matchstatus"];
-    const doc = await dlLees(`<columns code="130_3"><column><field>fin.trs.head.office</field><label>office</label><visible>true</visible><ask>true</ask><operator>equal</operator><from>${office}</from><to></to></column>` + velden.map(kol).join("") + `</columns>`);
+    const doc = await dlLees(`<columns code="${K.rapport}"><column><field>fin.trs.head.office</field><label>office</label><visible>true</visible><ask>true</ask><operator>equal</operator><from>${office}</from><to></to></column>` + velden.map(kol).join("") + `</columns>`);
     const browse = doc.getElementsByTagName("browse")[0];
     if (browse && browse.getAttribute("msgtype") === "error") throw new Error(browse.getAttribute("msg") || "Twinfield gaf een fout");
     const open = [];
     for (const rij of doc.getElementsByTagName("tr")) {
       const x = {};
       for (const td of rij.getElementsByTagName("td")) x[(td.getAttribute("field") || "").replace(/^fin\.trs\.(head|line)\./, "")] = td.textContent;
-      const bedrag = Number(x.openbasevaluesigned);
+      const bedrag = K.teken * Number(x.openbasevaluesigned);
       if (x.matchstatus === "matched" || !(bedrag > 0)) continue;
       open.push({ code: x.code, nummer: x.number, datum: (x.date || "").replace(/^(\d{4})(\d{2})(\d{2})$/, "$1-$2-$3"), rekening: x.dim1, rekeningnaam: x.dim1name,
-        relatie: x.dim2, relatienaam: (x.dim2name || "").trim(), factuur: x.invnumber || "", open: bedrag });
+        relatie: x.dim2, relatienaam: (x.dim2name || "").trim(), factuur: (x.invnumber || "").trim(), open: bedrag, kant });
     }
     let klanten = [];
-    try { klanten = await liveDimensies(office, "DEB"); } catch (e) { /* dan alleen klanten met open posten */ }
+    try { klanten = await liveDimensies(office, K.dim); } catch (e) { /* dan alleen relaties met open posten */ }
     const gezien = new Set(klanten.map(k => k.code));
     for (const o of open) if (o.relatie && !gezien.has(o.relatie)) { klanten.push({ code: o.relatie, naam: o.relatienaam }); gezien.add(o.relatie); }
     return { klanten, open, fout: "" };
   })();
-  bkAfletCache[office].catch(() => { delete bkAfletCache[office]; });
-  return bkAfletCache[office];
+  bkAfletCache[sleutel].catch(() => { delete bkAfletCache[sleutel]; });
+  return bkAfletCache[sleutel];
 }
 /* Afschrift verwijderen in Twinfield (Shereen 12 okt: een afschrift dat al geboekt staat, wil ze vanuit Shai laten
    verwijderen — met een tweede klik om zeker te zijn). Alleen als ALLE regels van het afschrift DUBBEL zijn. */
@@ -5923,7 +5934,8 @@ async function bkUitlegVerwerken(r, reden) {
 }
 /* Eén factuurkandidaat als goed te keuren regel (soort klant). */
 function bkKlantRegel(k, r) {
-  return { rekening: k.rekening || "0300", naam: bkRekNamen[`${r.office}|${k.rekening}`] || "Debiteuren", relatie: k.relatie,
+  const K = BK_KANT[k.kant || bkKant(r)];
+  return { rekening: k.rekening || K.rekening, naam: bkRekNamen[`${r.office}|${k.rekening}`] || K.rekNaam, relatie: k.relatie,
     relatienaam: k.relatienaam, bedrag: Number(r.bedrag), factuur: k.factuur || `${k.code} ${k.nummer}`, boekstuk: `${k.code}|${k.nummer}` };
 }
 /* Goedkeuren. Elke fout komt in beeld (onder de knop én bovenaan); een update die 0 rijen raakt telt

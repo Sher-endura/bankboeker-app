@@ -5767,6 +5767,10 @@ function bkDetailRij(r) {
         omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
     }
     const rek = tr.querySelector("#bk-rekening").value.trim();
+    if (!rek) {   // geen rekening gekozen → naar Vraagposten (Shereen 13 okt)
+      const vp = bkVraagpostGoedkeuring(r, reden, tr.querySelector("#bk-oms").value.trim());
+      return vp || toonMelding("melding-bk-detail", "fout", bkGeenVp([r.office]));
+    }
     if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
     return ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
   };
@@ -5913,7 +5917,7 @@ function bkKlantRegel(k, r) {
 async function bkGoedkeuren(regels, goedkeuring, meldingId = "melding-bank", vanStatus = BK_BEOORDELEN) {
   const door = gebruiker ? gebruiker.email : null, op = new Date().toISOString();
   const mis = [];
-  let gelukt = 0;
+  let gelukt = 0, vp = 0;
   toonMelding(meldingId, "ok", "Bezig met goedkeuren…");
   try {
     for (const r of regels) {
@@ -5926,11 +5930,12 @@ async function bkGoedkeuren(regels, goedkeuring, meldingId = "melding-bank", van
       await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie: "goedgekeurd", details: g, door });
       bkVink.delete(r.id);
       gelukt++;
+      if (g.vraagposten) vp++;
     }
   } catch (e) {
     mis.push("Onverwachte fout: " + (e && e.message || e));
   }
-  const tekst = `${gelukt} regel(s) goedgekeurd — Shai wijst ze in zijn volgende ronde toe in Twinfield.` + (mis.length ? "<br>Niet gelukt:<br>" + mis.map(escapeHtml).join("<br>") : "");
+  const tekst = `${gelukt} regel(s) goedgekeurd${vp ? ` (waarvan ${vp} op Vraagposten)` : ""} — Shai wijst ze in zijn volgende ronde toe in Twinfield.` + (mis.length ? "<br>Niet gelukt:<br>" + mis.map(escapeHtml).join("<br>") : "");
   if (mis.length) { toonMelding(meldingId, "fout", tekst); if (!gelukt) return 0; }
   bkGekozen = null;
   await laadBank();
@@ -5971,13 +5976,15 @@ function bkBulkStand() {
   document.getElementById("bk-bulk").style.display = bkVink.size ? "" : "none";
   const voorleggen = bkRegels.filter(r => bkVink.has(r.id) && r.status === "voorleggen").length;
   const zonder = bkRegels.filter(r => bkVink.has(r.id) && !bkStandaardGoedkeuring(r)).length;
-  document.getElementById("bk-bulk-tekst").textContent = `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Goedkeuren: Shai wijst ze toe precies zoals voorgesteld${zonder ? ` (${zonder} zonder voorstel — die kunnen alleen naar Vraagposten)` : ""}. Naar Vraagposten: op de vraagpostenrekening van de klant.`;
+  document.getElementById("bk-bulk-tekst").textContent = `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Goedkeuren: Shai wijst ze toe precies zoals voorgesteld${zonder ? ` (${zonder} zonder voorstel — die gaan naar Vraagposten)` : ""}. Naar Vraagposten: op de vraagpostenrekening van de klant.`;
 }
 document.getElementById("bk-vink-alles").addEventListener("change", (e) => {
   for (const r of bkVinkbaar()) e.target.checked ? bkVink.add(r.id) : bkVink.delete(r.id);
   vernieuwBkTabel();
 });
-document.getElementById("btn-bk-bulk").addEventListener("click", () => bkGoedkeuren(bkRegels.filter(r => bkVink.has(r.id)), bkStandaardGoedkeuring));
+// Zonder voorstel (per ongeluk) goedgekeurd → naar Vraagposten (Shereen 13 okt: "als ik deze per ongeluk goedkeur moet het
+// automatisch naar vraagposten worden geboekt").
+document.getElementById("btn-bk-bulk").addEventListener("click", () => bkGoedkeuren(bkRegels.filter(r => bkVink.has(r.id)), (r) => bkStandaardGoedkeuring(r) || bkVraagpostGoedkeuring(r)));
 /* De vraagpostenrekening van een klant (Shereen 12 okt: "niet alle klanten hebben 2999 — het heet Vraagpost,
    Vraagposten, Ask the accountant of zoiets, zo herken je het"). Eerst de rekening uit het klantprofiel als die in
    het rekeningschema staat; anders herkennen aan de naam. "Vraagposten Quickbooks" (2998, voor de QuickBooks-
@@ -5996,15 +6003,17 @@ function vraagpostenRekening(office) {
    (vraagpostenRekening) met de nette omschrijving; Shai wijst daarna toe en boekt (concept). */
 /* Naar Vraagposten — één regel (knop in het uitklapvak) of de aangevinkte (Shereen 12 okt: "bij elke banktransactie
    makkelijk kiezen om het naar vraagposten te boeken"). Eén werkwijze voor beide knoppen. */
+function bkVraagpostGoedkeuring(r, reden, oms) {
+  const vp = vraagpostenRekening(r.office);
+  if (!vp) return null;
+  return { soort: "grootboek", vraagposten: true, regels: [{ rekening: vp, bedrag: Number(r.bedrag) }],
+    omschrijving: (oms || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum, null, bkEigen[r.office])).slice(0, 40), reden };
+}
+const bkGeenVp = (offices) => "Geen vraagpostenrekening gevonden bij: " + escapeHtml(offices.join(", ")) + " (niet in het klantprofiel en geen rekening die Vraagposten / Ask the accountant / Uit te zoeken posten heet). Zet de juiste rekening in het klantprofiel (Settings).";
 function bkNaarVraagposten(regels, meldingId = "melding-bank", reden) {
-  const vpVan = vraagpostenRekening;
-  const zonder = [...new Set(regels.filter(r => !vpVan(r.office)).map(r => r.office))];
-  if (zonder.length) return toonMelding(meldingId, "fout", "Geen vraagpostenrekening gevonden bij: " + escapeHtml(zonder.join(", ")) + " (niet in het klantprofiel en geen rekening die Vraagposten / Ask the accountant / Uit te zoeken posten heet). Zet de juiste rekening in het klantprofiel (Settings). Er is niets goedgekeurd.");
-  return bkGoedkeuren(regels, (r) => {
-    const vp = vpVan(r.office);
-    return { soort: "grootboek", vraagposten: true, regels: [{ rekening: vp, bedrag: Number(r.bedrag) }],
-      omschrijving: (bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${vp}`], r.datum, null, bkEigen[r.office])).slice(0, 40), reden };
-  }, meldingId, [...BK_BEOORDELEN, "fout"]);   // ook vanuit Fout (Shereen 13 okt)
+  const zonder = [...new Set(regels.filter(r => !vraagpostenRekening(r.office)).map(r => r.office))];
+  if (zonder.length) return toonMelding(meldingId, "fout", bkGeenVp(zonder) + " Er is niets goedgekeurd.");
+  return bkGoedkeuren(regels, (r) => bkVraagpostGoedkeuring(r, reden), meldingId, [...BK_BEOORDELEN, "fout"]);   // ook vanuit Fout (Shereen 13 okt)
 }
 document.getElementById("btn-bk-vraagposten").addEventListener("click", () => bkNaarVraagposten(bkRegels.filter(r => bkVink.has(r.id))));
 document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);

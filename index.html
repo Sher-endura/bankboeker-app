@@ -5577,6 +5577,13 @@ function bkDetailRij(r) {
   let aflet = { klanten: [], open: [], fout: "" };
   const relVeld = tr.querySelector("#bk-relatie");
   const gekozenFacturen = () => [...tr.querySelectorAll(".bk-fvink:checked")].map(x => aflet.open.find(o => o.code + "|" + o.nummer === x.value)).filter(Boolean);
+  // Deelbetaling: oudste factuur eerst helemaal betalen; het restant blijft open op de laatste (Shereen 13 okt: "van de
+  // 1000 600 afletteren op de 1e inv en die 400 aanbetalen op de 2e").
+  const deelVerdeling = (facturen) => {
+    let over = Number(r.bedrag);
+    return [...facturen].sort((a, b) => String(a.datum).localeCompare(String(b.datum)))
+      .map(o => { const b = Math.round(Math.max(0, Math.min(o.open, over)) * 100) / 100; over = Math.round((over - b) * 100) / 100; return { o, b }; });
+  };
   let omsZelf = false;   // zelf getypt in het omschrijvingsvak? dan niet meer overschrijven
   const somTekst = () => {
     const oms = tr.querySelector("#bk-oms");
@@ -5609,6 +5616,12 @@ function bkDetailRij(r) {
     if (rest > 0.004 && db.checked) db.checked = false;
     if (rest > 0.004 && (som < 0.005 || !vak.querySelector('input[name="bk-verschil"]:checked'))) vb.checked = true;
     if (rest < -0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) db.checked = true;
+    // De verdeling laten zien: wat er per factuur betaald wordt en wat open blijft.
+    if (rest < -0.004 && db.checked && vak.style.display !== "none") {
+      el.innerHTML += `<div style="margin-top:4px">Verdeling: ` + deelVerdeling(gekozenFacturen()).map(({ o, b }) =>
+        `${escapeHtml(o.factuur || o.code + " " + o.nummer)} <b>${faBedrag(b)}</b>` + (b < 0.005 ? " (niets — haal het vinkje weg)"
+          : o.open - b > 0.004 ? ` (restant ${faBedrag(Math.round((o.open - b) * 100) / 100)} blijft open)` : " (helemaal)")).join(" · ") + `</div>`;
+    }
     verschilRek();
   };
   // Grootboekrekening voor het verschil: voorgevuld op naam uit het rekeningschema, zelf te wijzigen.
@@ -5695,7 +5708,7 @@ function bkDetailRij(r) {
       const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true;
       somTekst();
     });
-    tr.querySelectorAll('input[name="bk-verschil"]').forEach(x => x.addEventListener("change", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; verschilRek(); }));
+    tr.querySelectorAll('input[name="bk-verschil"]').forEach(x => x.addEventListener("change", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; somTekst(); }));
     const vrek = tr.querySelector("#bk-verschil-rek");
     vrek.addEventListener("input", () => { verschilRekZelf = !!vrek.value.trim(); verschilRek(); });
     if (beoordelen) faKeuzelijst(vrek, () => rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })));
@@ -5738,9 +5751,7 @@ function bkDetailRij(r) {
         if (soort === "vooruitbetaling") vooruit = rest;
         else if (soort === "deelbetaling") {
           // Oudste factuur eerst helemaal betalen; het restant blijft open op de laatste (Shereen 13 okt).
-          let over = Number(r.bedrag);
-          const betaald = [...facturen].sort((a, b) => String(a.datum).localeCompare(String(b.datum)))
-            .map(o => { const b = Math.round(Math.max(0, Math.min(o.open, over)) * 100) / 100; over = Math.round((over - b) * 100) / 100; return { o, b }; });
+          const betaald = deelVerdeling(facturen);
           verschil = { soort: "deelbetaling", bedrag: rest };
           return ({ soort: "klant", relatie: k.code, relatienaam: k.naam,
             regels: betaald.filter(x => x.b > 0.004).map(({ o, b }) => ({ ...bkKlantRegel(o, r), bedrag: b, open: o.open })), vooruitbetaling: 0, verschil,

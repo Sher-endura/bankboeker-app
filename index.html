@@ -5519,7 +5519,7 @@ function bkDetailRij(r) {
         <div id="bk-facturen" class="fa-uitleg" style="margin:6px 0"></div>
         <div id="bk-aflet-som" style="font-size:13px"></div>
         <div id="bk-verschil" style="display:none; margin-top:6px; font-size:13px">
-          ${[["vooruitbetaling", "vooruitbetaling op de klant"], ["afboeking", "op-/afboeking"], ["bankkosten", "bankkosten"], ["koersverschil", "koersverschil"]].map(([w, t]) =>
+          ${[["vooruitbetaling", "vooruitbetaling op de klant"], ["deelbetaling", "deelbetaling — restant blijft open op de factuur"],["afboeking", "op-/afboeking"], ["bankkosten", "bankkosten"], ["koersverschil", "koersverschil"]].map(([w, t]) =>
             `<label style="display:inline-block; margin:2px 14px 2px 0; white-space:nowrap" data-verschil="${w}"><input type="radio" name="bk-verschil" value="${w}"${(g.verschil || {}).soort === w || (w === "vooruitbetaling" && Number(g.vooruitbetaling) > 0.004) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${t}</label>`).join("")}
           <div class="fa-crd-vak" id="bk-verschil-rekvak" style="max-width:460px; margin-top:4px; display:none"><input type="text" id="bk-verschil-rek" value="${escapeHtml((g.verschil || {}).rekening || "")}" placeholder="grootboekrekening voor het verschil" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-verschil-rek-naam" class="fa-crd-naam"></span></div>
         </div>
@@ -5569,10 +5569,15 @@ function bkDetailRij(r) {
     const opKlant = !!tr.querySelector('input[name="bk-keuze"][value="klant"]')?.checked && !!relVeld.value.trim();
     if (!relVeld.value.trim()) el.innerHTML = "";
     vak.style.display = opKlant && Math.abs(rest) > 0.004 ? "" : "none";
+    // Zoals in Twinfield (Shereen 13 okt): overbetaling → vooruitbetaling (standaard) of op-/afboeking/bankkosten/koersverschil;
+    // onderbetaling → deelbetaling, restant blijft open op de factuur (standaard) of afboeken.
     vak.querySelector('[data-verschil="vooruitbetaling"]').style.display = rest > 0.004 ? "" : "none";
-    const vb = vak.querySelector('input[value="vooruitbetaling"]');
+    vak.querySelector('[data-verschil="deelbetaling"]').style.display = rest < -0.004 ? "" : "none";
+    const vb = vak.querySelector('input[value="vooruitbetaling"]'), db = vak.querySelector('input[value="deelbetaling"]');
     if (rest < -0.004 && vb.checked) vb.checked = false;
-    if (rest > 0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) vb.checked = true;   // zoals eerst: rest = vooruitbetaling
+    if (rest > 0.004 && db.checked) db.checked = false;
+    if (rest > 0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) vb.checked = true;
+    if (rest < -0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) db.checked = true;
     verschilRek();
   };
   // Grootboekrekening voor het verschil: voorgevuld op naam uit het rekeningschema, zelf te wijzigen.
@@ -5675,9 +5680,18 @@ function bkDetailRij(r) {
       let verschil = null, vooruit = 0;
       if (Math.abs(rest) > 0.004) {
         const soort = (tr.querySelector('input[name="bk-verschil"]:checked') || {}).value;
-        if (!soort || (soort === "vooruitbetaling" && rest < 0)) return toonMelding("melding-bk-detail", "fout", `Kies waar het verschil van ${faBedrag(Math.abs(rest))} heen gaat (op-/afboeking, bankkosten of koersverschil).`);
+        if (!soort || (soort === "vooruitbetaling" && rest < 0) || (soort === "deelbetaling" && rest > 0)) return toonMelding("melding-bk-detail", "fout", `Kies wat er met het verschil van ${faBedrag(Math.abs(rest))} gebeurt.`);
         if (soort === "vooruitbetaling") vooruit = rest;
-        else {
+        else if (soort === "deelbetaling") {
+          // Oudste factuur eerst helemaal betalen; het restant blijft open op de laatste (Shereen 13 okt).
+          let over = Number(r.bedrag);
+          const betaald = [...facturen].sort((a, b) => String(a.datum).localeCompare(String(b.datum)))
+            .map(o => { const b = Math.round(Math.max(0, Math.min(o.open, over)) * 100) / 100; over = Math.round((over - b) * 100) / 100; return { o, b }; });
+          verschil = { soort: "deelbetaling", bedrag: rest };
+          return ({ soort: "klant", relatie: k.code, relatienaam: k.naam,
+            regels: betaald.filter(x => x.b > 0.004).map(({ o, b }) => ({ ...bkKlantRegel(o, r), bedrag: b, open: o.open })), vooruitbetaling: 0, verschil,
+            omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
+        } else {
           const vr = tr.querySelector("#bk-verschil-rek").value.trim();
           if (!bkRekNamen[`${r.office}|${vr}`]) return toonMelding("melding-bk-detail", "fout", "Kies de grootboekrekening voor het verschil uit het rekeningschema van " + escapeHtml(r.office) + ".");
           verschil = { soort, bedrag: rest, rekening: vr, naam: bkRekNamen[`${r.office}|${vr}`] };

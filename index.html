@@ -5372,7 +5372,7 @@ function bkTwinfieldOpties(r, hist) {
 /* Factuurnummers in een tekst als "2026-0248" (zoals factuurNrs in robot/bank-herkenning.mjs): "ENDURA-2026-0248", "2026 0248", "20260248". */
 function bkFactuurNrs(t) {
   const uit = new Set();
-  for (const m of String(t || "").matchAll(/\b(20\d{2})[\s\-\/]?(\d{3,4})\b/g)) uit.add(`${m[1]}-${m[2].padStart(4, "0")}`);
+  for (const m of String(t || "").matchAll(/\b(20\d{2})\s*[\-\/]?\s*(\d{3,4})\b/g)) uit.add(`${m[1]}-${m[2].padStart(4, "0")}`);
   return uit;
 }
 function bkStandaardGoedkeuring(r) {

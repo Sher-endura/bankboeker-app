@@ -6084,6 +6084,9 @@ async function bkGoedkeuren(regels, goedkeuring, meldingId = "melding-bank", van
   toonMelding(meldingId, "ok", "Bezig met goedkeuren…");
   try {
     for (const r of regels) {
+      // Staat in Twinfield al toegewezen (13 okt: GOVERNMENT TAX / MC Debit ENDURA) — niet nog eens goedkeuren (en zeker
+      // niet naar Vraagposten); Shai zet hem bij het lezen op Toegewezen.
+      if (r.twinfield_bak === "Assigned") { mis.push(`${r.afschrift}/${r.regel}: staat in Twinfield al toegewezen — Shai zet hem bij zijn volgende ronde op Toegewezen`); continue; }
       const g = goedkeuring(r);
       if (!g) { mis.push(`${r.afschrift}/${r.regel}: geen voorstel om goed te keuren`); continue; }
       const { data, error } = await sb.from("bank_regels").update({ status: "goedgekeurd", goedgekeurd: g, goedgekeurd_door: door, goedgekeurd_op: op, opmerking: null, updated_by: door })

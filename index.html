@@ -26,6 +26,20 @@
   .subnav button { border: none; background: none; padding: 8px 14px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: var(--tekst); }
   input.zoek-keuze { min-width: 280px; }
   input.zoek-keuze.niet-gevonden { border-color: var(--rood); outline-color: var(--rood); }
+  /* Keuzelijst administraties (13 okt) — maakAdminKeuze. */
+  .admin-keuze { position: relative; display: inline-flex; align-items: center; }
+  .admin-keuze input.zoek-keuze { min-width: 360px; padding-right: 30px; }
+  .admin-wis { position: absolute; right: 6px; background: none; border: 0; color: var(--tekst); font-size: 15px; cursor: pointer; padding: 2px 4px; }
+  .admin-wis[hidden] { display: none; }
+  .admin-lijst { position: absolute; top: calc(100% + 4px); left: 0; z-index: 60; background: #fff; border: 1px solid var(--rand); border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.15); max-height: 380px; overflow-y: auto; min-width: 100%; width: max-content; max-width: min(620px, 92vw); padding: 4px 0; }
+  .admin-optie { display: flex; align-items: baseline; gap: 8px; padding: 6px 12px; cursor: pointer; color: var(--tekst); font-size: 14px; }
+  .admin-optie.actief { background: #e8f1fb; }
+  .admin-optie.gekozen .admin-code { text-decoration: underline; }
+  .admin-code { font-weight: 600; white-space: nowrap; }
+  .admin-naam { flex: 1; }
+  .admin-tel { margin-left: 16px; font-weight: 600; white-space: nowrap; }
+  .admin-leeg { padding: 8px 12px; color: var(--rood); font-size: 14px; }
   .subnav .subnav-klant { margin-left: auto; align-self: center; font-size: 13px; font-weight: 600; color: var(--tekst); }
   .subnav button.actief { color: var(--blauw); border-bottom-color: var(--zalm); font-weight: 600; }
   nav button.actief { color: var(--blauw); border-bottom-color: var(--zalm); font-weight: 600; }
@@ -813,6 +827,9 @@
         <option value="shai|voorstel">Shai voorstel</option><option value="shai|voorleggen">Shai voorleggen</option>
       </select>
       <span class="status-info" id="bk-substatus-info" title="TF = Twinfield stelt het voor (een herkenregel van Twinfield of een gekoppelde factuur).&#10;Shai = Shai stelt het voor (uit de historie, een vaste regel of een openstaande factuur).&#10;&#10;VOORSTEL = zeker genoeg (zekerheid 80 of hoger en niets spreekt het tegen). Mag je met de vinkjes in één keer goedkeuren.&#10;&#10;VOORLEGGEN = Shai twijfelt en wil dat iemand kijkt: Twinfield en de historie spreken elkaar tegen, het voorstel is zwak, er is geen voorstel, of de regel staat in Twinfield op Uitzoeken. Kijk het na vóór je goedkeurt.">ⓘ</span>
+      <select id="bk-richting-filter" style="width:auto" title="Alleen ontvangsten (geld komt binnen) of alleen betalingen (geld gaat eraf) tonen — ook de tellers en de vinkjes volgen dit">
+        <option value="">Ontvangsten en betalingen</option><option value="in">Alleen ontvangsten</option><option value="uit">Alleen betalingen</option>
+      </select>
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
     <div class="status-tabjes" id="bk-tabjes"></div>
@@ -4104,8 +4121,8 @@ function vernieuwFaFilters() {
   requestAnimationFrame(faHoogte);
 }
 function vernieuwFaTabel() {
-  const faSub = document.getElementById("fa-substatus").value;
-  vulAdminKeuze("fa-office", faDocs.filter(d => faStatusSel.has(d.status) && pastSubstatus(faSub, d.status, "shai")).map(d => d.office));
+  // Keuzelijst: administraties met nog open documenten, niet per tabje (Shereen 13 okt).
+  vulAdminKeuze("fa-office", faDocs.filter(d => !["geboekt", "overgeslagen", "verwijderd"].includes(d.status)).map(d => d.office));
   const tbody = document.querySelector("#tabel-facturen tbody");
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
@@ -5238,7 +5255,7 @@ function bkZichtbaar() {
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
   const sub = document.getElementById("bk-substatus").value;
-  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) && bkRecentVerwerkt(r) &&
+  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) &&
     pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron) &&   // zoeken blijft binnen tabje + status (12 okt)
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
@@ -5250,7 +5267,7 @@ let bkTabje = leesTabje("bankboeker.bank.tabje", BK_TABJES);
 let bkStatusSel = new Set(BK_TABJES.find(t => t[0] === bkTabje)[2]);
 function vernieuwBkFilters() {
   const office = document.getElementById("bk-office").value;
-  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s && bkRecentVerwerkt(r)).length, (t) => {
+  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s && bkRecentVerwerkt(r) && bkRichtingPast(r)).length, (t) => {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
   });
@@ -5365,9 +5382,9 @@ function bkStandaardGoedkeuring(r) {
   return null;
 }
 function vernieuwBkTabel() {
-  const bkSub = document.getElementById("bk-substatus").value;
-  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) &&
-    pastSubstatus(bkSub, r.status, r.voorstel && r.voorstel.bron)).map(r => r.office));
+  // Keuzelijst: administraties met nog te boeken regels, niet per tabje (Shereen 13 okt: "wellicht niet per tab, maar
+  // wel per admin") — te beoordelen, goedgekeurd, toegewezen of fout.
+  vulAdminKeuze("bk-office", bkRegels.filter(r => !["verwerkt", "overgeslagen"].includes(r.status)).map(r => r.office));
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">${document.getElementById("bk-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : "Niets in deze lijst."}</td></tr>`;
@@ -5927,6 +5944,12 @@ document.getElementById("bk-sorteer-zekerheid").addEventListener("click", () => 
 document.getElementById("bk-office").addEventListener("change", () => { vernieuwBkFilters(); vernieuwBkTabel(); });
 document.getElementById("bk-zoek").addEventListener("input", vernieuwBkTabel);
 document.getElementById("bk-substatus").addEventListener("change", () => { bkGekozen = null; vernieuwBkTabel(); });
+/* Filter ontvangsten / betalingen (Shereen 13 okt): ook de tellers op de tabjes en de vinkjes volgen het. */
+function bkRichtingPast(r) {
+  const f = document.getElementById("bk-richting-filter").value;
+  return !f || (f === "in" ? Number(r.bedrag) > 0 : Number(r.bedrag) < 0);
+}
+document.getElementById("bk-richting-filter").addEventListener("change", () => { bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel(); });
 
 /* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de
    Boekingsregels onder de Knowledgebase. Een groep onthoudt welk sub-tabblad laatst open stond. */
@@ -6007,9 +6030,13 @@ kiesTab("inlezen");   // tot de inlog klaar is; daarna opent de app op Twinfield
 const GEEN_ADMIN = "__niet_gevonden__";
 /* Keuzelijst administraties volgt het tabje (Shereen 12 okt): alleen klanten die in dit tabje iets hebben.
    De gekozen klant (of "Niet gevonden") blijft staan, ook als die hier niets heeft. */
+const ADMIN_TELLING = {};   // selectId → { administratie: aantal open regels } (voor de keuzelijst)
 function vulAdminKeuze(selectId, offices) {
   const kies = document.getElementById(selectId), vorige = kies.value;
-  const lijst = [...new Set(offices.filter(Boolean))].sort();
+  const tel = {};
+  for (const o of offices) if (o) tel[o] = (tel[o] || 0) + 1;
+  ADMIN_TELLING[selectId] = tel;
+  const lijst = Object.keys(tel).sort();
   if (vorige && vorige !== GEEN_ADMIN && !lijst.includes(vorige)) lijst.push(vorige);
   const sleutel = lijst.join("|");
   if (kies.dataset.lijst === sleutel) return;   // ongewijzigd: niets opnieuw opbouwen
@@ -6065,9 +6092,81 @@ function maakZoekbaar(selectId, placeholder, { nietGevonden = false } = {}) {
   new MutationObserver(vul).observe(sel, { childList: true, subtree: true, attributes: true });
   vul();
 }
+/* Keuzelijst administraties voor Bank en Basecone (Shereen 13 okt: "de zoekbalk werkt niet zo lekker"):
+   klik = de hele lijst open, per administratie code · naam en het aantal open regels; typen zoekt op code én naam
+   (elk stukje, gevonden stuk vet); ↑ ↓ Enter Esc; ✕ = terug naar alle administraties. De <select> eronder blijft de
+   waarde dragen (change-event). Welke administraties erin staan bepaalt vulAdminKeuze (alleen met open regels). */
+const adminNaam = (c) => ((profielen.find(p => p.code === c) || {}).naam || "").trim();
+function maakAdminKeuze(selectId, placeholder) {
+  const sel = document.getElementById(selectId);
+  if (!sel || sel.dataset.zoekbaar) return;
+  sel.dataset.zoekbaar = "1";
+  sel.style.display = "none";
+  const vak = document.createElement("div");
+  vak.className = "admin-keuze";
+  vak.innerHTML = `<input type="text" class="zoek-keuze" autocomplete="off" spellcheck="false" placeholder="${escapeHtml(placeholder)}"><button type="button" class="admin-wis" title="Terug naar alle administraties">✕</button><div class="admin-lijst" hidden></div>`;
+  sel.after(vak);
+  const veld = vak.querySelector("input"), wis = vak.querySelector(".admin-wis"), lijst = vak.querySelector(".admin-lijst");
+  let items = [], actief = 0;
+  const label = (c) => c ? c + (adminNaam(c) ? " · " + adminNaam(c) : "") : "";
+  const gekozen = () => (sel.value === GEEN_ADMIN ? "" : sel.value);
+  const toon = () => { if (document.activeElement !== veld) veld.value = label(gekozen()); wis.hidden = !gekozen(); };
+  const vet = (t, woorden) => {
+    let h = escapeHtml(t);
+    for (const w of woorden) { const i = h.toLowerCase().indexOf(escapeHtml(w).toLowerCase()); if (i >= 0) h = h.slice(0, i) + "<b>" + h.slice(i, i + escapeHtml(w).length) + "</b>" + h.slice(i + escapeHtml(w).length); }
+    return h;
+  };
+  const teken = (opGekozen) => {
+    const t = veld.value.trim().toLowerCase();
+    const zoekt = !!t && t !== label(gekozen()).toLowerCase();
+    const woorden = zoekt ? t.split(/\s+/).filter(Boolean) : [];
+    const tel = ADMIN_TELLING[selectId] || {};
+    const codes = [...sel.options].map(o => o.value).filter(v => v && v !== GEEN_ADMIN);
+    items = (zoekt ? [] : [""]).concat(codes.filter(c => woorden.every(w => (c + " " + adminNaam(c)).toLowerCase().includes(w))));
+    if (opGekozen) actief = Math.max(0, items.indexOf(gekozen()));
+    actief = Math.min(actief, Math.max(0, items.length - 1));
+    lijst.innerHTML = items.length
+      ? items.map((c, i) => `<div class="admin-optie${i === actief ? " actief" : ""}${c === gekozen() ? " gekozen" : ""}" data-c="${escapeHtml(c)}">` +
+          (c ? `<span class="admin-code">${vet(c, woorden)}</span><span class="admin-naam">${adminNaam(c) ? vet(adminNaam(c), woorden) : ""}</span><span class="admin-tel">${tel[c] || 0}</span>`
+             : `<span class="admin-code">Alle administraties</span><span class="admin-naam"></span><span class="admin-tel">${Object.values(tel).reduce((a, b) => a + b, 0)}</span>`) + `</div>`).join("")
+      : `<div class="admin-leeg">Niet gevonden — geen administratie met "${escapeHtml(veld.value.trim())}"</div>`;
+    lijst.hidden = false;
+    const a = lijst.querySelector(".actief"); if (a) a.scrollIntoView({ block: "nearest" });
+  };
+  const sluit = () => { lijst.hidden = true; };
+  const kies = (c) => {
+    sluit();
+    if (sel.value !== c) { sel.value = c; sel.dispatchEvent(new Event("change")); }
+    veld.blur(); toon();
+  };
+  veld.addEventListener("focus", () => { veld.value = label(gekozen()); teken(true); veld.select(); });
+  veld.addEventListener("click", () => { if (lijst.hidden) teken(true); });
+  veld.addEventListener("input", () => { actief = 0; teken(false); });
+  veld.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (lijst.hidden) return teken(true);
+      actief = Math.max(0, Math.min(items.length - 1, actief + (e.key === "ArrowDown" ? 1 : -1)));
+      teken(false);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (items.length) kies(items[actief]);
+    } else if (e.key === "Escape") { sluit(); veld.blur(); toon(); }
+  });
+  veld.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== veld) { sluit(); toon(); } }, 150));
+  lijst.addEventListener("mousedown", (e) => {
+    const o = e.target.closest(".admin-optie");
+    e.preventDefault();   // het veld niet laten blurren vóór de keuze
+    if (o) kies(o.dataset.c);
+  });
+  wis.addEventListener("click", () => kies(""));
+  sel.addEventListener("change", toon);
+  new MutationObserver(() => { toon(); if (!lijst.hidden) teken(false); }).observe(sel, { childList: true });
+  toon();
+}
 maakZoekbaar("klant-select", "🔍 Typ code of naam van de administratie…");
-maakZoekbaar("bk-office", "🔍 Alle administraties — typ om te zoeken", { nietGevonden: true });
-maakZoekbaar("fa-office", "🔍 Alle administraties — typ om te zoeken", { nietGevonden: true });
+maakAdminKeuze("bk-office", "🔍 Alle administraties — klik of typ om te zoeken");
+maakAdminKeuze("fa-office", "🔍 Alle administraties — klik of typ om te zoeken");
 
 document.getElementById("klant-select").addEventListener("change", e => {
   huidig = profielen[+e.target.value]; regelsSessie = []; allesVernieuwen();

@@ -4802,6 +4802,8 @@ function faVerwijderVragen() {
   const d = faGekozen; if (!d) return;
   const vak = document.getElementById("fa-verwijder-vak"), veld = document.getElementById("fa-verwijder-reden");
   vak.style.display = "";
+  // Bij overgeslagen/splitsen staan de invulvakken van het document op slot — het reden-vak niet (Shereen 13 okt, Pico Bello).
+  veld.disabled = false;
   veld.value = d.verwijder_reden || "";
   veld.focus();
 }

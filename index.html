@@ -4308,7 +4308,9 @@ function faKeuzelijst(veld, bron) {
   const verberg = () => { faLijst.style.display = "none"; };
   const kies = (x) => { if (!x) return; veld.value = x.code; verberg(); veld.dispatchEvent(new Event("input")); };
   const markeer = () => [...faLijst.children].forEach((c, i) => { c.classList.toggle("actief", i === actief); if (i === actief) c.scrollIntoView({ block: "nearest" }); });
-  veld.addEventListener("focus", toon);
+  // Bij klikken alles selecteren: dan vervangt typen ("island") het nummer dat er staat en zoekt hij op naam
+  // (Shereen 13 okt: "ik ken geen debiteurennummers uit het hoofd").
+  veld.addEventListener("focus", () => { toon(); setTimeout(() => { if (document.activeElement === veld) veld.select(); }, 0); });
   veld.addEventListener("input", (e) => { if (e.isTrusted) toon(); });
   veld.addEventListener("blur", verberg);
   veld.addEventListener("keydown", (e) => {
@@ -5590,7 +5592,10 @@ function bkDetailRij(r) {
     if (oms && !omsZelf && tr.querySelector('input[name="bk-keuze"][value="klant"]')?.checked) {
       const k = aflet.klanten.find(x => x.code === relVeld.value.trim());
       const t = factuurOmschrijving(gekozenFacturen().map(o => o.factuur), k && k.naam);
+      // Andere klant gekozen en (nog) geen factuur: niet de omschrijving van de vorige klant laten staan (Shereen 13 okt,
+      // Island Guide Franchise → Island Guide B.V.).
       if (t) oms.value = t;
+      else if (k && relVeld.value.trim() !== startRelatie) oms.value = netteOmschrijving(r.omschrijving, null, r.datum, null, bkEigen[r.office]).slice(0, 40);
     }
     const el = tr.querySelector("#bk-aflet-som"); if (!el) return;
     const som = Math.round(gekozenFacturen().reduce((t, o) => t + o.open, 0) * 100) / 100, rest = Math.round((Number(r.bedrag) - som) * 100) / 100;
@@ -5650,6 +5655,8 @@ function bkDetailRij(r) {
     const no = tr.querySelector("#bk-niet-open");
     if (no) no.textContent = nietOpen.length ? `⚠ Factuur ${nietOpen.join(", ")} uit de banktekst staat niet open. Kies "Zonder factuur op de klant boeken" (het bedrag komt open op de debiteur), of kies een andere openstaande factuur.` : "";
     if (!rel) { vak.textContent = "Kies eerst de klant."; somTekst(); return; }
+    // Halverwege typen ("D1012", "island"): nog geen klant — niet doen alsof die geen open facturen heeft.
+    if (!k && aflet.klanten.length) { vak.textContent = "Kies de klant uit de lijst (zoek op naam of nummer)."; somTekst(); return; }
     const lijst = aflet.open.filter(o => o.relatie === rel).sort((a, b) => a.datum.localeCompare(b.datum));
     // Veel open facturen (Shereen 12 okt, Miniño): in 5 kolommen over het scherm + zoeken op nummer, datum of bedrag.
     // Zoeken verbergt alleen; wat aangevinkt is telt mee, ook als het buiten de zoekopdracht valt.
@@ -5697,7 +5704,11 @@ function bkDetailRij(r) {
   if (relVeld) {
     tr.querySelector("#bk-facturen").textContent = "Openstaande facturen ophalen uit Twinfield…";
     bkAfletGegevens(r.office).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });
-    relVeld.addEventListener("input", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; toonFacturen(); });
+    relVeld.addEventListener("input", () => {
+      const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true;
+      const zf = tr.querySelector("#bk-zonder-factuur"); if (zf) zf.checked = false;   // nieuwe klant: opnieuw kiezen
+      toonFacturen();
+    });
     if (beoordelen) faKeuzelijst(relVeld, () => aflet.klanten);
     tr.querySelectorAll('input[name="bk-keuze"]').forEach(x => x.addEventListener("change", somTekst));
     // Zonder factuur (Shereen 13 okt: "op de klant boeken zonder invoice te selecteren, dan staat het op de debiteur en

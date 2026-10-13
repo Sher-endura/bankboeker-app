@@ -1632,6 +1632,25 @@ function factuurOmschrijving(facturen, naam) {
   if (!nrs.length) return "";
   return (nrs.join(", ") + (naam ? " " + naam : "")).slice(0, 40).trim();
 }
+/* Harde regel per klant (Shereen 13 okt, BINGO): een betaling aan een crediteur krijgt als omschrijving
+   "<Maand> statement <crediteurnaam>" — gaat vóór alle andere regels (ook vóór het factuurnummer). Maand uit de
+   banktekst, anders de maand vóór de betaaldatum (periodeDelen). Max 40 tekens, afgekapt op een heel woord.
+   crediteurVan: de crediteur in de toewijzing (relatiecode C…, of kant 'crediteur'). Identiek in bank-herkenning.mjs. */
+const CREDITEUR_STATEMENT = new Set(["BINGO"]);
+const MAANDEN_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function crediteurVan(g) {
+  const regels = (g && (g.regels || g.toewijzingen)) || [];
+  const r = regels.find((x) => x && x.relatie && (g.kant === "crediteur" || /^C/i.test(String(x.relatie))));
+  return r ? { relatie: r.relatie, naam: String(r.relatienaam || g.relatienaam || "").trim() } : (g && g.kant === "crediteur" && g.relatie ? { relatie: g.relatie, naam: String(g.relatienaam || "").trim() } : null);
+}
+function crediteurStatementOmschrijving(office, ruw, bedrag, datum, crediteurNaam) {
+  if (!CREDITEUR_STATEMENT.has(office) || !crediteurNaam || !(Number(bedrag) < 0)) return null;
+  const { maand } = periodeDelen(ruw, datum);
+  if (maand < 0) return null;
+  let t = `${MAANDEN_EN[maand]} statement ${crediteurNaam}`.replace(/\s+/g, " ").trim();
+  if (t.length > 40) { t = t.slice(0, 41); t = t.slice(0, t.lastIndexOf(" ") > 20 ? t.lastIndexOf(" ") : 40).trim(); }
+  return t;
+}
 /* ISO-weeknummer van de week vóór de datum (tip betaald in week 41 → "week 40"). */
 function weekVoorDatum(datum) {
   const m = String(datum || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -5236,6 +5255,10 @@ function bkOmsTekst(r) {
   const v = r.voorstel || {};
   if (!BK_BEOORDELEN.includes(r.status)) return v.omschrijving || "";
   const regel = (v.regels || [])[0] || {};
+  // Harde regel per klant (BINGO: "<Maand> statement <crediteur>") gaat voor alles.
+  const crd = crediteurVan(v);
+  const st = crd && crediteurStatementOmschrijving(r.office, r.omschrijving, r.bedrag, r.datum, crd.naam);
+  if (st) return st;
   if (v.soort === "klant") { const t = factuurOmschrijving((v.regels || []).map(x => x.factuur), regel.relatienaam); if (t) return t; }
   const u = pasUitlegToe(bkUitlegRegels.filter(x => x.office === r.office || x.office === "*"), r.omschrijving, Number(r.bedrag), r.datum);
   if (u && u.omschrijving) return u.omschrijving;
@@ -5651,7 +5674,9 @@ function bkDetailRij(r) {
     const oms = tr.querySelector("#bk-oms");
     if (oms && !omsZelf && tr.querySelector('input[name="bk-keuze"][value="klant"]')?.checked) {
       const k = aflet.klanten.find(x => x.code === relVeld.value.trim());
-      const t = factuurOmschrijving(gekozenFacturen().map(o => o.factuur), k && k.naam);
+      // Harde regel per klant (BINGO: "<Maand> statement <crediteur>") gaat vóór het factuurnummer.
+      const st = k && kant === "crediteur" ? crediteurStatementOmschrijving(r.office, r.omschrijving, r.bedrag, r.datum, k.naam) : null;
+      const t = st || factuurOmschrijving(gekozenFacturen().map(o => o.factuur), k && k.naam);
       // Andere klant gekozen en (nog) geen factuur: niet de omschrijving van de vorige klant laten staan (Shereen 13 okt,
       // Island Guide Franchise → Island Guide B.V.).
       if (t) oms.value = t;

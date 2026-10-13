@@ -5374,6 +5374,7 @@ function bkDetailRij(r) {
   const twKlant = g.soort !== "klant" && twVoorstel ? (v.regels || []).filter(x => x.relatie && x.factuur) : [];
   const startTwFacturen = new Set(twKlant.map(x => x.relatie + "|" + x.factuur));
   tr.innerHTML = `<td></td><td colspan="${BK_KOLOMMEN - 1}">
+    ${/^Niet gelukt in Twinfield/.test(r.opmerking || "") && BK_BEOORDELEN.includes(r.status) ? `<p style="margin:4px 0 8px; color:var(--rood); font-weight:600">⚠ ${escapeHtml(r.opmerking)}</p>` : ""}
     ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
     ${twVoorstel ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="twinfield"${keuzeTw ? " checked" : ""}${beoordelen ? "" : " disabled"}> Twinfields voorstel accepteren: ${(v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + ")}</label>` : ""}
     ${toonKlant ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="klant"${keuzeKlant ? " checked" : ""}${beoordelen ? "" : " disabled"}> Afletteren op klant — een of meer openstaande facturen (rest = vooruitbetaling op de klant):</label>

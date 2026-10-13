@@ -153,6 +153,7 @@
   .fa-status.verwijderen { background: #C6F432; color: #1f2937; }
   #tabel-bank td { vertical-align: top; font-size: 13px; }
   #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
+  #tabel-bank tr.bk-rij.gekozen td.bk-oms, #tabel-bank tr.bk-rij.gekozen td.bk-refined { cursor: text; }
   #tabel-bank .bk-vink-afs { margin: 0 8px 0 2px; vertical-align: middle; }
   .bk-verwijder-blok { margin: 8px 0; padding: 8px 12px; border: 1px solid #f3c4c0; background: #fdf1f0; border-radius: 8px; font-size: 13px; color: var(--tekst); }
   .bk-verwijder-blok .knop { margin-top: 6px; }
@@ -5151,7 +5152,14 @@ function vernieuwBkTabel() {
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
       ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
         : `<td colspan="2" class="bk-info">${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td>`}`;
-    tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink") && !e.target.closest(".bk-g")) { bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel(); } });
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest(".fa-vink") || e.target.closest(".bk-g")) return;
+      // Tekst uit de bankomschrijving kopiëren (Shereen 12 okt): selecteren of dubbelklikken klapt niets open/dicht,
+      // en in een open regel blijft klikken in de banktekst (RAW/REFINED) de regel open laten.
+      if (e.detail > 1 || String(getSelection()).trim()) return;
+      if (bkGekozen === r.id && e.target.closest(".bk-oms, .bk-refined")) return;
+      bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel();
+    });
     tr.querySelector(".bk-g").addEventListener("click", (e) => { e.stopPropagation(); bkGoogleBalk(e.currentTarget, r); });
     const vink = tr.querySelector(".bk-vink-rij");
     if (vink) vink.addEventListener("change", () => { vink.checked ? bkVink.add(r.id) : bkVink.delete(r.id); bkBulkStand(); });

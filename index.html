@@ -4287,6 +4287,28 @@ function faVinkAlles() {
   for (const d of faVinkbaar()) aan ? faVink.add(d.id) : faVink.delete(d.id);
   vernieuwFaTabel();
 }
+/* Harde regel centenverschil (Shereen 13 okt): verschillen de boekingsregels minder dan 1 van het factuurtotaal, dan een
+   extra regel "Afrondingsverschil" op de rekening voor afrondingsverschillen, en bestaat die niet: bankkosten. Ook in de
+   leesfunctie (factuur-lezen). Geeft de toegevoegde regel terug, of null. */
+// Grens is 1 AWG (Shereen 13 okt: "onder de 1 AWG"); andere valuta omgerekend. Onbekende valuta: niets automatisch.
+const AFROND_GRENS = { AWG: 1, ANG: 1, USD: 1 / 1.79, EUR: 1 / 2 };
+// Rekening: "Afrondingsverschillen" (NIET "Afronding netto Salaris"), anders de gewone bankkostenrekening.
+function afrondRekening(reks) {
+  return reks.find(x => /afrondingsverschil/i.test(x.naam))
+    || reks.find(x => /^\s*bank\s*kosten\s*$/i.test(x.naam)) || reks.find(x => /^\s*bank\s*charges/i.test(x.naam))
+    || reks.find(x => /bank\s*kosten|bank\s*charges/i.test(x.naam) && !/doorbelast|facturatie|foreign|maestro|amex|visa|master|discover|rbc/i.test(x.naam)) || null;
+}
+function faAfronding(office, g) {
+  const som = Math.round(g.regels.reduce((s, r) => s + Number(r.bedrag || 0), 0) * 100), verschil = Math.round(Number(g.bedrag || 0) * 100) - som;
+  const grens = AFROND_GRENS[String(g.valuta || "AWG").toUpperCase()];
+  if (!g.regels.length || !verschil || !grens || Math.abs(verschil) >= grens * 100) return null;
+  const reks = Object.keys(faRekNamen).filter(k => k.startsWith(office + "|")).map(k => ({ code: k.split("|")[1], naam: faRekNamen[k] || "" }));
+  const rek = afrondRekening(reks);
+  if (!rek) return null;
+  const regel = { grootboek: rek.code, bedrag: verschil / 100, omschrijving: "Afrondingsverschil" };
+  g.regels.push(regel);
+  return regel;
+}
 /* Dezelfde controles als bij één document goedkeuren, maar op het voorstel zoals Shai het maakte. */
 function faControleer(d, g) {
   const fouten = [];
@@ -4321,6 +4343,7 @@ async function faBulkGoedkeuren() {
       datum: v.datum || "", vervaldatum: v.vervaldatum || null, credit: !!v.credit, niet_in_betaalbatch: !!v.niet_in_betaalbatch,
       omschrijving: oms, regels: (v.regels || []).map(r => ({ grootboek: (r.grootboek || "").trim(), bedrag: Number(r.bedrag || 0), omschrijving: (r.omschrijving || oms).trim() })),
     };
+    faAfronding(d.office, g);   // centenverschil < 1 → regel Afrondingsverschil (harde regel)
     const fouten = faControleer(d, g);
     if (fouten.length) { overgeslagen.push(`${d.bestandsnaam || d.id}: ${fouten.join(", ")}`); continue; }
     const { error } = await sb.from("basecone_documenten").update({
@@ -4782,6 +4805,7 @@ function leesFaFormulier() {
 async function faGoedkeuren() {
   const d = faGekozen; if (!d) return;
   const g = leesFaFormulier();
+  faAfronding(d.office, g);   // centenverschil < 1 → regel Afrondingsverschil (harde regel)
   const fouten = [];
   if (!g.crediteur) fouten.push("crediteur ontbreekt");
   else if (g.crediteur === "NIEUW") { if (!d.nieuwe_crediteur || d.nieuwe_crediteur.status === "aangemaakt") fouten.push("crediteur NIEUW zonder openstaande aanvraag — klik op ＋ Nieuwe crediteur"); }

@@ -4293,10 +4293,13 @@ function faVinkAlles() {
 // Grens is 1 AWG (Shereen 13 okt: "onder de 1 AWG"); andere valuta omgerekend. Onbekende valuta: niets automatisch.
 const AFROND_GRENS = { AWG: 1, ANG: 1, USD: 1 / 1.79, EUR: 1 / 2 };
 // Rekening: "Afrondingsverschillen" (NIET "Afronding netto Salaris"), anders de gewone bankkostenrekening.
-function afrondRekening(reks) {
-  return reks.find(x => /afrondingsverschil/i.test(x.naam))
-    || reks.find(x => /^\s*bank\s*kosten\s*$/i.test(x.naam)) || reks.find(x => /^\s*bank\s*charges/i.test(x.naam))
+// Ook gebruikt bij de bank (afletteren met een verschil, Shereen 13 okt: "ja, ook bij de bank").
+function bankkostenRekening(reks) {
+  return reks.find(x => /^\s*bank\s*kosten\s*$/i.test(x.naam)) || reks.find(x => /^\s*bank\s*charges/i.test(x.naam))
     || reks.find(x => /bank\s*kosten|bank\s*charges/i.test(x.naam) && !/doorbelast|facturatie|foreign|maestro|amex|visa|master|discover|rbc/i.test(x.naam)) || null;
+}
+function afrondRekening(reks) {
+  return reks.find(x => /afrondingsverschil/i.test(x.naam)) || bankkostenRekening(reks);
 }
 function faAfronding(office, g) {
   const som = Math.round(g.regels.reduce((s, r) => s + Number(r.bedrag || 0), 0) * 100), verschil = Math.round(Number(g.bedrag || 0) * 100) - som;
@@ -5737,6 +5740,10 @@ function bkDetailRij(r) {
     const vb = vak.querySelector('input[value="vooruitbetaling"]'), db = vak.querySelector('input[value="deelbetaling"]');
     if (rest < -0.004 && vb.checked) vb.checked = false;
     if (rest > 0.004 && db.checked) db.checked = false;
+    laatsteRest = rest;
+    // Harde regel centenverschil (Shereen 13 okt, "ook bij de bank"): minder dan 1 AWG verschil met de facturen →
+    // standaard op-/afboeking op Afrondingsverschillen (anders bankkosten), zolang je zelf niets anders kiest.
+    if (Math.abs(rest) > 0.004 && Math.abs(rest) < 1 && som > 0.004 && !verschilGekozen) vak.querySelector('input[value="afboeking"]').checked = true;
     if (rest > 0.004 && (som < 0.005 || !vak.querySelector('input[name="bk-verschil"]:checked'))) vb.checked = true;
     if (rest < -0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) db.checked = true;
     // De verdeling laten zien: wat er per factuur betaald wordt en wat open blijft.
@@ -5750,14 +5757,21 @@ function bkDetailRij(r) {
   // Grootboekrekening voor het verschil: voorgevuld op naam uit het rekeningschema, zelf te wijzigen.
   const VERSCHIL_NAAM = { afboeking: /betalingsverschil|op.?\s*en\s*afboek|afboek|kleine\s*verschil|afrond/i, bankkosten: /bankkosten/i, koersverschil: /koers/i };
   let verschilRekZelf = !!(g.verschil || {}).rekening;
+  let verschilGekozen = !!(g.verschil || {}).soort || Number(g.vooruitbetaling) > 0.004, laatsteRest = 0;
   const verschilRek = () => {
     const soort = (tr.querySelector('input[name="bk-verschil"]:checked') || {}).value;
     const rekvak = tr.querySelector("#bk-verschil-rekvak"), veld = tr.querySelector("#bk-verschil-rek");
     if (!rekvak) return;
     rekvak.style.display = VERSCHIL_NAAM[soort] && tr.querySelector("#bk-verschil").style.display !== "none" ? "" : "none";
     if (VERSCHIL_NAAM[soort] && !verschilRekZelf) {
-      const hit = rekeningen.find(c => VERSCHIL_NAAM[soort].test(bkRekNamen[`${r.office}|${c}`] || ""));
-      veld.value = hit || "";
+      // Rekening voorvullen (13 okt): centen (< 1 AWG) → Afrondingsverschillen, groter → Betalingsverschillen; bankkosten
+      // → de gewone bankkostenrekening (niet "Afronding netto Salaris" of Maestro/Amex/doorbelast).
+      const reks = rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" }));
+      const hit = soort === "afboeking" ? (Math.abs(laatsteRest) < 1 ? afrondRekening(reks)
+          : reks.find(x => /betalingsverschil/i.test(x.naam) && !/kas/i.test(x.naam)) || afrondRekening(reks))
+        : soort === "bankkosten" ? bankkostenRekening(reks)
+        : reks.find(x => VERSCHIL_NAAM[soort].test(x.naam));
+      veld.value = hit ? hit.code : "";
     }
     const n = bkRekNamen[`${r.office}|${veld.value.trim()}`];
     tr.querySelector("#bk-verschil-rek-naam").textContent = veld.value.trim() && !/[a-z]/i.test(veld.value) ? (n || "onbekende rekening") : "";
@@ -5837,7 +5851,7 @@ function bkDetailRij(r) {
       const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true;
       somTekst();
     });
-    tr.querySelectorAll('input[name="bk-verschil"]').forEach(x => x.addEventListener("change", () => { const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; somTekst(); }));
+    tr.querySelectorAll('input[name="bk-verschil"]').forEach(x => x.addEventListener("change", (e) => { if (e.isTrusted) verschilGekozen = true; const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true; somTekst(); }));
     const vrek = tr.querySelector("#bk-verschil-rek");
     vrek.addEventListener("input", () => { verschilRekZelf = !!vrek.value.trim(); verschilRek(); });
     if (beoordelen) faKeuzelijst(vrek, () => rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })));

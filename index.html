@@ -191,6 +191,12 @@
   /* Hooguit 5 kolommen, maar nooit smaller dan 270px — zo wordt het bedrag nooit afgekapt (12 okt: "open 1..."). */
   .bk-fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(270px, calc((100% - 72px) / 5)), 1fr)); gap: 2px 18px; }
   .bk-fgrid label { font-weight: 400; font-size: 13px; color: var(--tekst); white-space: nowrap; }
+  /* Splitsen (13 okt): één toewijzing per regel — soort, rekening/relatie, factuur, bedrag. */
+  .bk-splits-rij { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 6px; }
+  .bk-splits-rij select { width: auto; }
+  .bk-splits-rij .bk-s-codevak { width: 340px; max-width: 100%; }
+  .bk-splits-rij .bk-s-bedrag { width: 120px; text-align: right; }
+  .bk-splits-rij .bk-s-factuur { max-width: 320px; }
   .bk-regel1 { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
   .fa-robot button.shai-herstart { padding: 3px 10px; font-size: 12px; margin-right: 6px; }
   .bk-robot-klein { flex: 1 1 0; min-width: 0; margin: 0 0 0 auto; padding: 6px 12px; font-size: 13px; max-width: 680px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -5263,7 +5269,7 @@ let bkDagOpen = null;   // welke dagen open staan (null = nog niet gekozen → n
 function bkZichtbaar() {
   const office = document.getElementById("bk-office").value;
   const zoek = document.getElementById("bk-zoek").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const tekst = (r) => { const v = r.goedgekeurd && r.goedgekeurd.regels ? r.goedgekeurd : r.voorstel || {};
+  const tekst = (r) => { const v = r.goedgekeurd && (r.goedgekeurd.regels || r.goedgekeurd.toewijzingen) ? { regels: bkGoedRegels(r.goedgekeurd) } : r.voorstel || {};
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
   const sub = document.getElementById("bk-substatus").value;
@@ -5450,7 +5456,7 @@ function vernieuwBkTabel() {
       const afsVink = vinkbaarAfs.length ? `<input type="checkbox" class="bk-vink-afs" data-afs="${escapeHtml(afsSleutel)}" title="Alle te beoordelen regels van dit afschrift aanvinken"${vinkbaarAfs.every(x => bkVink.has(x.id)) ? " checked" : ""}${vinkbaarAfs.some(x => bkVink.has(x.id)) && !vinkbaarAfs.every(x => bkVink.has(x.id)) ? " data-half=\"1\"" : ""}> ` : "";
       tbody.insertAdjacentHTML("beforeend", `<tr class="bk-kop"><td colspan="${BK_KOLOMMEN}">${afsVink}Afschrift ${escapeHtml(afs)} — ${klaar} van ${n.length} regels goedgekeurd of toegewezen${n.find(x => x.boekstuk) ? ` · boekstuk ${escapeHtml(n.find(x => x.boekstuk).boekstuk)}` : ""}</td></tr>`);
     }
-    const v = r.goedgekeurd && r.goedgekeurd.regels ? { ...r.voorstel, ...r.goedgekeurd } : r.voorstel || {};
+    const v = r.goedgekeurd && (r.goedgekeurd.regels || r.goedgekeurd.toewijzingen) ? { ...r.voorstel, ...r.goedgekeurd, regels: bkGoedRegels(r.goedgekeurd) } : r.voorstel || {};
     const z = Number((r.voorstel || {}).zekerheid || 0);
     const kanVink = BK_BEOORDELEN.includes(r.status);   // ook zonder voorstel: kan naar Vraagposten (Shereen 12 okt)
     const bron = bkHerkomst(r);   // herkomst: alleen in de ⓘ en in de kolom Bron (Shereen 11 okt)
@@ -5521,8 +5527,9 @@ function bkDetailRij(r) {
   const eigenOms = g.omschrijving || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum, null, bkEigen[r.office]);
   // Afletteren (11 okt): openstaande facturen met hetzelfde bedrag, voorgekozen wat Shai voorstelt.
   const kandidaten = v.kandidaten || [];
-  const keuzeKlant = g.soort === "klant" || (g.soort !== "grootboek" && (v.soort === "klant" || v.soort === "relatie"));
-  const keuzeTw = !keuzeKlant && twVoorstel && g.soort !== "grootboek";
+  const keuzeSplits = g.soort === "splitsen";
+  const keuzeKlant = !keuzeSplits && (g.soort === "klant" || (g.soort !== "grootboek" && (v.soort === "klant" || v.soort === "relatie")));
+  const keuzeTw = !keuzeKlant && !keuzeSplits && twVoorstel && g.soort !== "grootboek";
   const beoordelen = BK_BEOORDELEN.includes(r.status);
   // Afletteren op klant (Shereen 12 okt): elke ontvangst kan op een klant, met één of meer openstaande facturen;
   // is de betaling hoger dan de facturen samen, dan blijft het verschil als vooruitbetaling op de klant staan.
@@ -5557,7 +5564,9 @@ function bkDetailRij(r) {
           <div class="fa-crd-vak" id="bk-verschil-rekvak" style="max-width:460px; margin-top:4px; display:none"><input type="text" id="bk-verschil-rek" value="${escapeHtml((g.verschil || {}).rekening || "")}" placeholder="grootboekrekening voor het verschil" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-verschil-rek-naam" class="fa-crd-naam"></span></div>
         </div>
       </div>` : ""}
-    <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
+    <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="splitsen"${keuzeSplits ? " checked" : ""}${beoordelen ? "" : " disabled"}> Splitsen — een deel op de ene rekening, ${K.relatie} of factuur, de rest op een andere (zoals "Restant" in Twinfield):</label>
+    <div id="bk-splits" style="margin:0 0 8px 24px; display:${keuzeSplits ? "" : "none"}"></div>
+    <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant || keuzeSplits ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
     <div class="rij">
       <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div>${histAdvies ? `<button type="button" class="bk-hist-advies" title="Vult deze rekening in en kiest &quot;Toewijzen aan grootboekrekening&quot;">↳ Historie adviseert: <b>${escapeHtml(histAdvies.rekening)}</b> ${escapeHtml(histAdvies.naam || bkRekNamen[`${r.office}|${histAdvies.rekening}`] || "")} (${escapeHtml(datumNlKort(histAdvies.datum))}) — gebruik deze</button>` : ""}</div>
       <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen || r.status === "fout" ? "" : " disabled"}></div>
@@ -5731,6 +5740,99 @@ function bkDetailRij(r) {
     if (beoordelen) faKeuzelijst(vrek, () => rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })));
   }
   naam();
+  // Splitsen (Shereen 13 okt, demo Jennelee: 489,68 → 0321 300,00 + 9070 189,68; "dit werkt op dezelfde manier voor
+  // debiteuren en crediteuren, met overpayment en koersverschil en betalingen of ontvangsten voor 2 debiteuren door
+  // 1 klant"). Per regel: grootboekrekening, klant of leverancier (met een open factuur of zonder), en het bedrag.
+  // Bedragen zonder teken; Shai zet ze in Twinfield één voor één via het Restant-blok.
+  const rond = (x) => Math.round(x * 100) / 100;
+  const teken = Math.sign(Number(r.bedrag)) || 1;
+  const SPLITS_SOORT = [["grootboek", "Grootboekrekening"], ["debiteur", "Klant"], ["crediteur", "Leverancier"]];
+  let splits = keuzeSplits ? (g.toewijzingen || []).map(t => ({ soort: t.soort === "grootboek" ? "grootboek" : (t.kant || "debiteur"),
+      code: t.soort === "grootboek" ? t.rekening : t.relatie, factuur: t.soort === "facturen" ? ((t.facturen || [])[0] || {}).boekstuk || "" : "",
+      bedrag: Math.abs(Number(t.bedrag) || 0) }))
+    : [{ soort: "grootboek", code: eigen, factuur: "", bedrag: absBedrag }, { soort: "grootboek", code: "", factuur: "", bedrag: 0 }];
+  const splitsData = {};   // per kant: { klanten, open } zodra geladen
+  const laadSplitsData = (kant) => { if (kant === "grootboek" || splitsData[kant]) return;
+    splitsData[kant] = { klanten: [], open: [], laden: true };
+    bkAfletGegevens(r.office, kant).then(d => { splitsData[kant] = d; tekenSplits(); }, e => { splitsData[kant] = { klanten: [], open: [], fout: e.message || String(e) }; tekenSplits(); }); };
+  const splitsSom = () => {
+    const el = tr.querySelector("#bk-s-som"); if (!el) return;
+    const som = rond(splits.reduce((t, s) => t + (Number(s.bedrag) || 0), 0)), rest = rond(absBedrag - som);
+    el.innerHTML = `Verdeeld <b>${faBedrag(som)}</b> van <b>${faBedrag(absBedrag)}</b> — ` + (Math.abs(rest) < 0.005 ? "past precies"
+      : rest > 0 ? `nog <b>${faBedrag(rest)}</b> te verdelen` : `<b style="color:var(--rood)">${faBedrag(-rest)} te veel</b>`);
+  };
+  const kiesSplits = () => { const rs = tr.querySelector('input[name="bk-keuze"][value="splitsen"]'); if (rs && !rs.checked) { rs.checked = true; rs.dispatchEvent(new Event("change")); } };
+  function tekenSplits() {
+    const vak = tr.querySelector("#bk-splits"); if (!vak) return;
+    splits.forEach(s => laadSplitsData(s.soort));
+    vak.innerHTML = splits.map((s, i) => {
+      const d = splitsData[s.soort];
+      const open = s.soort !== "grootboek" && d ? d.open.filter(o => o.relatie === s.code).sort((a, b) => a.datum.localeCompare(b.datum)) : [];
+      const nm = s.soort === "grootboek" ? bkRekNamen[`${r.office}|${s.code}`] : d && (d.klanten.find(k => k.code === s.code) || {}).naam;
+      const naamTekst = !s.code || /[a-z]/i.test(s.code) && !nm ? "" : nm || (d && d.laden ? "…" : "onbekend");
+      return `<div class="bk-splits-rij" data-i="${i}">
+        <select class="bk-s-soort"${beoordelen ? "" : " disabled"}>${SPLITS_SOORT.map(([w, t]) => `<option value="${w}"${s.soort === w ? " selected" : ""}>${t}</option>`).join("")}</select>
+        <span class="fa-crd-vak bk-s-codevak"><input type="text" class="bk-s-code" value="${escapeHtml(s.code)}" placeholder="${s.soort === "grootboek" ? "rekening: nummer of naam" : BK_KANT[s.soort].relatie + ": nummer of naam"}" autocomplete="off"${beoordelen ? "" : " disabled"}><span class="fa-crd-naam">${escapeHtml(naamTekst)}</span></span>
+        ${s.soort !== "grootboek" ? `<select class="bk-s-factuur"${beoordelen ? "" : " disabled"}><option value="">zonder factuur</option>${open.map(o => `<option value="${escapeHtml(o.code + "|" + o.nummer)}"${s.factuur === o.code + "|" + o.nummer ? " selected" : ""}>${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open ${faBedrag(o.open)}</option>`).join("")}</select>` : ""}
+        <input type="text" class="bk-s-bedrag" inputmode="decimal" value="${s.bedrag ? faBedrag(s.bedrag) : ""}" placeholder="bedrag"${s.factuur ? ' readonly title="Het openstaande bedrag van de factuur"' : ""}${beoordelen ? "" : " disabled"}>
+        ${splits.length > 2 && beoordelen ? `<button type="button" class="knop stil bk-s-weg" title="Deze toewijzing weghalen">✕</button>` : ""}
+      </div>`; }).join("") +
+      `<div style="margin-top:4px; font-size:13px">${beoordelen ? `<button type="button" class="knop stil" id="bk-s-erbij">＋ toewijzing</button> ` : ""}<span id="bk-s-som"></span></div>
+       <div class="fa-uitleg" style="margin-top:4px">Een factuur gaat altijd voor het hele openstaande bedrag. Zonder factuur kan één keer, en Shai zet die als laatste.</div>`;
+    splitsSom();
+    vak.querySelectorAll(".bk-splits-rij").forEach(rij => {
+      const s = splits[+rij.dataset.i];
+      rij.addEventListener("focusin", kiesSplits);
+      rij.querySelector(".bk-s-soort").addEventListener("change", (e) => { s.soort = e.target.value; s.code = ""; s.factuur = ""; tekenSplits(); });
+      const code = rij.querySelector(".bk-s-code");
+      if (beoordelen) faKeuzelijst(code, () => s.soort === "grootboek" ? rekeningen.map(c => ({ code: c, naam: bkRekNamen[`${r.office}|${c}`] || "" })) : (splitsData[s.soort] || {}).klanten || []);
+      code.addEventListener("input", (e) => { s.code = code.value.trim(); s.factuur = ""; if (!e.isTrusted) tekenSplits(); });   // gekozen uit de lijst
+      code.addEventListener("change", () => tekenSplits());
+      const f = rij.querySelector(".bk-s-factuur");
+      if (f) f.addEventListener("change", () => { s.factuur = f.value; const o = (splitsData[s.soort].open || []).find(x => x.code + "|" + x.nummer === s.factuur); if (o) s.bedrag = o.open; tekenSplits(); });
+      const b = rij.querySelector(".bk-s-bedrag");
+      b.addEventListener("input", () => { s.bedrag = rond(Math.abs(parseBedrag(b.value))); splitsSom(); });
+      b.addEventListener("change", () => { b.value = s.bedrag ? faBedrag(s.bedrag) : ""; });
+      const weg = rij.querySelector(".bk-s-weg");
+      if (weg) weg.addEventListener("click", (e) => { e.stopPropagation(); splits.splice(+rij.dataset.i, 1); tekenSplits(); });
+    });
+    const erbij = vak.querySelector("#bk-s-erbij");
+    if (erbij) erbij.addEventListener("click", (e) => { e.stopPropagation(); kiesSplits();
+      const rest = rond(absBedrag - splits.reduce((t, s) => t + (Number(s.bedrag) || 0), 0));
+      splits.push({ soort: (splits[splits.length - 1] || {}).soort || "grootboek", code: "", factuur: "", bedrag: rest > 0 ? rest : 0 }); tekenSplits(); });
+  }
+  tekenSplits();
+  tr.querySelectorAll('input[name="bk-keuze"]').forEach(x => x.addEventListener("change", () => {
+    tr.querySelector("#bk-splits").style.display = tr.querySelector('input[name="bk-keuze"][value="splitsen"]').checked ? "" : "none"; }));
+  // De keuze "Splitsen" als goedkeuring: { soort: 'splitsen', toewijzingen: [...] } (zie splitsStappen in bank.mjs).
+  const splitsGoedkeuring = (reden) => {
+    const fout = (t) => toonMelding("melding-bk-detail", "fout", t);
+    if (splits.length < 2) return fout("Splitsen is voor twee of meer toewijzingen — voor één toewijzing gebruik je de andere keuzes.");
+    const tw = [];
+    for (const s of splits) {
+      const b = rond(Number(s.bedrag) || 0);
+      if (!(b > 0)) return fout("Elke toewijzing heeft een bedrag nodig (of haal hem weg met ✕).");
+      if (s.soort === "grootboek") {
+        if (!bkRekNamen[`${r.office}|${s.code}`]) return fout(`Rekening "${escapeHtml(s.code || "")}" staat niet in het rekeningschema van ${escapeHtml(r.office)}.`);
+        tw.push({ soort: "grootboek", rekening: s.code, naam: bkRekNamen[`${r.office}|${s.code}`], bedrag: teken * b });
+        continue;
+      }
+      const d = splitsData[s.soort] || {}, k = (d.klanten || []).find(x => x.code === s.code);
+      if (!k) return fout(`Kies een bestaande ${BK_KANT[s.soort].relatie} uit de lijst ("${escapeHtml(s.code || "")}").`);
+      if (s.factuur) {
+        const o = (d.open || []).find(x => x.code + "|" + x.nummer === s.factuur);
+        if (!o) return fout(`Factuur ${escapeHtml(s.factuur)} staat niet (meer) open bij ${escapeHtml(k.naam)}.`);
+        tw.push({ soort: "facturen", kant: s.soort, relatie: k.code, relatienaam: k.naam, rekening: o.rekening || BK_KANT[s.soort].rekening,
+          facturen: [{ boekstuk: s.factuur, factuur: o.factuur || `${o.code} ${o.nummer}`, open: o.open }], bedrag: teken * o.open });
+      } else tw.push({ soort: "relatie", kant: s.soort, relatie: k.code, relatienaam: k.naam, bedrag: teken * b });
+    }
+    const som = rond(tw.reduce((t, x) => t + Math.abs(x.bedrag), 0));
+    if (Math.abs(som - absBedrag) > 0.004) return fout(`De toewijzingen tellen op tot ${faBedrag(som)}; het bankbedrag is ${faBedrag(absBedrag)}.`);
+    const zonder = tw.filter(x => x.soort === "relatie");
+    if (zonder.length > 1) return fout("Zonder factuur kan maar één keer (Shai zet die als laatste).");
+    return { soort: "splitsen", toewijzingen: [...tw.filter(x => x.soort !== "relatie"), ...zonder],
+      omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden };
+  };
   const knop = (id, fn) => { const b = tr.querySelector("#" + id); if (b) b.addEventListener("click", async (e) => {
     e.stopPropagation();
     try { await fn(); } catch (fout) { toonMelding("melding-bk-detail", "fout", "Er ging iets mis: " + escapeHtml(fout && fout.message || String(fout))); }
@@ -5744,6 +5846,7 @@ function bkDetailRij(r) {
   const bkKeuzeUitVak = (reden) => {
     const keuze = (tr.querySelector('input[name="bk-keuze"]:checked') || {}).value;
     if (keuze === "twinfield") return ({ soort: "twinfield", omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
+    if (keuze === "splitsen") return splitsGoedkeuring(reden);
     if (keuze === "klant") {
       const rel = relVeld.value.trim();
       const k = aflet.klanten.find(x => x.code === rel);
@@ -5933,6 +6036,13 @@ async function bkUitlegVerwerken(r, reden) {
     `Meteen toegepast: ${aangepast} open regel(s) kregen de rekening, ${omschr} de omschrijving. Uitzetten kan in Knowledgebase Shai.`);
 }
 /* Eén factuurkandidaat als goed te keuren regel (soort klant). */
+/* De regels van een goedkeuring om te tonen; bij Splitsen elke toewijzing als regel (rekening + relatie + factuur). */
+function bkGoedRegels(g) {
+  if (g.soort !== "splitsen") return g.regels || [];
+  return (g.toewijzingen || []).map(t => t.soort === "grootboek" ? { rekening: t.rekening, naam: t.naam, bedrag: t.bedrag }
+    : { rekening: t.rekening || BK_KANT[t.kant || "debiteur"].rekening, naam: BK_KANT[t.kant || "debiteur"].rekNaam, relatie: t.relatie, relatienaam: t.relatienaam,
+        factuur: ((t.facturen || [])[0] || {}).factuur || "zonder factuur", bedrag: t.bedrag });
+}
 function bkKlantRegel(k, r) {
   const K = BK_KANT[k.kant || bkKant(r)];
   return { rekening: k.rekening || K.rekening, naam: bkRekNamen[`${r.office}|${k.rekening}`] || K.rekNaam, relatie: k.relatie,

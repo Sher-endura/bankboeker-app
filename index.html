@@ -1321,7 +1321,8 @@ function algemeen(ruw, bedrijf) {
   const KLEIN = new Set(["EN", "OF", "DE", "HET", "IN", "OP", "TE", "AAN", "MET", "BIJ", "NR", "NO", "AND", "FOR", "TO"]);
   const uit = woorden.map((w, i) => w === "INV" ? "inv" : w === "KLNR" ? "klnr." : afk.has(w) ? w
     : KLEIN.has(w) ? (i > 0 ? w.toLowerCase() : w.charAt(0) + w.slice(1).toLowerCase()) : titelKast(w)).join(" ").replace(/\s{2,}/g, " ").trim();
-  return kortOpWoord(uit || (ruw || "").trim(), 40);
+  // Blijft er geen woord over (bv. "$67.00/2296062" → "67.00"), dan de RAW-tekst (Shereen 12 okt).
+  return kortOpWoord(/[A-Za-z]{2}/.test(uit) ? uit : (ruw || "").replace(/\s{2,}/g, " ").trim(), 40);
 }
 /* CMB-bankteksten (KUSTER, 12 okt): "InternetBanking Tfr Debit CMS REF-DC67251890 <eigen tekst> Kuster LawMO BILEWEB
    <ontvanger> FT26266K8320". Kop, referentie en alles vanaf MOBILEWEB/MOBILEIOS (de bank breekt het woord soms af)

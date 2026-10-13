@@ -4154,11 +4154,14 @@ async function faNuDraaien() {
   const knop = document.getElementById("btn-fa-nu"), m = document.getElementById("fa-nu-melding");
   knop.disabled = true;
   const { data: st } = await sb.from("robot_status").select("status, bericht").eq("id", "basecone").maybeSingle();
+  // Eén klant of iedereen: volgt de keuze in "Alle administraties", zoals Twinfield Bank (Shereen 13 okt).
+  const office = document.getElementById("fa-office").value || null;
+  if (office === GEEN_ADMIN) { m.textContent = "Kies eerst een bestaande administratie (of maak het zoekvak leeg voor alle klanten)."; knop.disabled = false; return; }
   if (st && st.status === "werkt") {
     m.textContent = "Shai is al bezig — wat je goedkeurt, pakt hij in deze of de volgende ronde op.";
   } else {
-    const { error } = await sb.from("basecone_log").insert({ actie: "nu draaien", door: gebruiker ? gebruiker.email : null });
-    m.textContent = error ? "Lukte niet: " + error.message : "Gevraagd — Shai begint binnen een halve minuut (als zijn venster op de robotcomputer open staat).";
+    const { error } = await sb.from("basecone_log").insert({ actie: "nu draaien", office, door: gebruiker ? gebruiker.email : null });
+    m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"} (als zijn venster op de robotcomputer open staat).`;
   }
   setTimeout(() => { knop.disabled = false; laadRobotStatus(); }, 30000);
 }

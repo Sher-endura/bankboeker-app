@@ -204,6 +204,8 @@
   .bk-scroll { overflow: auto; }
   #tabel-bank thead th { position: sticky; top: 0; z-index: 5; background: var(--grijs); }
   #tabel-bank tr.bk-kop td { background: var(--grijs); color: var(--tekst); font-weight: 600; font-size: 13px; }
+  #tabel-bank tr.bk-klant { cursor: pointer; user-select: none; }
+  #tabel-bank .bk-klap-pijl { display: inline-block; width: 16px; }
   #tabel-bank tr.bk-klant td { background: var(--zalm); color: #1f2937; font-weight: 700; font-size: 15px; padding-top: 10px; padding-bottom: 10px; }   /* één felle balk per administratie (Shereen 11 okt) */
   #tabel-bank tr.bk-rij { cursor: pointer; } #tabel-bank tr.bk-rij:hover td { background: #f3f6fa; }
   #tabel-bank tr.gekozen td { background: #eaf1fb; }
@@ -4121,8 +4123,9 @@ function vernieuwFaFilters() {
   requestAnimationFrame(faHoogte);
 }
 function vernieuwFaTabel() {
-  // Keuzelijst: administraties met nog open documenten, niet per tabje (Shereen 13 okt).
-  vulAdminKeuze("fa-office", faDocs.filter(d => !["geboekt", "overgeslagen", "verwijderd"].includes(d.status)).map(d => d.office));
+  // Keuzelijst: per tabje, zoals Twinfield Bank (Shereen 13 okt).
+  const faSub = document.getElementById("fa-substatus").value;
+  vulAdminKeuze("fa-office", faDocs.filter(d => faStatusSel.has(d.status) && pastSubstatus(faSub, d.status, "shai")).map(d => d.office));
   const tbody = document.querySelector("#tabel-facturen tbody");
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
@@ -5185,6 +5188,7 @@ function bkOmsTekst(r) {
   return netteOmschrijving(r.omschrijving, rekNaam, r.datum, null, bkEigen[r.office]) || v.omschrijving || "";
 }
 let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [], bkEigen = {}, bkHistOpen = null;
+const bkDicht = new Set();   // ingeklapte administraties (klik op de rode kopbalk)
 let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const bkVink = new Set();
 const bkZeker = (z) => (z >= 85 ? "hoog" : z >= 60 ? "middel" : "laag");
@@ -5389,9 +5393,11 @@ function bkStandaardGoedkeuring(r) {
   return null;
 }
 function vernieuwBkTabel() {
-  // Keuzelijst: administraties met nog te boeken regels, niet per tabje (Shereen 13 okt: "wellicht niet per tab, maar
-  // wel per admin") — te beoordelen, goedgekeurd, toegewezen of fout.
-  vulAdminKeuze("bk-office", bkRegels.filter(r => !["verwerkt", "overgeslagen"].includes(r.status)).map(r => r.office));
+  // Keuzelijst: weer per tabje (Shereen 13 okt: "ik klikte OUTSTANDING_HOME bij te beoordelen omdat dat getal in de zoekbox
+  // stond, en alles was al goedgekeurd") — alleen administraties met regels in dit tabje, het getal = regels in dit tabje.
+  const bkSub = document.getElementById("bk-substatus").value;
+  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) &&
+    pastSubstatus(bkSub, r.status, r.voorstel && r.voorstel.bron)).map(r => r.office));
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="${BK_KOLOMMEN}" class="fa-uitleg">${document.getElementById("bk-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : "Niets in deze lijst."}</td></tr>`;
@@ -5422,8 +5428,10 @@ function vernieuwBkTabel() {
       vorigeKlant = r.office; vorigAfschrift = "";
       const naam = (profielen.find(p => p.code === r.office) || {}).naam || "";
       const open = lijst.filter(x => x.office === r.office).length;
-      tbody.insertAdjacentHTML("beforeend", `<tr class="bk-klant"><td colspan="${BK_KOLOMMEN}">${escapeHtml(r.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${open} regel${open === 1 ? "" : "s"}</span></td></tr>`);
+      const dicht = bkDicht.has(r.office);
+      tbody.insertAdjacentHTML("beforeend", `<tr class="bk-klant" data-office="${escapeHtml(r.office)}" title="Klik om ${dicht ? "uit" : "in"} te klappen"><td colspan="${BK_KOLOMMEN}"><span class="bk-klap-pijl">${dicht ? "▸" : "▾"}</span> ${escapeHtml(r.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${open} regel${open === 1 ? "" : "s"}</span></td></tr>`);
     }
+    if (bkDicht.has(r.office)) continue;   // ingeklapt (Shereen 13 okt)
     const afs = `${r.bank_code} ${r.afschrift}${r.sub_id > 1 ? "/" + r.sub_id : ""}`;
     if (afs !== vorigAfschrift && !bkSorteer) {
       vorigAfschrift = afs;
@@ -5977,6 +5985,14 @@ function bkRichtingPast(r) {
   const f = document.getElementById("bk-richting-filter").value;
   return !f || (f === "in" ? Number(r.bedrag) > 0 : Number(r.bedrag) < 0);
 }
+document.querySelector("#tabel-bank tbody").addEventListener("click", (e) => {
+  const kop = e.target.closest("tr.bk-klant");
+  if (!kop || !kop.dataset.office) return;
+  const o = kop.dataset.office;
+  bkDicht.has(o) ? bkDicht.delete(o) : bkDicht.add(o);
+  if (bkGekozen && (bkRegels.find(x => x.id === bkGekozen) || {}).office === o) bkGekozen = null;
+  vernieuwBkTabel();
+});
 document.getElementById("bk-richting-filter").addEventListener("change", () => { bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel(); });
 
 /* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de

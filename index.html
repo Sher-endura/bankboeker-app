@@ -155,6 +155,12 @@
   #tabel-bank td.bk-klantcode { font-weight: 600; white-space: nowrap; }
   /* Onder het bedrag: ontvangst of betaling vanuit de bankrekening (Shereen 12 okt) — klein, maar niet grijs. */
   #tabel-bank .bk-richting { font-size: 12px; font-weight: 400; margin-top: 2px; }
+  /* ↻ andere omschrijvingen (Shereen 13 okt) — rood, zoals gevraagd. */
+  #tabel-bank .bk-hist { background: none; border: 0; padding: 0 2px; color: var(--rood); font-size: 19px; font-weight: 700; cursor: pointer; line-height: 1; vertical-align: middle; }
+  .bk-oms-opties { margin: 6px 0 2px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+  .bk-oms-optie { border: 1px solid var(--blauw); background: #fff; color: var(--tekst); border-radius: 6px; padding: 4px 8px; cursor: pointer; text-align: left; }
+  .bk-oms-optie span { display: block; font-size: 11px; color: var(--tekst); }
+  .bk-oms-optie.gekozen { background: #e8f1fb; border-width: 2px; }
   /* Ontvangst groen, betaling rood (Shereen 12 okt) — bedrag én het woordje eronder. */
   #tabel-bank td.bk-ontvangst { color: var(--groen); }
   #tabel-bank td.bk-betaling { color: var(--rood); }
@@ -5133,7 +5139,7 @@ function bkOmsTekst(r) {
   if (uitHist) return uitHist;
   return netteOmschrijving(r.omschrijving, rekNaam, r.datum, null, bkEigen[r.office]) || v.omschrijving || "";
 }
-let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [], bkEigen = {};
+let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [], bkEigen = {}, bkHistOpen = null;
 let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const bkVink = new Set();
 const bkZeker = (z) => (z >= 85 ? "hoog" : z >= 60 ? "middel" : "laag");
@@ -5239,6 +5245,29 @@ function bkHoogte() {
 }
 addEventListener("resize", bkHoogte);
 /* Wat goedgekeurd zou worden als je het voorstel ongewijzigd overneemt (ook bij de vinkjes). */
+/* Andere omschrijvingen voor een bankregel (Shereen 13 okt, rood ↻ in de regel): Shai's voorstel, de Twinfield-
+   historie (ook met de periode bijgewerkt), eerder goedgekeurde omschrijvingen bij vergelijkbare bankteksten van
+   dezelfde klant (dezelfde naamwoorden), de opgeschoonde banktekst en de RAW-tekst. Uniek, max 40 tekens, hooguit 10. */
+function bkOmsOpties(r) {
+  const uit = [], gezien = new Set();
+  const voeg = (t, bron) => { t = String(t || "").replace(/\s+/g, " ").trim().slice(0, 40); const k = t.toLowerCase(); if (t && !gezien.has(k)) { gezien.add(k); uit.push({ t, bron }); } };
+  const v = r.voorstel || {};
+  voeg(bkOmsTekst(r), "voorstel van Shai");
+  for (const h of v.historie || []) {
+    voeg(omschrijvingUitHistorie(h.omschrijving, r.omschrijving, r.datum), `historie ${datumNlKort(h.datum)}, periode bijgewerkt`);
+    voeg(h.omschrijving, `Twinfield-historie ${datumNlKort(h.datum)}`);
+  }
+  const mijn = new Set(naamWoorden(r.omschrijving));
+  const lijkt = bkRegels.filter(x => x.id !== r.id && x.office === r.office && x.goedgekeurd && x.goedgekeurd.omschrijving).map(x => {
+    const w = new Set(naamWoorden(x.omschrijving)), samen = [...w].filter(y => mijn.has(y)).length;
+    return { x, samen, score: samen / Math.max(1, Math.min(mijn.size, w.size)) };
+  }).filter(o => o.samen >= Math.min(2, mijn.size) && o.score >= 0.5)
+    .sort((a, b) => b.score - a.score || String(b.x.datum).localeCompare(String(a.x.datum))).slice(0, 5);
+  for (const { x } of lijkt) voeg(x.goedgekeurd.omschrijving, `eerder goedgekeurd ${datumNlKort(x.datum)}`);
+  voeg(netteOmschrijving(r.omschrijving, null, r.datum, null, bkEigen[r.office]), "opgeschoonde banktekst");
+  voeg(r.omschrijving, "RAW banktekst");
+  return uit.slice(0, 10);
+}
 function bkStandaardGoedkeuring(r) {
   const v = r.voorstel || {};
   // De omschrijving die in REFINED staat (Shereen 12 okt) — niet Shai's opgeslagen versie van de vorige ronde,
@@ -5313,17 +5342,20 @@ function vernieuwBkTabel() {
       <td class="num ${Number(r.bedrag) < 0 ? "bk-betaling" : "bk-ontvangst"}" style="white-space:nowrap">${faBedrag(r.bedrag)}<div class="bk-richting">${Number(r.bedrag) < 0 ? "betaling" : "ontvangst"}</div></td>
       <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
-      ${bkUitklap ? `<td class="bk-bron">${escapeHtml(bron)} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
-        : `<td colspan="2" class="bk-info">${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td>`}`;
+      ${bkUitklap ? `<td class="bk-bron">${BK_BEOORDELEN.includes(r.status) ? `<button type="button" class="bk-hist" title="Andere omschrijvingen zoeken (historie, eerder goedgekeurd, banktekst)">↻</button> ` : ""}${escapeHtml(bron)} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
+        : `<td colspan="2" class="bk-info">${BK_BEOORDELEN.includes(r.status) ? `<button type="button" class="bk-hist" title="Andere omschrijvingen zoeken (historie, eerder goedgekeurd, banktekst)">↻</button> ` : ""}${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td>`}`;
     tr.addEventListener("click", (e) => {
-      if (e.target.closest(".fa-vink") || e.target.closest(".bk-g")) return;
+      if (e.target.closest(".fa-vink") || e.target.closest(".bk-g") || e.target.closest(".bk-hist")) return;
       // Tekst uit de bankomschrijving kopiëren (Shereen 12 okt): selecteren of dubbelklikken klapt niets open/dicht,
       // en in een open regel blijft klikken in de banktekst (RAW/REFINED) de regel open laten.
       if (e.detail > 1 || String(getSelection()).trim()) return;
       if (bkGekozen === r.id && e.target.closest(".bk-oms, .bk-refined")) return;
-      bkGekozen = bkGekozen === r.id ? null : r.id; vernieuwBkTabel();
+      bkGekozen = bkGekozen === r.id ? null : r.id; bkHistOpen = null; vernieuwBkTabel();
     });
     tr.querySelector(".bk-g").addEventListener("click", (e) => { e.stopPropagation(); bkGoogleBalk(e.currentTarget, r); });
+    // ↻ (Shereen 13 okt): regel openklappen met de lijst andere omschrijvingen onder het REFINED-vak.
+    const hk = tr.querySelector(".bk-hist");
+    if (hk) hk.addEventListener("click", (e) => { e.stopPropagation(); bkHistOpen = bkHistOpen === r.id && bkGekozen === r.id ? null : r.id; bkGekozen = r.id; vernieuwBkTabel(); });
     const vink = tr.querySelector(".bk-vink-rij");
     if (vink) vink.addEventListener("change", () => { vink.checked ? bkVink.add(r.id) : bkVink.delete(r.id); bkBulkStand(); });
     tbody.appendChild(tr);
@@ -5373,6 +5405,8 @@ function bkDetailRij(r) {
   // selectie"): die klant en die factuur (op factuurnummer — Twinfield geeft geen boekstuk) staan klaar in de lijst.
   const twKlant = g.soort !== "klant" && twVoorstel ? (v.regels || []).filter(x => x.relatie && x.factuur) : [];
   const startTwFacturen = new Set(twKlant.map(x => x.relatie + "|" + x.factuur));
+  const toonOpties = bkHistOpen === r.id && (beoordelen || r.status === "fout");
+  const omsOpties = toonOpties ? bkOmsOpties(r) : [];
   tr.innerHTML = `<td></td><td colspan="${BK_KOLOMMEN - 1}">
     ${/^Niet gelukt in Twinfield/.test(r.opmerking || "") && BK_BEOORDELEN.includes(r.status) ? `<p style="margin:4px 0 8px; color:var(--rood); font-weight:600">⚠ ${escapeHtml(r.opmerking)}</p>` : ""}
     ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
@@ -5393,6 +5427,7 @@ function bkDetailRij(r) {
       <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div></div>
       <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen || r.status === "fout" ? "" : " disabled"}></div>
     </div>
+    ${toonOpties ? `<div class="bk-oms-opties"><b>Kies een omschrijving</b> (of typ zelf in het vak hierboven): ${omsOpties.map((o, i) => `<button type="button" class="bk-oms-optie" data-i="${i}">${escapeHtml(o.t)}<span>${escapeHtml(o.bron)}</span></button>`).join("")}</div>` : ""}
     ${beoordelen ? `<label style="display:block; margin:8px 0 3px; font-size:12px; font-weight:600">Waarom verbeter je dit? (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</label>
       <input type="text" id="bk-reden" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%">` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
     <p style="margin:10px 0 4px">
@@ -5474,6 +5509,11 @@ function bkDetailRij(r) {
     somTekst();
   };
   tr.querySelector("#bk-oms").addEventListener("input", (e) => { if (e.isTrusted) omsZelf = true; });
+  tr.querySelectorAll(".bk-oms-optie").forEach(b => b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const oms = tr.querySelector("#bk-oms"); oms.value = omsOpties[+b.dataset.i].t; omsZelf = true; oms.focus();
+    tr.querySelectorAll(".bk-oms-optie").forEach(x => x.classList.toggle("gekozen", x === b));
+  }));
   if (relVeld) {
     tr.querySelector("#bk-facturen").textContent = "Openstaande facturen ophalen uit Twinfield…";
     bkAfletGegevens(r.office).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });

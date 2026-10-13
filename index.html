@@ -1144,7 +1144,7 @@ const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND",
   "POS", "MAESTRO", "ACH", "TRANSFER", "PAYMENT", "PURCHASE", "MCDT", "EDC",
   // "InternetBanking Tfr Debit CMS REF-DC…" is alleen de manier van betalen (Shereen 12 okt): KUSTER-verzekeringen
   // werden herkend op "INTERNETBANKING TFR DEBIT" → 4831 Telefoon/Fax/Internet.
-  "INTERNETBANKING", "TFR", "DEBIT", "CREDIT", "CMS", "REF", "DC", "MOBILEWEB", "MOBILEIOS", "NETTO"]);
+  "INTERNETBANKING", "INTERNET", "TFR", "DEBIT", "CREDIT", "CMS", "REF", "DC", "MOBILEWEB", "MOBILEIOS", "NETTO", "OUTWARD", "LOC", "CLEARING", "PARTIAL"]);
 function soortVan(omschrijving) {
   const b = (omschrijving || "").toUpperCase();
   return SOORTEN.find(s => s.her.test(b)) || null;
@@ -1163,7 +1163,12 @@ function maandUitTekst(boven) {
   if (m) return MAANDEN_NL[Number(m[1]) - 1];
   m = boven.match(/\b20\d{2}[\/-](0?[1-9]|1[0-2])\b/);
   if (m) return MAANDEN_NL[Number(m[1]) - 1];
-  for (const w of boven.replace(/[^A-Z]/g, " ").split(/\s+/)) { const i = maandVanWoord(w); if (i >= 0) return MAANDEN_NL[i]; }
+  const ws = boven.replace(/[^A-Z]/g, " ").split(/\s+/);
+  for (let k = 0; k < ws.length; k++) {
+    let i = maandVanWoord(ws[k]);
+    if (i < 0 && ws[k].length === 1 && ws[k + 1]) i = maandVanWoord(ws[k] + ws[k + 1]);   // door de bank afgebroken: "S EPTEMBER"
+    if (i >= 0) return MAANDEN_NL[i];
+  }
   return null;
 }
 function maandUitDatum(datum) {
@@ -1173,7 +1178,8 @@ function maandUitDatum(datum) {
   return m && Number(m[1]) >= 1 && Number(m[1]) <= 12 ? MAANDEN_NL[Number(m[1]) - 1] : null;
 }
 function naamWoorden(omschrijving) {
-  let d = (omschrijving || "").toUpperCase();
+  // Geen naam: rangtelwoorden ("2nd", "1ste"), een afgebroken maand of de herhaalde rekeninghouder (zie naamBron).
+  let d = naamBron(omschrijving).toUpperCase().replace(/\b\d+(ST|ND|RD|TH|STE|DE|E)\b/g, " ");
   d = d.replace(/\bI\.?\s*F\.?\s*O\.?/g, " ");            // "in favor of" = ten gunste van
   const soort = soortVan(d);
   if (soort) d = d.replace(new RegExp(`(?:${soort.her.source})[A-Z]*`, "g"), " ");   // heel woord: "SALARIS", niet "SALAR" + "IS"
@@ -1185,7 +1191,7 @@ function naamWoorden(omschrijving) {
    voornaam: de eerste voorletter blijft). Een tweede voorletter valt altijd weg, een tweede voornaam
    alleen als het anders niet in de ruimte past. Identiek aan robot/bank-herkenning.mjs. */
 const TUSSENVOEGSELS = new Set(["VAN", "DE", "DEN", "DER", "TER", "TEN", "TE", "DA", "DOS", "DEL", "LA"]);
-function naamVoorOmschrijving(ruw, ruimte = 40) {
+function naamVoorOmschrijving(ruw, ruimte = 40, eenVoornaam = false) {
   let d = (ruw || "").toUpperCase().replace(/\bI\.?\s*F\.?\s*O\.?/g, " ");
   const soort = soortVan(d);
   if (soort) d = d.replace(new RegExp(`(?:${soort.her.source})[A-Z]*`, "g"), " ");
@@ -1198,6 +1204,7 @@ function naamVoorOmschrijving(ruw, ruimte = 40) {
   if (a < 0) a = Math.max(1, w.length - 1);                          // anders het laatste woord
   const voluit = w.slice(0, a).filter((x) => x.length > 1);
   const voor = voluit.length ? voluit : w.slice(0, 1);
+  if (eenVoornaam) voor.splice(1);   // deelbetaling (Shereen 12 okt): "Allan Kuster", zonder tweede voornaam
   const achter = w.slice(a).filter((x) => x.length > 1);
   const kast = (x) => (TUSSENVOEGSELS.has(x) && achter.indexOf(x) < achter.length - 1 ? x.toLowerCase()
     : OMS_KAPITALEN.has(x) ? x : x.charAt(0) + x.slice(1).toLowerCase());
@@ -1244,13 +1251,18 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf) {
   const week = boven.match(/\bWEEK\s*(\d{1,2})\b/);
   // Salaris en tips (Shereen 10 okt): "<Naam> - <Maand> salaris" en "<Naam> - week <nr> tip";
   // een tip gaat over de week vóór de betaling.
-  const naam = [...new Set(naamWoorden(ruw))];
+  // Deelbetaling (Shereen 12 okt): "2nd Partial Payment Netto salaris september … Allan Franz Kuster" →
+  // "Allan Kuster - September 2nd prt".
+  const deel = boven.match(/\b(\d{1,2})\s?(ST|ND|RD|TH|STE|DE|E)\s+(?:PARTIAL\s+PAYMENT|DEEL\s?BETAL\s?ING|TERMIJN)\b/);
+  const bron = naamBron(deel ? ruw.slice(0, deel.index) + " " + ruw.slice(deel.index + deel[0].length) : ruw);
+  const naam = [...new Set(naamWoorden(bron))];
   if (naam.length && soort && (soort.label === "SALARIS" || soort.label === "TIPS")) {
     const wanneer = soort.label === "SALARIS"
       ? maandUitTekst(boven) || (week ? "week " + week[1] : null) || maandUitDatum(datum)
       : (week ? "week " + week[1] : null) || maandUitTekst(boven) || weekVoorDatum(datum);
-    const staart = " - " + (wanneer ? wanneer + " " : "") + (soort.label === "SALARIS" ? "salaris" : "tip");
-    const titel = naamVoorOmschrijving(ruw, 40 - staart.length);
+    const wat = deel ? deel[1] + deel[2].toLowerCase() + " prt" : soort.label === "SALARIS" ? "salaris" : "tip";
+    const staart = " - " + (wanneer ? wanneer + " " : "") + wat;
+    const titel = naamVoorOmschrijving(bron, 40 - staart.length, !!deel);
     return titel.slice(0, 40 - staart.length).trim() + staart;
   }
   const belasting = belastingOmschrijving(ruw, datum);
@@ -1321,6 +1333,23 @@ function zonderBankstaart(ruw) {
   return t.replace(/M\s?O\s?B\s?I\s?L\s?E\s?(?:W\s?E\s?B|I\s?O\s?S)[\s\S]*$/i, " ")
     .replace(/^\s*(?:INTERNET\s?BANKING\s+TFR\s+DEBIT|INTERNET\s+TRANSFER\s+CREDIT|OUTWARD\s+LOC\s+CLEARING\s+PAYMENT)\b/i, " ")
     .replace(/\bCMS\s+REF-?[A-Z]{0,3}\d*/gi, " ").replace(/\s{2,}/g, " ").trim();
+}
+/* Waar de naam in staat, zonder de staart die de bank herhaalt (KUSTER, 12 okt): "… Allan Franz Kuster K uster Law"
+   — vanaf een tweede keer dezelfde naam (ook afgebroken: "K USTER") is het de rekeninghouder (Kuster Law), niet de
+   werknemer. Een door de bank afgebroken maand ("S EPTEMBER") is geen naam. */
+function naamBron(ruw) {
+  // Alleen een DIRECTE herhaling knipt ("Kuster Kuster Law", "Kuster K uster Law"); "Curt I.F.O. Curt D Harms" niet.
+  const w = String(ruw || "").split(/\s+/), uit = [];
+  const kaal = (x) => (x || "").toUpperCase().replace(/[^A-Z]/g, "");
+  let vorige = "";
+  for (let i = 0; i < w.length; i++) {
+    const k = kaal(w[i]), plus = k.length === 1 ? k + kaal(w[i + 1]) : "";
+    if (plus && maandVanWoord(plus) >= 0) { i++; continue; }
+    if (vorige.length >= 4 && (k === vorige || plus === vorige)) break;
+    if (k) vorige = k;
+    uit.push(w[i]);
+  }
+  return uit.join(" ");
 }
 /* Afkappen op 40 tekens, maar op een heel woord (geen "Boogaa"). */
 function kortOpWoord(t, max) {

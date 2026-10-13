@@ -5368,6 +5368,12 @@ function bkTwinfieldOpties(r, hist) {
   }
   return uit;
 }
+/* Factuurnummers in een tekst als "2026-0248" (zoals factuurNrs in robot/bank-herkenning.mjs): "ENDURA-2026-0248", "2026 0248", "20260248". */
+function bkFactuurNrs(t) {
+  const uit = new Set();
+  for (const m of String(t || "").matchAll(/\b(20\d{2})[\s\-\/]?(\d{3,4})\b/g)) uit.add(`${m[1]}-${m[2].padStart(4, "0")}`);
+  return uit;
+}
 function bkStandaardGoedkeuring(r) {
   // Opgeslagen keuze (💾 Opslaan, 13 okt) gaat voor Shai's voorstel.
   if (r.goedgekeurd && r.goedgekeurd.concept && r.goedgekeurd.soort) { const { concept, opgeslagen_door, opgeslagen_op, ...g } = r.goedgekeurd; return g; }
@@ -5516,6 +5522,7 @@ function bkDetailRij(r) {
     ${toonKlant ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="klant"${keuzeKlant ? " checked" : ""}${beoordelen ? "" : " disabled"}> Afletteren op klant — een of meer openstaande facturen (rest = vooruitbetaling op de klant):</label>
       <div class="bk-aflet" style="margin:0 0 8px 24px">
         <div class="fa-crd-vak" style="max-width:460px"><input type="text" id="bk-relatie" value="${escapeHtml(startRelatie)}" placeholder="klant: nummer of naam" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-relatie-naam" class="fa-crd-naam"></span></div>
+        <div id="bk-niet-open" style="margin:6px 0 2px; color:var(--rood); font-weight:600"></div>
         <div id="bk-facturen" class="fa-uitleg" style="margin:6px 0"></div>
         <div id="bk-aflet-som" style="font-size:13px"></div>
         <div id="bk-verschil" style="display:none; margin-top:6px; font-size:13px">
@@ -5563,12 +5570,13 @@ function bkDetailRij(r) {
     // Over- of onderbetaling (Shereen 12 okt): zoals in Twinfield kiezen waar het verschil heen gaat.
     el.innerHTML = `Aangevinkt <b>${faBedrag(som)}</b> · ontvangen <b>${faBedrag(r.bedrag)}</b> · ` + (rest < -0.004
       ? `<b>onderbetaling ${faBedrag(-rest)}</b> — waar gaat het verschil heen?`
-      : rest > 0.004 ? `<b>overbetaling ${faBedrag(rest)}</b> — waar gaat het verschil heen?` : "past precies");
+      : rest > 0.004 ? (som < 0.005 ? `<b>geen factuur aangevinkt</b> — het hele bedrag komt op de debiteur, zonder factuur (vooruitbetaling)`
+        : `<b>overbetaling ${faBedrag(rest)}</b> — waar gaat het verschil heen?`) : "past precies");
     const vak = tr.querySelector("#bk-verschil");
     // Alleen bij zelf afletteren op klant (Shereen 12 okt: bij Twinfields voorstel leek het een overboeking).
     const opKlant = !!tr.querySelector('input[name="bk-keuze"][value="klant"]')?.checked && !!relVeld.value.trim();
     if (!relVeld.value.trim()) el.innerHTML = "";
-    vak.style.display = opKlant && Math.abs(rest) > 0.004 ? "" : "none";
+    vak.style.display = opKlant && Math.abs(rest) > 0.004 && som > 0.004 ? "" : "none";   // geen factuur: altijd vooruitbetaling
     // Zoals in Twinfield (Shereen 13 okt): overbetaling → vooruitbetaling (standaard) of op-/afboeking/bankkosten/koersverschil;
     // onderbetaling → deelbetaling, restant blijft open op de factuur (standaard) of afboeken.
     vak.querySelector('[data-verschil="vooruitbetaling"]').style.display = rest > 0.004 ? "" : "none";
@@ -5576,7 +5584,7 @@ function bkDetailRij(r) {
     const vb = vak.querySelector('input[value="vooruitbetaling"]'), db = vak.querySelector('input[value="deelbetaling"]');
     if (rest < -0.004 && vb.checked) vb.checked = false;
     if (rest > 0.004 && db.checked) db.checked = false;
-    if (rest > 0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) vb.checked = true;
+    if (rest > 0.004 && (som < 0.005 || !vak.querySelector('input[name="bk-verschil"]:checked'))) vb.checked = true;
     if (rest < -0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) db.checked = true;
     verschilRek();
   };
@@ -5601,6 +5609,10 @@ function bkDetailRij(r) {
     const k = aflet.klanten.find(x => x.code === rel);
     const naamEl = tr.querySelector("#bk-relatie-naam"); naamEl.textContent = rel && k ? k.naam : rel && !/[a-z]/i.test(rel) && aflet.klanten.length ? "onbekende klant" : "";
     if (aflet.fout) { vak.innerHTML = `<span style="color:var(--rood)">Openstaande facturen ophalen lukte niet: ${escapeHtml(aflet.fout)}</span>`; return; }
+    // Factuurnummer uit de banktekst dat niet openstaat (Shereen 13 okt): melden, en nooit zelf een andere factuur kiezen.
+    const nietOpen = aflet.fout ? [] : [...bkFactuurNrs(r.omschrijving)].filter(n => !aflet.open.some(o => o.factuur === n || bkFactuurNrs(o.factuur).has(n)));
+    const no = tr.querySelector("#bk-niet-open");
+    if (no) no.textContent = nietOpen.length ? `⚠ Factuur ${nietOpen.join(", ")} uit de banktekst staat niet open. Vink niets aan om het bedrag op de debiteur zonder factuur te boeken (vooruitbetaling), of kies een andere openstaande factuur.` : "";
     if (!rel) { vak.textContent = "Kies eerst de klant."; somTekst(); return; }
     const lijst = aflet.open.filter(o => o.relatie === rel).sort((a, b) => a.datum.localeCompare(b.datum));
     // Veel open facturen (Shereen 12 okt, Miniño): in 5 kolommen over het scherm + zoeken op nummer, datum of bedrag.

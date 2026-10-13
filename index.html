@@ -1318,6 +1318,10 @@ function algemeen(ruw, bedrijf) {
     if (/^\d+(-\d+)+,?$/.test(w)) return w;
     return w.replace(/-?\d{6,}/g, " ");
   }).join(" ").replace(/(\bPOS\b)[\s\d]+/g, "$1 ");
+  // Maestro/POS is de betaalmethode, geen omschrijving (Shereen 13 okt) — behalve bij de bankkosten "Maestro Comm.".
+  if (!/\bCOMM\b/.test(d)) d = d.replace(/\bMAESTRO\s*\/\s*POS\b|\bMAESTRO\b|\bPOS\b/g, " ");
+  // Pinmoment achter een POS-betaling ("07/10 09:39 6435": datum, tijd, terminal) zegt de lezer niets.
+  d = d.replace(/\b\d{1,2}\/\d{1,2}\s+\d{1,2}:\d{2}(\s+\d{1,6})?\b/g, " ");
   if (bedrijf) {
     const eerste = String(bedrijf).toUpperCase().split(/[^A-Z]+/).find((w) => w.length >= 4);
     if (eerste) d = d.replace(new RegExp("(^|[^A-Z])" + eerste + "[A-Z0-9]*.*$"), " ");
@@ -5246,6 +5250,11 @@ function bkHoogte() {
 }
 addEventListener("resize", bkHoogte);
 /* Wat goedgekeurd zou worden als je het voorstel ongewijzigd overneemt (ook bij de vinkjes). */
+/* Bij het zoeken naar vergelijkbare omschrijvingen tellen plaatsen en landcodes niet mee (Shereen 13 okt: alles met
+   "Oranjestad AW" leek op elkaar — Topcar, The West Deck, Price Smart bij een Axross/Wayaca-betaling). */
+const BK_PLAATS = new Set(["ORANJESTAD", "ORANJES", "ORANJE", "AW", "ARUBA", "NOORD", "PARADERA", "SANTA", "CRUZ", "SAVANETA", "SAN", "NICOLAS",
+  "TANKI", "LEENDE", "PALM", "BEACH", "EAGLE", "NL", "GB", "US", "USA", "IE", "CW", "CURACAO", "BONAIRE", "NETHERLANDS", "HOLLAND"]);
+const bkZoekWoorden = (t) => naamWoorden(t).filter(w => !BK_PLAATS.has(w));
 /* Andere omschrijvingen voor een bankregel (Shereen 13 okt, rood ↻ in de regel): Shai's voorstel, de Twinfield-
    historie (ook met de periode bijgewerkt), eerder goedgekeurde omschrijvingen bij vergelijkbare bankteksten van
    dezelfde klant (dezelfde naamwoorden), de opgeschoonde banktekst en de RAW-tekst. Uniek, max 40 tekens, hooguit 10. */
@@ -5258,9 +5267,9 @@ function bkOmsOpties(r) {
     voeg(omschrijvingUitHistorie(h.omschrijving, r.omschrijving, r.datum), `historie ${datumNlKort(h.datum)}, periode bijgewerkt`);
     voeg(h.omschrijving, `Twinfield-historie ${datumNlKort(h.datum)}`);
   }
-  const mijn = new Set(naamWoorden(r.omschrijving));
+  const mijn = new Set(bkZoekWoorden(r.omschrijving));
   const lijkt = bkRegels.filter(x => x.id !== r.id && x.office === r.office && x.goedgekeurd && x.goedgekeurd.omschrijving).map(x => {
-    const w = new Set(naamWoorden(x.omschrijving)), samen = [...w].filter(y => mijn.has(y)).length;
+    const w = new Set(bkZoekWoorden(x.omschrijving)), samen = [...w].filter(y => mijn.has(y)).length;
     return { x, samen, score: samen / Math.max(1, Math.min(mijn.size, w.size)) };
   }).filter(o => o.samen >= Math.min(2, mijn.size) && o.score >= 0.5)
     .sort((a, b) => b.score - a.score || String(b.x.datum).localeCompare(String(a.x.datum))).slice(0, 5);
@@ -5301,11 +5310,11 @@ function bkTwinfieldHistorie(office) {
 }
 /* Uit die historie: omschrijvingen bij een vergelijkbare banktekst (dezelfde naamwoorden), beste en nieuwste eerst. */
 function bkTwinfieldOpties(r, hist) {
-  const mijn = new Set(naamWoorden(r.omschrijving));
+  const mijn = new Set(bkZoekWoorden(r.omschrijving));
   if (!mijn.size) return [];
   const per = new Map();
   for (const h of hist) {
-    const w = new Set(naamWoorden(h.omschrijving)), samen = [...w].filter(y => mijn.has(y)).length;
+    const w = new Set(bkZoekWoorden(h.omschrijving)), samen = [...w].filter(y => mijn.has(y)).length;
     if (samen < Math.min(2, mijn.size)) continue;
     const score = samen / Math.max(1, Math.min(mijn.size, w.size));
     if (score < 0.5) continue;

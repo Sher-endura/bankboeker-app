@@ -744,6 +744,8 @@
     <div class="fa-detail">
       <div class="fa-scan" id="fa-scan"></div>
       <div class="fa-form">
+        <!-- Melding bovenaan (Shereen 14 okt: onder de knoppen was "Goedgekeurd … Dit is het volgende document" verwarrend). -->
+        <div id="melding-fa-detail"></div>
         <p style="margin:0 0 4px"><span id="fa-som"></span></p>
         <label style="margin-top:2px">Waarom verbeter je dit? (optioneel — wordt een regel voor de robot)</label>
         <input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris">
@@ -767,7 +769,6 @@
           <button class="knop" id="btn-fa-verwijder-ok">Verwijderen door Shai</button>
           <button class="knop stil" id="btn-fa-verwijder-annuleer">Annuleren</button>
         </div>
-        <div id="melding-fa-detail"></div>
         <div class="rij">
           <div><label>Crediteur * <button type="button" class="knop stil" id="btn-fa-crd-ververs" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Net een crediteur aangemaakt in Twinfield? Haal de lijst opnieuw op.">↻ Crediteuren uit Twinfield</button><button type="button" class="knop stil" id="btn-fa-crd-nieuw" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Staat de leverancier er nog niet in? Shai maakt hem aan in Basecone.">＋ Nieuwe crediteur</button></label><div class="fa-crd-vak"><input type="text" id="fa-crediteur" placeholder="bv. C0197 of een naam" autocomplete="off"><span id="fa-crediteur-naam" class="fa-crd-naam"></span></div></div>
           <div><label>Factuurnummer *</label><input type="text" id="fa-factuurnummer"></div>

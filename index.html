@@ -5895,7 +5895,7 @@ function bkDetailRij(r) {
   }
   if (relVeld) {
     tr.querySelector("#bk-facturen").textContent = `${K.facturen[0].toUpperCase() + K.facturen.slice(1)} ophalen uit Twinfield…`;
-    bkAfletGegevens(r.office, kant).then(d => { aflet = d; toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });
+    bkAfletGegevens(r.office, kant).then(d => { aflet = bkMinGeclaimd(d, r, startFacturen); toonFacturen(); }, e => { aflet.fout = e.message || String(e); toonFacturen(); });
     relVeld.addEventListener("input", () => {
       const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true;
       const zf = tr.querySelector("#bk-zonder-factuur"); if (zf) zf.checked = false;   // nieuwe klant: opnieuw kiezen
@@ -5931,7 +5931,7 @@ function bkDetailRij(r) {
   const splitsData = {};   // per kant: { klanten, open } zodra geladen
   const laadSplitsData = (kant) => { if (kant === "grootboek" || splitsData[kant]) return;
     splitsData[kant] = { klanten: [], open: [], laden: true };
-    bkAfletGegevens(r.office, kant).then(d => { splitsData[kant] = d; tekenSplits(); }, e => { splitsData[kant] = { klanten: [], open: [], fout: e.message || String(e) }; tekenSplits(); }); };
+    bkAfletGegevens(r.office, kant).then(d => { splitsData[kant] = bkMinGeclaimd(d, r); tekenSplits(); }, e => { splitsData[kant] = { klanten: [], open: [], fout: e.message || String(e) }; tekenSplits(); }); };
   const splitsSom = () => {
     const el = tr.querySelector("#bk-s-som"); if (!el) return;
     const som = rond(splits.reduce((t, s) => t + (Number(s.bedrag) || 0), 0)), rest = rond(absBedrag - som);
@@ -6214,6 +6214,31 @@ async function bkUitlegVerwerken(r, reden) {
 }
 /* Eén factuurkandidaat als goed te keuren regel (soort klant). */
 /* De regels van een goedkeuring om te tonen; bij Splitsen elke toewijzing als regel (rekening + relatie + factuur). */
+/* Onthouden wat al gekozen is (Shereen 14 okt, Rasmijn: factuur 0284 hing al aan de betaling van september in een nog
+   niet geboekt afschrift, en Shai koos hem ook voor augustus). Twinfield toont zo'n factuur nog als open tot dat afschrift
+   geboekt is. Per factuur (code|nummer) het bedrag dat al gekozen is bij een ándere goedgekeurde/toegewezen regel; een
+   geboekt afschrift (Verwerkt) telt niet meer — dat zit dan al in Twinfields openstaande posten. Zelfde regel als robot/bank.mjs. */
+function bkGeclaimd(office, behalveId) {
+  const m = new Map();
+  const tel = (sleutel, bedrag) => { if (sleutel && String(sleutel).includes("|")) m.set(sleutel, (m.get(sleutel) || 0) + Math.abs(Number(bedrag) || 0)); };
+  for (const x of bkRegels) {
+    if (x.office !== office || x.id === behalveId || !["goedgekeurd", "toegewezen"].includes(x.status) || !x.goedgekeurd || x.goedgekeurd.concept) continue;
+    const g = x.goedgekeurd;
+    if (g.soort === "splitsen") { for (const t of g.toewijzingen || []) for (const f of t.facturen || []) tel(f.boekstuk, f.open ?? t.bedrag); continue; }
+    for (const y of (g.soort === "twinfield" ? (x.voorstel || {}).regels : g.regels) || []) tel(y.boekstuk || (y.factuur ? "F|" + y.factuur : null), y.bedrag);   // Twinfield-voorstel: alleen factuurnummer
+  }
+  return m;
+}
+/* De open facturen min wat elders al gekozen is; helemaal gekozen = niet meer tonen (behalve wat deze regel zelf al had). */
+function bkMinGeclaimd(d, r, houden = new Set()) {
+  if (!d || !d.open) return d;
+  const claim = bkGeclaimd(r.office, r.id);
+  const open = d.open.map(o => {
+    const c = (claim.get(o.code + "|" + o.nummer) || 0) + (o.factuur ? claim.get("F|" + o.factuur) || 0 : 0);
+    return c ? { ...o, open: Math.sign(o.open || 1) * Math.round((Math.abs(o.open) - c) * 100) / 100, alGekozen: c } : o;
+  }).filter(o => Math.abs(o.open) > 0.004 || houden.has(o.code + "|" + o.nummer));
+  return { ...d, open };
+}
 function bkGoedRegels(g) {
   if (g.soort !== "splitsen") return g.regels || [];
   return (g.toewijzingen || []).map(t => t.soort === "grootboek" ? { rekening: t.rekening, naam: t.naam, bedrag: t.bedrag }

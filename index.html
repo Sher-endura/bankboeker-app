@@ -223,6 +223,10 @@
   .status-tabjes button { background: none; border: none; border-bottom: 3px solid transparent; padding: 6px 6px; font-size: 14px; color: var(--tekst); cursor: pointer; white-space: nowrap; }
   .status-tabjes button:hover { color: var(--blauw); }
   .status-tabjes button.actief { color: var(--blauw); font-weight: 600; border-bottom-color: #FB7974; }
+  /* Tabjes waar je iets moet doen (Shereen 14 okt): fel, in de kleur van het Shai-logo. */
+  .status-tabjes button.doen { background: var(--zalm); color: #fff; font-weight: 600; border-radius: 6px 6px 0 0; padding: 6px 10px; margin-right: 4px; }
+  .status-tabjes button.doen:hover { color: #fff; filter: brightness(0.93); }
+  .status-tabjes button.doen.actief { color: #fff; border-bottom-color: var(--tekst); }
   .bk-scroll { overflow: auto; }
   #tabel-bank thead th { position: sticky; top: 0; z-index: 5; background: var(--grijs); }
   #tabel-bank tr.bk-kop td { background: var(--grijs); color: var(--tekst); font-weight: 600; font-size: 13px; }
@@ -3991,10 +3995,11 @@ const SHAI_STATUS_TEKST = {
 /* Statustabjes (Shereen 12 okt: "maak default voorstel en voorleggen in een tab, en alle anderen in aparte
    tabs, voor beide"). tabjes = [[sleutel, tekst, [statussen]], …]; het eerste is de standaard. De keuze
    onthoudt deze browser. */
-function statusTabjes(vakId, tabjes, gekozen, telling, kies) {
+function statusTabjes(vakId, tabjes, gekozen, telling, kies, doen = []) {
   const vak = document.getElementById(vakId);
+  const klasse = (sleutel) => [sleutel === gekozen ? "actief" : "", doen.includes(sleutel) ? "doen" : ""].filter(Boolean).join(" ");
   vak.innerHTML = tabjes.map(([sleutel, tekst, st]) =>
-    `<button type="button" data-tab="${sleutel}"${sleutel === gekozen ? ' class="actief"' : ""}>${escapeHtml(tekst)} (${st.reduce((n, x) => n + telling(x), 0)})</button>`).join("");
+    `<button type="button" data-tab="${sleutel}"${klasse(sleutel) ? ` class="${klasse(sleutel)}"` : ""}>${escapeHtml(tekst)} (${st.reduce((n, x) => n + telling(x), 0)})</button>`).join("");
   vak.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kies(b.dataset.tab)));
 }
 const leesTabje = (sleutel, tabjes) => { try { const t = localStorage.getItem(sleutel); if (tabjes.some(x => x[0] === t)) return t; } catch (e) { /* standaard */ } return tabjes[0][0]; };
@@ -5318,6 +5323,15 @@ function bkOmsTekst(r) {
 }
 let bkRegels = [], bkGekozen = null, bkRekNamen = {}, bkUitlegRegels = [], bkEigen = {}, bkHistOpen = null;
 const bkDicht = new Set();   // ingeklapte administraties (klik op de rode kopbalk)
+/* In Goedgekeurd, Toegewezen en Verwerkt staan de administraties standaard ingeklapt (Shereen 14 okt: "dat leest
+   fijner"); daar onthoudt bkOpen welke je openklapte, per tabje. In de andere tabjes blijft alles open tenzij je inklapt. */
+const BK_STANDAARD_DICHT = ["goedgekeurd", "toegewezen", "verwerkt"];
+const bkOpen = new Set();   // "tabje|office"
+const bkIsDicht = (o) => (BK_STANDAARD_DICHT.includes(bkTabje) ? !bkOpen.has(`${bkTabje}|${o}`) : bkDicht.has(o));
+function bkKlap(o) {
+  if (BK_STANDAARD_DICHT.includes(bkTabje)) { const k = `${bkTabje}|${o}`; bkOpen.has(k) ? bkOpen.delete(k) : bkOpen.add(k); }
+  else bkDicht.has(o) ? bkDicht.delete(o) : bkDicht.add(o);
+}
 let bkSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
 const bkVink = new Set();
 const bkZeker = (z) => (z >= 85 ? "hoog" : z >= 60 ? "middel" : "laag");
@@ -5362,19 +5376,28 @@ async function laadBank() {
   vernieuwBkFilters();
   vernieuwBkTabel();
 }
+/* ▶ Shai nu laten draaien kan niet zolang Shai al in Twinfield bezig is (Shereen 14 okt), en 30 s na een klik. */
+let bkNuGevraagd = false;
 async function laadBankStatus() {
   const { data } = await sb.from("robot_status").select("*").eq("id", "bank").maybeSingle();
   shaiStatus(document.getElementById("bk-robot"), data, { app: "Twinfield", gebruiker: "Endura_AI", snelkoppeling: "Shai Twinfield-bank", maxMinuten: 75, log: "bank_log" });
+  const bezig = !!data && data.status === "werkt" && Date.now() - new Date(data.laatste_hartslag).getTime() < 75 * 60000;
+  const knop = document.getElementById("btn-bk-nu");
+  knop.disabled = bezig || bkNuGevraagd;
+  knop.title = bezig ? `Shai is nu bezig in Twinfield${data.bericht ? " (" + data.bericht + ")" : ""} — als hij klaar is, kan het weer.`
+    : "Shai begint binnen een halve minuut aan een ronde in Twinfield.";
 }
+// Bijhouden of Shai bezig is, ook als je niets aanklikt (alleen als het tabblad Twinfield Bank open staat).
+setInterval(() => { if (CLOUD && document.getElementById("bk-robot").offsetParent) laadBankStatus(); }, 30000);
 async function bkNuDraaien() {
   const knop = document.getElementById("btn-bk-nu"), m = document.getElementById("bk-nu-melding");
-  knop.disabled = true;
+  knop.disabled = true; bkNuGevraagd = true;
   // Eén klant of iedereen: volgt de keuze in "Alle administraties" (Shereen 11 okt).
   const office = document.getElementById("bk-office").value || null;
-  if (office === GEEN_ADMIN) { m.textContent = "Kies eerst een bestaande administratie (of maak het zoekvak leeg voor alle klanten)."; knop.disabled = false; return; }
+  if (office === GEEN_ADMIN) { m.textContent = "Kies eerst een bestaande administratie (of maak het zoekvak leeg voor alle klanten)."; bkNuGevraagd = false; knop.disabled = false; return; }
   const { error } = await sb.from("bank_log").insert({ actie: "nu draaien", office, door: gebruiker ? gebruiker.email : null });
   m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"} (als zijn Twinfield-venster open en ingelogd is).`;
-  setTimeout(() => { knop.disabled = false; laadBankStatus(); }, 30000);
+  setTimeout(() => { bkNuGevraagd = false; laadBankStatus(); }, 30000);
 }
 /* Tabje Verwerkt (Shereen 12 okt: "anders wordt het een megalijst"): per dag inklapbaar, nieuwste dag open, en
    alleen de laatste 31 dagen. Ouder staat gewoon in Twinfield; de regels blijven bewaard (Shai leert ervan). */
@@ -5389,28 +5412,26 @@ function bkZichtbaar() {
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
   const sub = document.getElementById("bk-substatus").value;
-  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(bkTabStatus(r)) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
+  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
     pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron) &&   // zoeken blijft binnen tabje + status (12 okt)
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
 /* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Basecone.
-   Splitsen (Shereen 14 okt: "wacht splitsen" stond tussen Goedgekeurd, waar ze niet meer kijkt): goedgekeurde regels die
-   via het Restant-blok moeten (meer facturen, zonder factuur, deelbetaling, vooruitbetaling, verschil, "Splitsen") —
-   dezelfde regel als in robot/bank.mjs. Ze houden status goedgekeurd; alleen het tabje is anders. */
-const bkMoetSplitsen = (r) => { const g = r.goedgekeurd || {};
-  return g.soort === "splitsen" || (g.soort === "klant" && !(g.regels && g.regels.length === 1 && !(Number(g.vooruitbetaling) > 0.004) && !g.verschil)); };
-const bkTabStatus = (r) => (r.status === "goedgekeurd" && bkMoetSplitsen(r) ? "splitsen" : r.status);
-const BK_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["splitsen", "Splitsen", ["splitsen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
-  ["toegewezen", "Toegewezen", ["toegewezen"]], ["verwerkt", "Verwerkt (concept)", ["verwerkt"]], ["fout", "Fout", ["fout"]],
-  ["overgeslagen", "Overgeslagen", ["overgeslagen"]]];
+   Volgorde en kleur (Shereen 14 okt): eerst de tabjes waar je iets moet doen (Te beoordelen, Fout, Overgeslagen), fel
+   gekleurd (BK_TABJES_DOEN); daarna wat Shai doet. Het tabje Splitsen (14 okt ochtend) is weer weg: splitsen staat aan,
+   Shai neemt die regels gewoon mee bij Goedgekeurd. */
+const BK_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["fout", "Fout", ["fout"]],
+  ["overgeslagen", "Overgeslagen", ["overgeslagen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
+  ["toegewezen", "Toegewezen", ["toegewezen"]], ["verwerkt", "Verwerkt (concept)", ["verwerkt"]]];
+const BK_TABJES_DOEN = ["beoordelen", "fout", "overgeslagen"];
 let bkTabje = leesTabje("bankboeker.bank.tabje", BK_TABJES);
 let bkStatusSel = new Set(BK_TABJES.find(t => t[0] === bkTabje)[2]);
 function vernieuwBkFilters() {
   const office = document.getElementById("bk-office").value;
-  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && bkTabStatus(r) === s && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r)).length, (t) => {
+  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r)).length, (t) => {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
-  });
+  }, BK_TABJES_DOEN);
   toonSubstatus("bk-substatus", bkTabje === "beoordelen");
   bkStatusKnop();
 }
@@ -5531,7 +5552,7 @@ function vernieuwBkTabel() {
   // Keuzelijst: weer per tabje (Shereen 13 okt: "ik klikte OUTSTANDING_HOME bij te beoordelen omdat dat getal in de zoekbox
   // stond, en alles was al goedgekeurd") — alleen administraties met regels in dit tabje, het getal = regels in dit tabje.
   const bkSub = document.getElementById("bk-substatus").value;
-  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(bkTabStatus(r)) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
+  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
     pastSubstatus(bkSub, r.status, r.voorstel && r.voorstel.bron)).map(r => r.office));
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
@@ -5565,10 +5586,10 @@ function vernieuwBkTabel() {
       vorigeKlant = r.office; vorigAfschrift = "";
       const naam = (profielen.find(p => p.code === r.office) || {}).naam || "";
       const open = lijst.filter(x => x.office === r.office).length;
-      const dicht = bkDicht.has(r.office);
+      const dicht = bkIsDicht(r.office);
       tbody.insertAdjacentHTML("beforeend", `<tr class="bk-klant" data-office="${escapeHtml(r.office)}" title="Klik om ${dicht ? "uit" : "in"} te klappen"><td colspan="${BK_KOLOMMEN}"><span class="bk-klap-pijl">${dicht ? "▸" : "▾"}</span> ${escapeHtml(r.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${open} regel${open === 1 ? "" : "s"}</span></td></tr>`);
     }
-    if (bkDicht.has(r.office)) continue;   // ingeklapt (Shereen 13 okt)
+    if (bkIsDicht(r.office)) continue;   // ingeklapt (Shereen 13 okt)
     const afs = `${r.bank_code} ${r.afschrift}${r.sub_id > 1 ? "/" + r.sub_id : ""}`;
     if (afs !== vorigAfschrift && !bkSorteer) {
       vorigAfschrift = afs;
@@ -6330,7 +6351,7 @@ document.querySelector("#tabel-bank tbody").addEventListener("click", (e) => {
   const kop = e.target.closest("tr.bk-klant");
   if (!kop || !kop.dataset.office) return;
   const o = kop.dataset.office;
-  bkDicht.has(o) ? bkDicht.delete(o) : bkDicht.add(o);
+  bkKlap(o);
   if (bkGekozen && (bkRegels.find(x => x.id === bkGekozen) || {}).office === o) bkGekozen = null;
   vernieuwBkTabel();
 });

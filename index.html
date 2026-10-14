@@ -5562,7 +5562,9 @@ function bkStandaardGoedkeuring(r) {
   // die nog met oudere regels gemaakt kan zijn ("… B.O.O. Sera Fina Tradin").
   const oms = (bkOmsTekst(r) || v.omschrijving || "").slice(0, 40);
   if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield", omschrijving: oms };
-  if (v.soort === "klant" && v.regels && v.regels.length === 1 && v.regels[0].boekstuk) return { soort: "klant", ...(v.kant === "crediteur" ? { kant: v.kant } : {}), regels: [v.regels[0]], omschrijving: oms };
+  // Alleen als de factuur precies het betaalde bedrag is (14 okt, Kuster 26175/5: 0195 open 24.100, betaald 6.450, met het vinkje
+  // goedgekeurd zonder deelbetaling) — anders eerst in het uitklapvak kiezen: deelbetaling, op-/afboeking, …
+  if (v.soort === "klant" && v.regels && v.regels.length === 1 && v.regels[0].boekstuk && Math.abs(Math.abs(Number(v.regels[0].bedrag)) - Math.abs(Number(r.bedrag))) < 0.005) return { soort: "klant", ...(v.kant === "crediteur" ? { kant: v.kant } : {}), regels: [v.regels[0]], omschrijving: oms };
   if (v.soort === "grootboek" && v.regels && v.regels.length === 1 && v.regels[0].rekening)
     return { soort: "grootboek", regels: [{ rekening: v.regels[0].rekening, bedrag: Number(r.bedrag) }], omschrijving: oms };
   return null;
@@ -5624,7 +5626,8 @@ function vernieuwBkTabel() {
     const z = Number((r.voorstel || {}).zekerheid || 0);
     const kanVink = BK_BEOORDELEN.includes(r.status);   // ook zonder voorstel: kan naar Vraagposten (Shereen 12 okt)
     const bron = bkHerkomst(r);   // herkomst: alleen in de ⓘ en in de kolom Bron (Shereen 11 okt)
-    const uitleg = (r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "");
+    // "Klant/leverancier toewijzen doet Shai nog niet" stond in oudere voorstellen — klopt niet meer (Shereen 14 okt).
+    const uitleg = ((r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "")).replace(/\s*Klant\/leverancier toewijzen doet Shai nog niet — graag zelf in Twinfield\.?/g, "");
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>

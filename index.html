@@ -4181,12 +4181,19 @@ function vernieuwFaFilters() {
     vernieuwFaFilters(); vernieuwFaTabel();
   });
   toonSubstatus("fa-substatus", faTabje === "beoordelen");
+  faStatusKnop();
   requestAnimationFrame(faHoogte);
+}
+/* De knop noemt de administratie waarvoor Shai gaat draaien, zoals bij Twinfield Bank (Shereen 14 okt). */
+function faStatusKnop() {
+  const office = document.getElementById("fa-office").value;
+  document.getElementById("btn-fa-nu").textContent = `▶ Shai nu laten draaien (${office === GEEN_ADMIN ? "niet gevonden" : office || "alle klanten"})`;
 }
 function vernieuwFaTabel() {
   // Keuzelijst: per tabje, zoals Twinfield Bank (Shereen 13 okt).
   const faSub = document.getElementById("fa-substatus").value;
   vulAdminKeuze("fa-office", faDocs.filter(d => faStatusSel.has(d.status) && pastSubstatus(faSub, d.status, "shai")).map(d => d.office));
+  faStatusKnop();
   const tbody = document.querySelector("#tabel-facturen tbody");
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";

@@ -5382,19 +5382,25 @@ function bkZichtbaar() {
     return [r.office, r.bank_code, r.afschrift, r.omschrijving, faBedrag(r.bedrag), Number(r.bedrag).toFixed(2), r.datum, datumNlKort(r.datum), r.status, r.boekstuk,
       ...(v.regels || []).flatMap(x => [x.rekening, x.naam, x.relatienaam, x.factuur])].filter(Boolean).join(" ").toLowerCase(); };
   const sub = document.getElementById("bk-substatus").value;
-  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
+  return bkRegels.filter(r => (!office || r.office === office) && bkStatusSel.has(bkTabStatus(r)) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
     pastSubstatus(sub, r.status, r.voorstel && r.voorstel.bron) &&   // zoeken blijft binnen tabje + status (12 okt)
     (!zoek.length || zoek.every(w => tekst(r).includes(w))));
 }
-/* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Basecone. */
-const BK_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
+/* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Basecone.
+   Splitsen (Shereen 14 okt: "wacht splitsen" stond tussen Goedgekeurd, waar ze niet meer kijkt): goedgekeurde regels die
+   via het Restant-blok moeten (meer facturen, zonder factuur, deelbetaling, vooruitbetaling, verschil, "Splitsen") —
+   dezelfde regel als in robot/bank.mjs. Ze houden status goedgekeurd; alleen het tabje is anders. */
+const bkMoetSplitsen = (r) => { const g = r.goedgekeurd || {};
+  return g.soort === "splitsen" || (g.soort === "klant" && !(g.regels && g.regels.length === 1 && !(Number(g.vooruitbetaling) > 0.004) && !g.verschil)); };
+const bkTabStatus = (r) => (r.status === "goedgekeurd" && bkMoetSplitsen(r) ? "splitsen" : r.status);
+const BK_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["splitsen", "Splitsen", ["splitsen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
   ["toegewezen", "Toegewezen", ["toegewezen"]], ["verwerkt", "Verwerkt (concept)", ["verwerkt"]], ["fout", "Fout", ["fout"]],
   ["overgeslagen", "Overgeslagen", ["overgeslagen"]]];
 let bkTabje = leesTabje("bankboeker.bank.tabje", BK_TABJES);
 let bkStatusSel = new Set(BK_TABJES.find(t => t[0] === bkTabje)[2]);
 function vernieuwBkFilters() {
   const office = document.getElementById("bk-office").value;
-  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && r.status === s && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r)).length, (t) => {
+  statusTabjes("bk-tabjes", BK_TABJES, bkTabje, (s) => bkRegels.filter(r => (!office || r.office === office) && bkTabStatus(r) === s && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r)).length, (t) => {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
   });
@@ -5518,7 +5524,7 @@ function vernieuwBkTabel() {
   // Keuzelijst: weer per tabje (Shereen 13 okt: "ik klikte OUTSTANDING_HOME bij te beoordelen omdat dat getal in de zoekbox
   // stond, en alles was al goedgekeurd") — alleen administraties met regels in dit tabje, het getal = regels in dit tabje.
   const bkSub = document.getElementById("bk-substatus").value;
-  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
+  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(bkTabStatus(r)) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
     pastSubstatus(bkSub, r.status, r.voorstel && r.voorstel.bron)).map(r => r.office));
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();

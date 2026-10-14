@@ -5789,8 +5789,8 @@ function bkDetailRij(r) {
     el.innerHTML = som < 0.005 ? (zf && zf.checked ? `<b>Zonder factuur</b> — het hele bedrag ${faBedrag(absBedrag)} komt open op de ${kant}; afletteren later in Twinfield`
         : `<b>geen factuur aangevinkt</b> — vink een factuur aan, of kies "Zonder factuur op de ${K.relatie} boeken"`)
       : `Aangevinkt <b>${faBedrag(som)}</b> · ${K.ontvangen} <b>${faBedrag(absBedrag)}</b> · ` + (rest < -0.004
-      ? `<b>onderbetaling ${faBedrag(-rest)}</b> — waar gaat het verschil heen?`
-      : rest > 0.004 ? `<b>overbetaling ${faBedrag(rest)}</b> — waar gaat het verschil heen?` : "past precies");
+      ? `<b>${faBedrag(-rest)} minder</b> dan de facturen — kies hieronder wat er met het verschil gebeurt`
+      : rest > 0.004 ? `<b>${faBedrag(rest)} meer</b> dan de facturen — kies hieronder wat er met het verschil gebeurt` : "past precies");
     const vak = tr.querySelector("#bk-verschil");
     // Alleen bij zelf afletteren op klant (Shereen 12 okt: bij Twinfields voorstel leek het een overboeking).
     const opKlant = !!tr.querySelector('input[name="bk-keuze"][value="klant"]')?.checked && !!relVeld.value.trim();
@@ -5810,10 +5810,17 @@ function bkDetailRij(r) {
     if (rest > 0.004 && (som < 0.005 || !vak.querySelector('input[name="bk-verschil"]:checked'))) vb.checked = true;
     if (rest < -0.004 && !vak.querySelector('input[name="bk-verschil"]:checked')) db.checked = true;
     // De verdeling laten zien: wat er per factuur betaald wordt en wat open blijft.
+    // Deelbetaling in gewone woorden (Shereen 14 okt: "geen onderbetaling en waar gaat verschil heen, it's confusing"):
+    // "Betaling 1.000,00 op factuur Endura-2024-0322 · restant open op Endura-2024-0322 na boeken: 1.542,50".
     if (rest < -0.004 && db.checked && vak.style.display !== "none") {
-      el.innerHTML += `<div style="margin-top:4px">Verdeling: ` + deelVerdeling(gekozenFacturen()).map(({ o, b }) =>
-        `${escapeHtml(o.factuur || o.code + " " + o.nummer)} <b>${faBedrag(b)}</b>` + (b < 0.005 ? " (niets — haal het vinkje weg)"
-          : o.open - b > 0.004 ? ` (restant ${faBedrag(Math.round((o.open - b) * 100) / 100)} blijft open)` : " (helemaal)")).join(" · ") + `</div>`;
+      const naam = (o) => escapeHtml(o.factuur || o.code + " " + o.nummer);
+      const delen = deelVerdeling(gekozenFacturen());
+      const leeg = delen.filter(({ b }) => b < 0.005), betaald = delen.filter(({ b }) => b >= 0.005);
+      const open = betaald.filter(({ o, b }) => o.open - b > 0.004);
+      el.innerHTML = `Betaling <b>${faBedrag(absBedrag)}</b> op ` + (betaald.length === 1 ? `factuur ${naam(betaald[0].o)}`
+          : betaald.map(({ o, b }) => `${naam(o)} <b>${faBedrag(b)}</b>${o.open - b > 0.004 ? "" : " (helemaal betaald)"}`).join(" · ")) +
+        open.map(({ o, b }) => `<br>Restant open op ${naam(o)} na boeken: <b>${faBedrag(Math.round((o.open - b) * 100) / 100)}</b>`).join("") +
+        (leeg.length ? `<br>${leeg.map(({ o }) => naam(o)).join(", ")}: daar blijft niets voor over — haal het vinkje weg` : "");
     }
     verschilRek();
   };

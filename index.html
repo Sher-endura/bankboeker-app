@@ -4221,7 +4221,10 @@ function vernieuwFaTabel() {
   const zoekt = document.getElementById("fa-zoek").value.trim();
   tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${document.getElementById("fa-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
   { const o = document.getElementById("fa-office").value, open = FA_TABJES[0][2];
-    toonWoot("fa-woot", o, faTabje === "beoordelen" && !zoekt && !faDocs.some(d => (!o || d.office === o) && open.includes(d.status))); }
+    const klaar = faTabje === "beoordelen" && !zoekt && !faDocs.some(d => (!o || d.office === o) && open.includes(d.status));
+    toonWoot("fa-woot", o, klaar);
+    // Alles beoordeeld (Shereen 14 okt: "alles is klaar maar je ziet de inv nog"): ook het documentvenster rechts dicht.
+    if (klaar && faGekozen) { const d = faDocs.find(x => x.id === faGekozen.id); if (!d || !open.includes(d.status)) setTimeout(() => faSluitDetail("Alles is beoordeeld — Shai vult de goedgekeurde documenten in Basecone in en boekt ze door."), 0); } }
   // Per klant (Shereen 13 okt: "tab Fout in Basecone moet per klant"), zoals Twinfield Bank: een kopbalk per
   // administratie, klik = in-/uitklappen. Binnen een klant blijft de volgorde (of de sortering op zekerheid).
   const faOffices = [...new Set(lijst.map(d => d.office))].sort();

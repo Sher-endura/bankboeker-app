@@ -4110,10 +4110,19 @@ async function shaiHerstart(knop, vak, w) {
   zeg(`↻ Gevraagd — Shai start opnieuw en zet zijn ${w.app}-venster vooraan (binnen een minuut)`);
   setTimeout(() => (w.log === "bank_log" ? laadBankStatus() : laadRobotStatus()), 60000);
 }
+/* ▶ Shai nu laten draaien kan niet zolang Shai al in Basecone bezig is (Shereen 14 okt), en 30 s na een klik. */
+let faNuGevraagd = false;
 async function laadRobotStatus() {
   const { data } = await sb.from("robot_status").select("*").eq("id", "basecone").maybeSingle();
   shaiStatus(document.getElementById("fa-robot"), data, { app: "Basecone", gebruiker: "Shai", snelkoppeling: "Shai Basecone-robot", maxMinuten: 45, log: "basecone_log" });
+  const bezig = !!data && data.status === "werkt" && Date.now() - new Date(data.laatste_hartslag).getTime() < 45 * 60000;
+  const knop = document.getElementById("btn-fa-nu");
+  knop.disabled = bezig || faNuGevraagd;
+  knop.title = bezig ? `Shai is nu bezig in Basecone${data.bericht ? " (" + data.bericht + ")" : ""} — als hij klaar is, kan het weer.`
+    : "Shai wacht anders tot zijn volgende ronde (elke dag om 12:00 en 18:00). Hij begint binnen een halve minuut.";
 }
+// Bijhouden of Shai bezig is, ook als je niets aanklikt (alleen als het tabblad Basecone open staat).
+setInterval(() => { if (CLOUD && document.getElementById("fa-robot").offsetParent) laadRobotStatus(); }, 30000);
 /* ↻ Verversen (Shereen 10 okt): lijst opnieuw laden én de voorstellen die nog beoordeeld moeten worden
    en gelezen zijn vóór de nieuwste regel/uitleg, opnieuw laten lezen — dan nemen ze die kennis mee
    (meldingen en zekerheid worden opnieuw bepaald). Kost ±6 ct per voorstel (Opus). */
@@ -4157,26 +4166,28 @@ async function faVerversen() {
    minuut of die er is en begint dan meteen een ronde (ook buiten werktijd). */
 async function faNuDraaien() {
   const knop = document.getElementById("btn-fa-nu"), m = document.getElementById("fa-nu-melding");
-  knop.disabled = true;
+  knop.disabled = true; faNuGevraagd = true;
   const { data: st } = await sb.from("robot_status").select("status, bericht").eq("id", "basecone").maybeSingle();
   // Eén klant of iedereen: volgt de keuze in "Alle administraties", zoals Twinfield Bank (Shereen 13 okt).
   const office = document.getElementById("fa-office").value || null;
-  if (office === GEEN_ADMIN) { m.textContent = "Kies eerst een bestaande administratie (of maak het zoekvak leeg voor alle klanten)."; knop.disabled = false; return; }
+  if (office === GEEN_ADMIN) { m.textContent = "Kies eerst een bestaande administratie (of maak het zoekvak leeg voor alle klanten)."; faNuGevraagd = false; knop.disabled = false; return; }
   if (st && st.status === "werkt") {
     m.textContent = "Shai is al bezig — wat je goedkeurt, pakt hij in deze of de volgende ronde op.";
   } else {
     const { error } = await sb.from("basecone_log").insert({ actie: "nu draaien", office, door: gebruiker ? gebruiker.email : null });
     m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"} (als zijn venster op de robotcomputer open staat).`;
   }
-  setTimeout(() => { knop.disabled = false; laadRobotStatus(); }, 30000);
+  setTimeout(() => { faNuGevraagd = false; laadRobotStatus(); }, 30000);
 }
 /* Status als tabjes (Shereen 12 okt) — zie statusTabjes; zelfde opzet als Twinfield Bank. */
 // Minder tabjes (Shereen 13 okt: "het is beoordelen, goedkeuren, geboekt, fout, overgeslagen"): tussenstanden horen
 // bij een tabje — nieuw/wordt gelezen bij Te beoordelen (komt er zo aan, met hun eigen statuslabel; niet aan te vinken),
 // ingevuld bij Goedgekeurd (Shai boekt hem zo door). Wordt verwijderd staat in het tabje DELETED.
-const FA_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen", "nieuw", "gelezen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd", "ingevuld"]],
-  ["geboekt", "Geboekt", ["geboekt"]], ["fout", "Fout", ["fout"]], ["overgeslagen", "Overgeslagen", ["overgeslagen"]],
-  ["splitsen", "Wacht op splitsen", ["splitsen"]]];
+// Volgorde en kleur zoals Twinfield Bank (Shereen 14 okt): eerst waar je iets moet doen, fel (FA_TABJES_DOEN).
+const FA_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen", "nieuw", "gelezen"]], ["fout", "Fout", ["fout"]],
+  ["overgeslagen", "Overgeslagen", ["overgeslagen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd", "ingevuld"]],
+  ["geboekt", "Geboekt", ["geboekt"]], ["splitsen", "Wacht op splitsen", ["splitsen"]]];
+const FA_TABJES_DOEN = ["beoordelen", "fout", "overgeslagen"];
 let faTabje = leesTabje("bankboeker.basecone.tabje", FA_TABJES);
 let faStatusSel = new Set(FA_TABJES.find(t => t[0] === faTabje)[2]);
 function vernieuwFaFilters() {
@@ -4184,7 +4195,7 @@ function vernieuwFaFilters() {
   statusTabjes("fa-tabjes", FA_TABJES, faTabje, (s) => faDocs.filter(d => (!office || d.office === office) && d.status === s).length, (t) => {
     faTabje = t; faStatusSel = new Set(FA_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.basecone.tabje", t);
     vernieuwFaFilters(); vernieuwFaTabel();
-  });
+  }, FA_TABJES_DOEN);
   toonSubstatus("fa-substatus", faTabje === "beoordelen");
   faStatusKnop();
   requestAnimationFrame(faHoogte);
@@ -4215,10 +4226,10 @@ function vernieuwFaTabel() {
     if (d.office !== faVorigeKlant) {
       faVorigeKlant = d.office;
       const naam = (profielen.find(p => p.code === d.office) || {}).naam || "";
-      const n = lijst.filter(x => x.office === d.office).length, dicht = faDicht.has(d.office);
+      const n = lijst.filter(x => x.office === d.office).length, dicht = faIsDicht(d.office);
       tbody.insertAdjacentHTML("beforeend", `<tr class="fa-klant" data-office="${escapeHtml(d.office)}" title="Klik om ${dicht ? "uit" : "in"} te klappen"><td colspan="9"><span class="bk-klap-pijl">${dicht ? "▸" : "▾"}</span> ${escapeHtml(d.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${n} document${n === 1 ? "" : "en"}</span></td></tr>`);
     }
-    if (faDicht.has(d.office)) continue;
+    if (faIsDicht(d.office)) continue;
     const v = d.goedgekeurd || d.voorstel || {};
     const pnt = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
     const alle = [...(pnt.voorleg ? [pnt.voorleg] : []), ...pnt.lijst];
@@ -4248,6 +4259,14 @@ function vernieuwFaTabel() {
 const FA_BEOORDELEN = ["voorstel", "voorleggen"];
 const faVink = new Set();
 const faDicht = new Set();   // ingeklapte administraties in de Basecone-lijst (klik op de kopbalk)
+/* In Goedgekeurd en Geboekt standaard ingeklapt, zoals Twinfield Bank (Shereen 14 okt); faOpen = opengeklapt, per tabje. */
+const FA_STANDAARD_DICHT = ["goedgekeurd", "geboekt"];
+const faOpen = new Set();   // "tabje|office"
+const faIsDicht = (o) => (FA_STANDAARD_DICHT.includes(faTabje) ? !faOpen.has(`${faTabje}|${o}`) : faDicht.has(o));
+function faKlap(o) {
+  if (FA_STANDAARD_DICHT.includes(faTabje)) { const k = `${faTabje}|${o}`; faOpen.has(k) ? faOpen.delete(k) : faOpen.add(k); }
+  else faDicht.has(o) ? faDicht.delete(o) : faDicht.add(o);
+}
 /* Wat de lijst links toont: administratie + statusfilter + zekerheidsfilter, eventueel gesorteerd op
    zekerheid (Shereen 10 okt). Zonder sortering blijft de volgorde van de database (laatst bijgewerkt eerst). */
 let faSorteer = null;   // null | "af" (hoog → laag) | "op" (laag → hoog)
@@ -4283,7 +4302,7 @@ function faSorteerZekerheid() {
   vernieuwFaTabel();
 }
 // Alles aanvinken pakt ook "voorleggen" (Shereen 13 okt, zelfde als Twinfield Bank).
-const faVinkbaar = () => faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status) && !faDicht.has(d.office));   // ingeklapt = niet mee aanvinken
+const faVinkbaar = () => faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status) && !faIsDicht(d.office));   // ingeklapt = niet mee aanvinken
 function faBulkStand() {
   // Alleen wat je ziet blijft aangevinkt (12 okt, zelfde als Twinfield Bank).
   const zicht = new Set(faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status)).map(d => d.id));
@@ -6344,7 +6363,7 @@ document.querySelector("#tabel-facturen tbody").addEventListener("click", (e) =>
   const kop = e.target.closest("tr.fa-klant");
   if (!kop || !kop.dataset.office) return;
   const o = kop.dataset.office;
-  faDicht.has(o) ? faDicht.delete(o) : faDicht.add(o);
+  faKlap(o);
   vernieuwFaTabel();
 });
 document.querySelector("#tabel-bank tbody").addEventListener("click", (e) => {

@@ -227,6 +227,19 @@
   .status-tabjes button { background: none; border: none; border-bottom: 3px solid transparent; padding: 6px 6px; font-size: 14px; color: var(--tekst); cursor: pointer; white-space: nowrap; }
   .status-tabjes button:hover { color: var(--blauw); }
   .status-tabjes button.actief { color: var(--blauw); font-weight: 600; border-bottom-color: #FB7974; }
+  /* Harde regel toevoegen (Knowledgebase, 14 okt) */
+  .kb-hard { margin: 8px 0 14px; border: 1px solid var(--rand); border-radius: 8px; background: var(--grijs); }
+  .kb-hard > summary { cursor: pointer; padding: 8px 12px; font-weight: 600; color: var(--blauw); }
+  .kb-hard-form { padding: 4px 14px 10px; }
+  .kb-stap { background: #fff; border: 1px solid var(--rand); border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+  .kb-stap label { display: block; margin: 8px 0 3px; font-size: 13px; }
+  .kb-stap input[type=text], .kb-stap select { width: 100%; }
+  .kb-keuzes { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 0 2px; }
+  .kb-keuzes label { display: inline-flex; gap: 6px; align-items: center; margin: 0; font-size: 14px; }
+  .kb-rij { display: flex; gap: 10px; align-items: center; }
+  .kb-chips { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .kb-chips button { border: 1px solid #9cc3ea; background: #dcebf9; color: var(--blauw-d); border-radius: 12px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+  .kb-voorbeeld { font-size: 13px; margin: 4px 0 2px; }
   /* Tabjes waar je iets moet doen (Shereen 14 okt): fel, in de kleur van het Shai-logo. */
   .status-tabjes button.doen { background: var(--zalm); color: #fff; font-weight: 600; border-radius: 6px 6px 0 0; padding: 6px 10px; margin-right: 4px; }
   .status-tabjes button.doen:hover { color: #fff; filter: brightness(0.93); }
@@ -896,8 +909,46 @@
 
 <section id="tab-kennis" style="display:none">
   <div class="kaart">
-    <h2>Bankregels uit jullie uitleg</h2>
-    <p class="fa-uitleg">Gemaakt door de AI (Haiku) uit "Waarom verbeter je dit?" in Twinfield Bank. De bank-Shai past ze in elke ronde toe op nieuwe regels — zonder AI. Klopt een regel niet, zet hem dan uit. Eén keer per maand kijkt Claude de nieuwe regels na.</p>
+    <h2>Harde regels voor de bank-Shai</h2>
+    <p class="fa-uitleg">Vaste afspraken voor Twinfield Bank: <i>"bij klant X altijd deze omschrijving"</i>, <i>"betalingen met dit woord altijd op die rekening"</i>. Shai past ze in elke ronde toe en ze gaan vóór zijn eigen voorstel. Ze ontstaan vanzelf uit "Waarom verbeter je dit?", of je zet ze hier zelf neer. Klopt een regel niet, zet hem dan uit.</p>
+    <details class="kb-hard" id="kb-hard">
+      <summary>＋ Harde regel toevoegen</summary>
+      <div class="kb-hard-form">
+        <div class="kb-stap"><b>1 · Voor wie geldt de regel?</b>
+          <div class="kb-keuzes">
+            <label><input type="radio" name="kb-hard-voor" value="leverancier" checked> Eén leverancier</label>
+            <label><input type="radio" name="kb-hard-voor" value="debiteur"> Eén klant (debiteur)</label>
+            <label><input type="radio" name="kb-hard-voor" value="administratie"> Een hele administratie</label>
+            <label><input type="radio" name="kb-hard-voor" value="alle"> Alle administraties</label>
+          </div>
+          <div id="kb-hard-office-vak"><label>Administratie</label><select id="kb-hard-office" style="max-width:320px"></select></div>
+          <div id="kb-hard-relatie-vak"><label id="kb-hard-relatie-label">Leverancier (code)</label>
+            <div class="kb-rij"><input type="text" id="kb-hard-relatie" placeholder="bv. C0175" autocomplete="off" style="max-width:180px"> <span id="kb-hard-relatie-naam" class="fa-uitleg"></span></div></div>
+        </div>
+        <div class="kb-stap"><b>2 · Wanneer precies?</b> <span class="fa-uitleg" id="kb-hard-wanneer-uitleg"></span>
+          <label>Woorden in de bankomschrijving (één ervan moet erin staan, scheiden met een komma)</label>
+          <input type="text" id="kb-hard-woorden" placeholder="bv. TRANSFER CHARGES, TRF FEE">
+          <label>Ontvangsten of betalingen?</label>
+          <select id="kb-hard-richting" style="max-width:300px"><option value="">Allebei</option><option value="bij">Alleen ontvangsten (geld komt binnen)</option><option value="af">Alleen betalingen (geld gaat eruit)</option></select></div>
+        <div class="kb-stap"><b>3 · Wat doet Shai dan?</b>
+          <label>Omschrijving in Twinfield — klik op een knopje om het in te voegen; Shai vult het per bankregel in</label>
+          <input type="text" id="kb-hard-oms" placeholder="bv. {factuur} Kuster Advocaten" maxlength="80">
+          <div class="kb-chips">
+            <button type="button" data-v="{factuur}" title="Het factuurnummer dat Shai koppelt (of dat in de banktekst staat)">factuurnummer</button>
+            <button type="button" data-v="{periode}" title="Maand + jaar uit de banktekst of de datum, bv. sep 2026">periode</button>
+            <button type="button" data-v="{maand}" title="Alleen de maand, bv. sep">maand</button>
+            <button type="button" data-v="{jaar}" title="Alleen het jaar, bv. 2026">jaar</button>
+            <button type="button" data-v="{naam}" title="De naam uit de banktekst">naam uit de bank</button>
+          </div>
+          <div class="kb-voorbeeld" id="kb-hard-voorbeeld"></div>
+          <div id="kb-hard-rekening-vak"><label>Grootboekrekening (alleen als het altijd dezelfde rekening is; leeg = rekening niet aanpassen)</label>
+            <input type="text" id="kb-hard-rekening" placeholder="bv. 9070" style="max-width:200px"></div>
+        </div>
+        <div class="kb-stap"><b>4 · Waarom?</b> <span class="fa-uitleg">Zodat collega's (en Claude) later snappen waarom deze regel er is.</span>
+          <input type="text" id="kb-hard-reden" placeholder="bv. Shereen: bij Kuster alleen factuurnummer en Kuster Advocaten, geen banktekst"></div>
+        <p><button class="knop" id="btn-kb-hard-opslaan">Regel opslaan</button> <span id="kb-hard-melding"></span></p>
+      </div>
+    </details>
     <div style="overflow-x:auto"><table id="tabel-uitleg-regels"><thead><tr><th>Klant</th><th>Wanneer</th><th>Wat</th><th>Uitleg van</th><th>Wat de AI ervan maakte</th><th></th></tr></thead><tbody></tbody></table></div>
   </div>
   <div class="kaart">
@@ -1599,11 +1650,14 @@ function omschrijvingUitHistorie(hist, ruw, datum) {
    herkent en past toe — zonder AI, in de app (Verversen) en in elke ronde van de bank-Shai.
    Identiek in bank-herkenning.mjs en index.html (en het herkennen ook in supabase/functions/bank-uitleg). */
 const uitlegNorm = (t) => " " + String(t || "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim() + " ";
-function pastUitlegRegel(regel, ruw, bedrag) {
+function pastUitlegRegel(regel, ruw, bedrag, relatie) {
   const tekst = uitlegNorm(ruw), z = (regel && regel.zoek) || {};
   const heeft = (w) => { const n = uitlegNorm(w).trim(); return n.length >= 2 && tekst.includes(" " + n + " "); };
   const eenVan = (z.een_van || []).filter(Boolean), alle = (z.alle || []).filter(Boolean);
-  if (!eenVan.length && !alle.length) return false;
+  // Harde regel voor één klant/leverancier (Shereen 14 okt, Kuster D10110): geldt als die relatie gekoppeld is,
+  // ook zonder woorden uit de banktekst.
+  if (z.relatie && String(relatie || "").toUpperCase() !== String(z.relatie).toUpperCase()) return false;
+  if (!eenVan.length && !alle.length && !z.relatie) return false;
   if (eenVan.length && !eenVan.some(heeft)) return false;
   if (alle.length && !alle.every(heeft)) return false;
   if (z.richting === "af" && !(Number(bedrag) < 0)) return false;
@@ -1611,9 +1665,11 @@ function pastUitlegRegel(regel, ruw, bedrag) {
   return true;
 }
 /* Sjabloon voor de omschrijving: {periode} {maand} {jaar} {naam} {tekst} {factuur}. Max 40 tekens. */
-function vulSjabloon(sjabloon, ruw, datum) {
+function vulSjabloon(sjabloon, ruw, datum, facturen) {
   const p = periodeDelen(ruw, datum);
-  const factuur = (String(ruw || "").toUpperCase().match(/\b\d{1,5}-[A-Z]{1,3}-\d{2,4}\b|\b(?:INV|INVOICE|FACT|FACTUUR)[\s#:.-]*[A-Z0-9-]{3,}\b|\b20\d{2}-\d{3,4}\b/) || [""])[0];
+  // {factuur}: eerst de gekoppelde factuur (14 okt: Kuster "Endura 2026 0195" in de banktekst werd niet herkend), anders uit de banktekst.
+  const gekoppeld = [...new Set((facturen || []).filter(Boolean))].join(", ");
+  const factuur = gekoppeld || (String(ruw || "").toUpperCase().match(/\b\d{1,5}-[A-Z]{1,3}-\d{2,4}\b|\b(?:INV|INVOICE|FACT|FACTUUR)[\s#:.-]*[A-Z0-9-]{3,}\b|\b20\d{2}-\d{3,4}\b/) || [""])[0];
   const waarde = {
     periode: p.maand >= 0 ? `${MAAND_KORT[p.maand]}${p.jaar ? " " + p.jaar : ""}` : "",
     maand: p.maand >= 0 ? MAAND_KORT[p.maand] : "", jaar: p.jaar ? String(p.jaar) : "",
@@ -1624,14 +1680,14 @@ function vulSjabloon(sjabloon, ruw, datum) {
 }
 /* De eerste regel die past: eerst die van de klant zelf, dan die voor alle klanten; de nieuwste eerst.
    Een regel voor alle klanten zet nooit een rekening (nummers verschillen per klant). */
-function pasUitlegToe(regels, ruw, bedrag, datum) {
+function pasUitlegToe(regels, ruw, bedrag, datum, extra = {}) {
   const lijst = [...(regels || [])].filter((x) => x.actief !== false)
     .sort((a, b) => (a.office === "*") - (b.office === "*") || String(b.created_at || "").localeCompare(String(a.created_at || "")));
   for (const regel of lijst) {
-    if (!pastUitlegRegel(regel, ruw, bedrag)) continue;
+    if (!pastUitlegRegel(regel, ruw, bedrag, extra.relatie)) continue;
     const zet = regel.zet || {};
     return { regel, rekening: regel.office !== "*" ? (zet.rekening || null) : null,
-      omschrijving: zet.omschrijving ? vulSjabloon(zet.omschrijving, ruw, datum) || null : null };
+      omschrijving: zet.omschrijving ? vulSjabloon(zet.omschrijving, ruw, datum, extra.facturen) || null : null };
   }
   return null;
 }
@@ -5051,7 +5107,7 @@ async function laadUitlegRegelsKB() {
   tbody.innerHTML = (data || []).length ? "" : `<tr><td colspan="6" class="fa-uitleg">Nog geen regels — die ontstaan als je in Twinfield Bank bij een correctie "Waarom verbeter je dit?" invult.</td></tr>`;
   for (const r of data || []) {
     const tr = document.createElement("tr");
-    const wanneer = [(r.zoek.een_van || []).length ? "bevat " + r.zoek.een_van.join(" of ") : "", (r.zoek.alle || []).length ? "én " + r.zoek.alle.join(" + ") : "", r.zoek.richting === "af" ? "(betalingen)" : r.zoek.richting === "bij" ? "(ontvangsten)" : ""].filter(Boolean).join(" ");
+    const wanneer = [r.zoek.relatie ? (/^C/i.test(r.zoek.relatie) ? "leverancier " : "klant ") + r.zoek.relatie : "", (r.zoek.een_van || []).length ? "bevat " + r.zoek.een_van.join(" of ") : "", (r.zoek.alle || []).length ? "én " + r.zoek.alle.join(" + ") : "", r.zoek.richting === "af" ? "(betalingen)" : r.zoek.richting === "bij" ? "(ontvangsten)" : ""].filter(Boolean).join(" ");
     const wat = [r.zet.rekening ? "rekening " + r.zet.rekening : "", r.zet.omschrijving ? `omschrijving "${r.zet.omschrijving}"` : ""].filter(Boolean).join(" + ");
     tr.innerHTML = `<td>${escapeHtml(r.office === "*" ? "alle klanten" : r.office)}</td><td>${escapeHtml(wanneer)}</td><td>${escapeHtml(wat)}</td>
       <td>${escapeHtml((r.created_by || "").split("@")[0])} · ${escapeHtml(datumNlKort(String(r.created_at).slice(0, 10)))}<br><i>"${escapeHtml(r.reden)}"</i></td><td>${escapeHtml(r.toelichting || "")}</td>
@@ -5063,7 +5119,90 @@ async function laadUitlegRegelsKB() {
     tbody.appendChild(tr);
   }
 }
+/* Harde regel toevoegen (Shereen 14 okt: "ik wil de mogelijkheid om harde regels toe te voegen aan de knowledgebase",
+   "gebruikersvriendelijk en Shai-vriendelijk", "per leverancier, per debiteur, per administratie, voor alle administraties").
+   Zelfde tabel als de regels uit de uitleg (bank_uitleg_regels): zoek = {een_van, alle, richting, relatie},
+   zet = {rekening, omschrijving}; office '*' = alle administraties (dan nooit een rekening: nummers verschillen per klant). */
+const kbVoor = () => (document.querySelector('input[name="kb-hard-voor"]:checked') || {}).value || "leverancier";
+function kbHardVelden() {
+  const v = (id) => document.getElementById(id).value.trim(), voor = kbVoor();
+  return { voor, office: voor === "alle" ? "*" : v("kb-hard-office"), relatie: ["leverancier", "debiteur"].includes(voor) ? v("kb-hard-relatie").toUpperCase() : "",
+    woorden: v("kb-hard-woorden").split(",").map(w => w.trim()).filter(Boolean), richting: v("kb-hard-richting") || null,
+    oms: v("kb-hard-oms"), rekening: voor === "alle" ? "" : v("kb-hard-rekening"), reden: v("kb-hard-reden") };
+}
+function kbHardScherm() {
+  const voor = kbVoor(), rel = voor === "leverancier" || voor === "debiteur";
+  document.getElementById("kb-hard-office-vak").style.display = voor === "alle" ? "none" : "";
+  document.getElementById("kb-hard-relatie-vak").style.display = rel ? "" : "none";
+  document.getElementById("kb-hard-rekening-vak").style.display = voor === "alle" ? "none" : "";
+  document.getElementById("kb-hard-relatie-label").textContent = voor === "debiteur" ? "Klant (debiteurcode)" : "Leverancier (crediteurcode)";
+  document.getElementById("kb-hard-relatie").placeholder = voor === "debiteur" ? "bv. D10110" : "bv. C0175";
+  document.getElementById("kb-hard-wanneer-uitleg").textContent = rel
+    ? "Mag leeg blijven: dan geldt de regel voor elke bankregel die aan deze relatie gekoppeld is."
+    : "Vul minstens één woord in — anders weet Shai niet bij welke bankregels de regel hoort.";
+  kbHardRelatieNaam();
+}
+function kbHardVoorbeeld() {
+  const f = kbHardVelden(), el = document.getElementById("kb-hard-voorbeeld");
+  if (!f.oms) { el.innerHTML = ""; return; }
+  // Een echte bankregel die bij de regel past als voorbeeld (als Twinfield Bank geladen is); anders een verzonnen voorbeeld.
+  const regel = { zoek: { een_van: f.woorden, alle: [], richting: f.richting, relatie: f.relatie || null }, zet: { omschrijving: f.oms } };
+  const echt = (bkRegels || []).filter(x => f.office === "*" || x.office === f.office).map(x => {
+    const regels = (x.goedgekeurd && x.goedgekeurd.regels) || (x.voorstel || {}).regels || [];
+    return { x, extra: { relatie: (regels.find(y => y.relatie) || {}).relatie, facturen: regels.map(y => y.factuur) } };
+  }).find(({ x, extra }) => pastUitlegRegel(regel, x.omschrijving, Number(x.bedrag), extra.relatie));
+  const uit = echt ? vulSjabloon(f.oms, echt.x.omschrijving, echt.x.datum, echt.extra.facturen) : vulSjabloon(f.oms, "", new Date().toISOString().slice(0, 10), ["Endura-2026-0195"]);
+  el.innerHTML = `Voorbeeld: <b>${escapeHtml(uit || "(leeg)")}</b> <span class="fa-uitleg">(${uit.length}/40 tekens${echt ? ` · bij bankregel "${escapeHtml(String(echt.x.omschrijving).slice(0, 45))}"` : " · verzonnen voorbeeld"})</span>`;
+}
+async function kbHardRelatieNaam() {
+  const f = kbHardVelden(), el = document.getElementById("kb-hard-relatie-naam");
+  kbHardVoorbeeld();
+  if (!f.relatie || !f.office || f.office === "*") { el.textContent = ""; return; }
+  el.textContent = "naam opzoeken…";
+  try {
+    const d = await bkAfletGegevens(f.office, f.voor === "debiteur" ? "debiteur" : "crediteur");
+    const k = (d.klanten || []).find(x => String(x.code).toUpperCase() === f.relatie);
+    el.textContent = k ? "✓ " + k.naam : `onbekende code bij ${f.office} — controleer hem`;
+  } catch (e) { el.textContent = ""; }
+}
+function kbHardInit() {
+  const kies = document.getElementById("kb-hard-office");
+  if (!kies.options.length) kies.innerHTML = `<option value="">— kies de administratie —</option>` + profielen.map(p => p.code).sort().map(c => `<option>${escapeHtml(c)}</option>`).join("");
+  kbHardScherm();
+}
+document.querySelectorAll('input[name="kb-hard-voor"]').forEach(x => x.addEventListener("change", kbHardScherm));
+document.querySelectorAll(".kb-chips button").forEach(b => b.addEventListener("click", () => {
+  const veld = document.getElementById("kb-hard-oms"), i = veld.selectionStart ?? veld.value.length;
+  veld.value = (veld.value.slice(0, i) + b.dataset.v + " " + veld.value.slice(i)).replace(/ {2,}/g, " ");
+  veld.focus(); kbHardVoorbeeld();
+}));
+["kb-hard-oms", "kb-hard-woorden", "kb-hard-richting"].forEach(id => document.getElementById(id).addEventListener("input", kbHardVoorbeeld));
+document.getElementById("kb-hard-office").addEventListener("change", kbHardRelatieNaam);
+document.getElementById("kb-hard-relatie").addEventListener("change", kbHardRelatieNaam);
+document.getElementById("btn-kb-hard-opslaan").addEventListener("click", async () => {
+  const f = kbHardVelden(), m = document.getElementById("kb-hard-melding");
+  const rel = f.voor === "leverancier" || f.voor === "debiteur";
+  const fout = f.voor !== "alle" && !f.office ? "Kies de administratie."
+    : rel && !f.relatie ? `Vul de code van de ${f.voor === "debiteur" ? "klant" : "leverancier"} in.`
+    : rel && f.voor === "debiteur" && !/^D/i.test(f.relatie) ? "Een klantcode begint met D." : rel && f.voor === "leverancier" && !/^C/i.test(f.relatie) ? "Een leverancierscode begint met C."
+    : !rel && !f.woorden.length ? "Vul minstens één woord uit de bankomschrijving in (stap 2)."
+    : !f.oms && !f.rekening ? "Vul een omschrijving en/of een rekening in (stap 3)." : !f.reden ? "Schrijf kort waarom (stap 4)." : "";
+  if (fout) { m.innerHTML = `<span style="color:var(--rood)">${escapeHtml(fout)}</span>`; return; }
+  const voorTekst = f.voor === "alle" ? "alle administraties" : f.voor === "administratie" ? f.office : `${f.voor} ${f.relatie} bij ${f.office}`;
+  const wanneer = [f.woorden.length ? `banktekst bevat ${f.woorden.join(" of ")}` : "", f.richting === "bij" ? "alleen ontvangsten" : f.richting === "af" ? "alleen betalingen" : ""].filter(Boolean).join(", ");
+  const wat = [f.oms ? `omschrijving "${f.oms}"` : "", f.rekening ? `rekening ${f.rekening}` : ""].filter(Boolean).join(" en ");
+  const { error } = await sb.from("bank_uitleg_regels").insert({ office: f.office,
+    zoek: { een_van: f.woorden, alle: [], richting: f.richting, relatie: f.relatie || null }, zet: { rekening: f.rekening || null, omschrijving: f.oms || null },
+    reden: f.reden, toelichting: `Harde regel (met de hand) voor ${voorTekst}${wanneer ? " — " + wanneer : ""} → ${wat}.`, created_by: gebruiker ? gebruiker.email : null });
+  if (error) { m.innerHTML = `<span style="color:var(--rood)">Opslaan lukte niet: ${escapeHtml(error.message)}</span>`; return; }
+  m.innerHTML = `<span style="color:var(--groen)">✓ Opgeslagen. Shai gebruikt hem vanaf zijn volgende ronde; in Twinfield Bank zie je hem na Verversen.</span>`;
+  ["kb-hard-relatie", "kb-hard-woorden", "kb-hard-oms", "kb-hard-rekening", "kb-hard-reden"].forEach(id => { document.getElementById(id).value = ""; });
+  document.getElementById("kb-hard-relatie-naam").textContent = ""; kbHardVoorbeeld();
+  const { data: ur } = await sb.from("bank_uitleg_regels").select("*").eq("actief", true); bkUitlegRegels = ur || [];
+  laadUitlegRegelsKB();
+});
 async function laadKennisTab() {
+  kbHardInit();
   laadUitlegRegelsKB();
   if (!CLOUD) { document.querySelector("#tabel-fa-kennis tbody").innerHTML = `<tr><td class="fa-uitleg">Alleen in cloud-modus (met inlog).</td></tr>`; return; }
   const kies = document.getElementById("kb-office");
@@ -5338,10 +5477,12 @@ function bkOmsTekst(r) {
   // Harde regel per klant (BINGO: "<Maand> statement <crediteur>") gaat voor alles.
   const crd = crediteurVan(v);
   const st = crd && crediteurStatementOmschrijving(r.office, r.omschrijving, r.bedrag, r.datum, crd.naam);
+  // Harde regel uit de Knowledgebase (14 okt) gaat voor alles, zoals in de bank-Shai — ook per klant/leverancier.
+  const u = pasUitlegToe(bkUitlegRegels.filter(x => x.office === r.office || x.office === "*"), r.omschrijving, Number(r.bedrag), r.datum,
+    { relatie: ((v.regels || []).find(x => x.relatie) || {}).relatie, facturen: (v.regels || []).map(x => x.factuur) });
+  if (u && u.omschrijving) return u.omschrijving;
   if (st) return st;
   if (v.soort === "klant") { const t = factuurOmschrijving((v.regels || []).map(x => x.factuur), regel.relatienaam); if (t) return t; }
-  const u = pasUitlegToe(bkUitlegRegels.filter(x => x.office === r.office || x.office === "*"), r.omschrijving, Number(r.bedrag), r.datum);
-  if (u && u.omschrijving) return u.omschrijving;
   // Volgorde (Shereen 12 okt): vaste schrijfregels (salaris/tip/belasting) → historie → opgeschoonde banktekst.
   const rekNaam = regel.naam || bkRekNamen[`${r.office}|${regel.rekening}`];
   const uitHist = heeftVasteSchrijfregel(r.omschrijving, rekNaam) ? null : omschrijvingUitHistorie(((v.historie || [])[0] || {}).omschrijving, r.omschrijving, r.datum);
@@ -5783,7 +5924,9 @@ function bkDetailRij(r) {
       const k = aflet.klanten.find(x => x.code === relVeld.value.trim());
       // Harde regel per klant (BINGO: "<Maand> statement <crediteur>") gaat vóór het factuurnummer.
       const st = k && kant === "crediteur" ? crediteurStatementOmschrijving(r.office, r.omschrijving, r.bedrag, r.datum, k.naam) : null;
-      const t = st || factuurOmschrijving(gekozenFacturen().map(o => o.factuur), k && k.naam);
+      const hard = pasUitlegToe(bkUitlegRegels.filter(x => x.office === r.office || x.office === "*"), r.omschrijving, Number(r.bedrag), r.datum,
+        { relatie: k && k.code, facturen: gekozenFacturen().map(o => o.factuur) });   // harde regel uit de Knowledgebase (14 okt)
+      const t = (hard && hard.omschrijving) || st || factuurOmschrijving(gekozenFacturen().map(o => o.factuur), k && k.naam);
       // Andere klant gekozen en (nog) geen factuur: niet de omschrijving van de vorige klant laten staan (Shereen 13 okt,
       // Island Guide Franchise → Island Guide B.V.).
       if (t) oms.value = t;
@@ -6211,7 +6354,8 @@ async function bkUitlegVerwerken(r, reden) {
   const door = gebruiker ? gebruiker.email : null;
   let aangepast = 0, omschr = 0;
   for (const x of bkRegels.filter(x => BK_BEOORDELEN.includes(x.status) && (regel.office === "*" || x.office === regel.office))) {
-    const u = pasUitlegToe([regel], x.omschrijving, Number(x.bedrag), x.datum);
+    const u = pasUitlegToe([regel], x.omschrijving, Number(x.bedrag), x.datum,
+      { relatie: (((x.voorstel || {}).regels || []).find(y => y.relatie) || {}).relatie, facturen: ((x.voorstel || {}).regels || []).map(y => y.factuur) });
     if (!u) continue;
     if (u.omschrijving) omschr++;
     const v = x.voorstel || {};

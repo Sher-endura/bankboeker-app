@@ -341,14 +341,37 @@
      afgelopen maand. Hier ziet zij per maand wat er voor wie is gemaakt, en zet ze het met "In aanleverlijst"
      op de maandkaart in E-Board (functie shai-vraagposten): dan gaat NVT weg en ziet de klant het bestand.
      De oude pagina's (Ronde / Inlezen / Controleren / Doorvoeren) staan hieronder nog, maar zijn verborgen. -->
-<section id="tab-vraagposten" style="display:none">
+<!-- Vraagposten te beoordelen (Shereen 15 okt avond): de antwoorden van klanten, alle klanten in één lijst, zonder maand.
+     Een eigen tabje en niet bij Twinfield Bank → Te beoordelen: daar staan bankregels met een eigen werkwijze (bank-Shai),
+     en deze posten boekt Shai straks via een aparte taak in de oorspronkelijke boeking (geen memoriaal). -->
+<section id="tab-vp-beoordelen" style="display:none">
   <div class="kaart">
     <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap">
-      <h2 style="margin:0; flex:1">Vraagposten</h2>
+      <h2 style="margin:0; flex:1">Vraagposten te beoordelen</h2>
+      <div><label for="vpb-klant" style="margin-top:0">Klant</label><select id="vpb-klant" style="min-width:260px"></select></div>
+      <button class="knop stil" id="btn-vpb-verversen">↻ Verversen</button>
+    </div>
+    <p class="vp-uitleg">Antwoorden die klanten via hun aanleverpagina terugstuurden op de vraagpostenlijst. Shai pakt ze vanzelf op en stelt per post een rekening voor. Pas aan waar nodig — in het rekeningveld typ je een stukje van het nummer of de naam — en keur goed.</p>
+    <div id="vpb-tabjes" style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px"></div>
+    <div id="melding-vpb"></div>
+    <div id="vpb-lijsten"></div>
+    <div style="overflow-x:auto">
+      <table id="tabel-vpb">
+        <thead><tr><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="tab-vp-overzicht" style="display:none">
+  <div class="kaart">
+    <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap">
+      <h2 style="margin:0; flex:1">Vraagposten — maandoverzicht</h2>
       <div><label for="vp-maand" style="margin-top:0">Maand</label><select id="vp-maand" style="min-width:200px"></select></div>
       <button class="knop stil" id="btn-vp-verversen">↻ Verversen</button>
     </div>
-    <p class="vp-uitleg">Shai maakt rond de 5e van elke maand per klant een Excel-bestand van de vraagposten (2999) van de afgelopen maand. De klant ziet het pas als je op <b>In aanleverlijst</b> klikt: dan staat het op de maandkaart in E-Board en gaat "niet van toepassing" weg. Klik op een klant om de regels te zien.</p>
+    <p class="vp-uitleg">Shai maakt op de 4e van elke maand per klant een Excel-bestand van de vraagposten (2999) van de afgelopen maand. De klant ziet het pas als je op <b>In aanleverlijst</b> klikt: dan staat het op de maandkaart in E-Board en gaat "niet van toepassing" weg. Klik op een klant om de regels te zien.</p>
     <div id="melding-vp"></div>
     <p id="vp-telling" class="vp-uitleg" style="font-weight:600"></p>
     <div style="overflow-x:auto">
@@ -6702,12 +6725,14 @@ document.getElementById("bk-zekerheid").addEventListener("change", () => { bkGek
 /* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de
    Boekingsregels onder de Knowledgebase. Een groep onthoudt welk sub-tabblad laatst open stond. */
 const TAB_GROEPEN = {
+  // Vraagposten (15 okt avond): eerst wat je moet beoordelen, dan het maandoverzicht.
+  vraagposten: [["vp-beoordelen", "Vraagposten te beoordelen"], ["vp-overzicht", "📋 Maandoverzicht"]],
   // Vraagposten is sinds 15 okt één pagina (maandoverzicht). De oude subtabjes Ronde / Inlezen / Controleren /
   // Doorvoeren zijn verborgen (Shereen: "eerst verbergen"); hun secties staan nog in de pagina.
   kennisbank: [["kennis", "🧠 Knowledgebase Shai"], ["regels", "Boekingsregels (2999)"]],
   basecone: [["facturen", "🧾 Documenten"], ["verwijderd", "🗑️ DELETED"]],
 };
-const laatsteInGroep = { kennisbank: "kennis", basecone: "facturen" };
+const laatsteInGroep = { vraagposten: "vp-beoordelen", kennisbank: "kennis", basecone: "facturen" };
 const groepVan = (naam) => Object.keys(TAB_GROEPEN).find(g => TAB_GROEPEN[g].some(t => t[0] === naam)) || null;
 function kiesTab(naam) {
   if (TAB_GROEPEN[naam]) naam = laatsteInGroep[naam];
@@ -6717,15 +6742,15 @@ function kiesTab(naam) {
   setTimeout(onlineWaarBijwerken, 50);   // collega's zien op welk tabblad je zit
   const sub = document.getElementById("subnav");
   sub.style.display = groep ? "" : "none";
-  sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "") +
-    (groep === "vraagposten" ? `<span id="kop-klant" class="subnav-klant">${huidig ? escapeHtml(`Actieve klant: ${huidig.code} · ${huidig.naam}`) : ""}</span>` : "");
+  sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "");   // (de oude kop "Actieve klant" hoorde bij de verborgen pagina's)
   sub.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.sub)));
-  for (const s of ["vraagposten","ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
+  for (const s of ["vp-beoordelen","vp-overzicht","ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
-  if (naam === "vraagposten") laadVraagposten();
+  if (naam === "vp-overzicht") laadVraagposten();
+  if (naam === "vp-beoordelen") laadVpBeoordelen();
   if (naam === "herhaal") laadHerhaal();
   if (naam === "verwijderd") laadVerwijderd();
-  document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank" || naam === "verwijderd");
+  document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank" || naam === "verwijderd" || naam === "vp-beoordelen");
   if (naam === "bank") { laadBank(); requestAnimationFrame(bkHoogte); }
   if (naam === "facturen") { laadFacturen(); requestAnimationFrame(faHoogte); }
   if (naam === "kennis") laadKennisTab();
@@ -7223,28 +7248,21 @@ function vpVorigeMaand() {
   const d = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth() - 1, 1));
   return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
-/** Keuzelijst: de laatste 12 maanden plus alle maanden waar Shai iets voor maakte. */
-function vpVulMaanden(extra = []) {
-  const keuze = document.getElementById("vp-maand"), gekozen = keuze.value || vpVorigeMaand();
-  const nu = new Date(Date.now() - 4 * 3600_000), maanden = new Set(extra);
-  for (let i = 1; i <= 12; i++) {
-    const d = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth() - i, 1));
-    maanden.add(`${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
-  }
-  keuze.innerHTML = [...maanden].sort().reverse().map(p => `<option value="${p}"${p === gekozen ? " selected" : ""}>${escapeHtml(vpLabel(p))}</option>`).join("");
+/** Keuzelijst: alleen de maanden waarin Shai echt iets maakte (Shereen 15 okt: geen "nog niet gemaakt"). */
+function vpVulMaanden(perioden, gekozen) {
+  document.getElementById("vp-maand").innerHTML = perioden.map(p => `<option value="${p}"${p === gekozen ? " selected" : ""}>${escapeHtml(vpLabel(p))}</option>`).join("");
 }
 async function laadVraagposten() {
   if (!CLOUD || !sb) return;   // bij het opstarten bestaat de verbinding nog niet
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
-  if (!document.getElementById("vp-maand").value) vpVulMaanden();
-  const periode = document.getElementById("vp-maand").value;
+  const periode = document.getElementById("vp-maand").value;   // leeg = de nieuwste maand (kiest de server)
   toonMelding("melding-vp", "ok", "Overzicht ophalen…");
   try {
     vpData = await vpRoep({ actie: "overzicht", periode });
   } catch (e) { toonMelding("melding-vp", "fout", "Kon het overzicht niet ophalen: " + escapeHtml(e.message)); return; }
   document.getElementById("melding-vp").innerHTML = "";
-  vpVulMaanden(vpData.perioden || []);
+  vpVulMaanden(vpData.perioden || [], vpData.periode);
   const klaar = new Set(vpData.klanten.filter(k => k.stand === "klaar").map(k => k.id));
   vpVink = new Set([...vpVink].filter(id => klaar.has(id)));
   vpTeken();
@@ -7253,6 +7271,11 @@ const VP_STAND_KLASSE = { klaar: "klaar", verstuurd: "verstuurd", geen: "geen", 
 function vpTeken() {
   const tbody = document.querySelector("#tabel-vp tbody");
   if (!vpData) { tbody.innerHTML = ""; return; }
+  if (!vpData.periode) {
+    tbody.innerHTML = "";
+    document.getElementById("vp-telling").textContent = "Nog geen vraagposten gemaakt. De eerste ronde is op 4 november (over oktober).";
+    return;
+  }
   const k = vpData.klanten;
   const tel = (s) => k.filter(x => x.stand === s).length;
   const delen = [[tel("klaar"), "klaar om te versturen"], [tel("verstuurd"), "in aanleverlijst"], [tel("geen"), "geen vraagposten"],
@@ -7276,7 +7299,7 @@ function vpTeken() {
       <table><thead><tr><th>Boekdatum</th><th>Dagboek</th><th>Periode</th><th>Omschrijving</th><th class="num">Bedrag</th></tr></thead><tbody>
       ${r.regels.map(x => `<tr><td>${escapeHtml(vpDatum(x.datum))}</td><td>${escapeHtml(x.dagboek || "")}</td><td>${escapeHtml(x.periode || "")}</td><td>${escapeHtml(x.omschrijving || "")}</td><td class="num">${vpBedragHtml(x.bedrag)}</td></tr>`).join("")}
       </tbody></table></td></tr>` : "";
-    return rij + regels + (vpAntwOpen.has(r.klant_id) ? vpAntwPaneel(r) : "");
+    return rij + regels;
   }).join("");
   const klaar = k.filter(x => x.stand === "klaar");
   const alles = document.getElementById("vp-alles");
@@ -7324,9 +7347,7 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
     return;
   }
   const antw = e.target.closest(".vp-antw");
-  if (antw) { vpAntwOpenDicht(antw.dataset.klant); return; }
-  const actie = e.target.closest("[data-vpa]");
-  if (actie) { vpAntwActie(actie.dataset.vpa, actie.dataset.klant, actie.dataset.id); return; }
+  if (antw) { vpbKlant = antw.dataset.office; vpbStand = "nieuw"; kiesTab("vp-beoordelen"); return; }
   const naam = e.target.closest("td.vp-naam");
   if (naam) {
     const id = naam.parentElement.dataset.id;
@@ -7335,46 +7356,23 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
     vpTeken();
   }
 });
-// Wat je in het antwoordenpaneel kiest of typt, onthouden tot Goedkeuren (zonder het paneel opnieuw te tekenen).
-document.querySelector("#tabel-vp tbody").addEventListener("change", (e) => {
-  const veld = e.target.closest("[data-vpa-veld]");
-  if (!veld) return;
-  const a = vpAntw.get(veld.dataset.klant)?.antwoorden.find(x => x.id === veld.dataset.id);
-  if (a) a["_" + veld.dataset.vpaVeld] = veld.value.trim();
-});
 
-/* ===== Vraagposten — antwoorden van de klant (Shereen 15 okt) =====
-   De klant stuurt de lijst ingevuld terug via zijn aanleverpagina; E-Board (shai-vraagposten) pakt het bestand zelf op
-   uit SharePoint en zoekt elke beantwoorde regel terug op 2999. Hier: per regel het antwoord, Shai's voorstel
-   (functie vraagpost-voorstel: Haiku kiest uit het rekeningschema van de klant), Goedkeuren / Overslaan, en Doorvoeren:
-   per boekstuk een CONCEPT-memoriaal van 2999 naar de gekozen rekening, met "Bankboeker <DAGBOEK> <NUMMER>" op de
-   tegenregel — dezelfde route als de oude Doorvoeren (memoriaalXmlGroep), zodat Shai de post daarna als opgelost
-   herkent en hij niet opnieuw in de lijst komt. Onbeantwoord schuift de 5e vanzelf mee naar de volgende maand. */
-const vpAntw = new Map(), vpAntwOpen = new Set();
-const VPA_STAND = { nieuw: "Te beoordelen", goedgekeurd: "Goedgekeurd", doorgevoerd: "Doorgevoerd", overgeslagen: "Overgeslagen", niet_gevonden: "Niet meer open op 2999" };
+/* ===== Vraagposten te beoordelen (Shereen 15 okt avond) =====
+   De klant stuurt de vraagpostenlijst ingevuld terug via zijn aanleverpagina; E-Board (shai-vraagposten) pakt het
+   bestand zelf op uit SharePoint en zoekt elke beantwoorde regel terug op 2999. Hier staan ze van alle klanten in één
+   lijst, zonder maandkeuze: antwoord + Shai's voorstel (functie vraagpost-voorstel, Sonnet 5.5, kiest uit het
+   rekeningschema van de klant), aanpassen (rekening = zoekveld: typ een stukje nummer of naam), Goedkeuren/Overslaan.
+   Boeken: NIET met een memoriaal (Shereen: "dan krijg je nooit een schone vraagpostenrekening"). Shai gaat de
+   oorspronkelijke boeking in Twinfield aanpassen (2999 → goedgekeurde rekening) als aparte taak na de bankverwerking;
+   dat leert hij nog. Tot dan blijven goedgekeurde antwoorden in het tabje Goedgekeurd staan. */
+let vpbData = null, vpbStand = "nieuw", vpbKlant = "", vpbBezig = null;
+const vpbSchemas = new Map();   // administratie → [{ code, naam }]
+const VPB_TABJES = [["nieuw", "Te beoordelen"], ["goedgekeurd", "Goedgekeurd"], ["overgeslagen", "Overgeslagen"], ["doorgevoerd", "Geboekt"], ["niet_gevonden", "Niet meer open op 2999"]];
+/** In het maandoverzicht: knopje naar de antwoorden van deze klant. */
 function vpAntwKnop(r) {
-  const t = r.antwoorden || {};
-  const totaal = Object.values(t).reduce((s, n) => s + n, 0);
-  if (!totaal) return "";
-  const te = (t.nieuw || 0) + (t.goedgekeurd || 0);
-  return `<div style="margin-top:4px"><button class="knop ${te ? "" : "stil"} vp-antw" data-klant="${r.klant_id}" style="padding:3px 10px; font-size:12px">💬 ${te ? `${te} antwoord${te === 1 ? "" : "en"} te verwerken` : "Antwoorden (alles verwerkt)"}</button></div>`;
-}
-async function vpAntwOpenDicht(klantId) {
-  if (vpAntwOpen.has(klantId)) { vpAntwOpen.delete(klantId); vpTeken(); return; }
-  vpAntwOpen.add(klantId);
-  await vpAntwLaad(klantId);
-}
-async function vpAntwLaad(klantId) {
-  const k = vpData.klanten.find(x => x.klant_id === klantId);
-  const st = vpAntw.get(klantId) || { antwoorden: [], bestanden: [], schema: [], laden: true };
-  st.laden = true; vpAntw.set(klantId, st); vpTeken();
-  try {
-    const [r, schema] = await Promise.all([vpRoep({ actie: "antwoorden", klant_id: klantId }), vpSchema(k.administratie)]);
-    Object.assign(st, { antwoorden: r.antwoorden || [], bestanden: r.bestanden || [], schema, fout: null });
-  } catch (e) { st.fout = e.message; }
-  st.laden = false; vpTeken();
-  // Voorstellen maken voor wat nog geen voorstel heeft (één keer per keer openen).
-  if (!st.fout && st.antwoorden.some(a => a.status === "nieuw" && !a.voorstel)) vpAntwActie("voorstellen", klantId);
+  const t = r.antwoorden || {}, te = t.nieuw || 0, goed = t.goedgekeurd || 0;
+  if (!te && !goed) return "";
+  return `<div style="margin-top:4px"><button class="knop ${te ? "" : "stil"} vp-antw" data-office="${escapeHtml(r.administratie)}" style="padding:3px 10px; font-size:12px">💬 ${te ? `${te} antwoord${te === 1 ? "" : "en"} te beoordelen` : `${goed} goedgekeurd`}</button></div>`;
 }
 /** Rekeningschema: wat Shai van Twinfield bewaarde (stamdata BAS), anders het klantprofiel. */
 async function vpSchema(office) {
@@ -7383,132 +7381,159 @@ async function vpSchema(office) {
   if (!s.length) s = ((profielen.find(p => p.code === office) || {}).schema || []).map(x => ({ code: String(x.gl), naam: String(x.naam || "") }));
   return s.filter(x => x.code !== "2999" && x.code !== "2998");
 }
-function vpAntwPaneel(r) {
-  const st = vpAntw.get(r.klant_id);
-  const kop = `<tr class="vp-regels"><td colspan="7">`;
-  if (!st || st.laden) return kop + `<div class="vp-uitleg">Antwoorden ophalen…</div></td></tr>`;
-  if (st.fout) return kop + `<div class="melding fout">${escapeHtml(st.fout)}</div></td></tr>`;
-  const bestanden = st.bestanden.map(b => `${escapeHtml(b.task_deliverable_uploads?.bestandsnaam || "bestand")} — teruggestuurd${b.task_deliverable_uploads?.door_naam ? ` door ${escapeHtml(b.task_deliverable_uploads.door_naam)}` : ""} op ${escapeHtml(vwDatum(b.task_deliverable_uploads?.geupload_op))} · ${b.beantwoord} beantwoord, ${b.gevonden} teruggevonden${b.fout ? ` · <b>${escapeHtml(b.fout)}</b>` : ""}`).join("<br>");
-  const goed = st.antwoorden.filter(a => a.status === "goedgekeurd").length;
-  const opties = (gekozen) => `<option value="">— rekening kiezen —</option>` + st.schema.map(s => `<option value="${escapeHtml(s.code)}"${s.code === gekozen ? " selected" : ""}>${escapeHtml(s.code + " " + s.naam)}</option>`).join("");
-  const rijen = st.antwoorden.map(a => {
-    const bewerkbaar = a.status === "nieuw";
-    const rek = a._rekening ?? a.keuze?.rekening ?? a.voorstel?.rekening ?? "";
+const vpbRekTekst = (office, code) => { const s = (vpbSchemas.get(office) || []).find(x => x.code === code); return code ? (s ? `${s.code} ${s.naam}` : code) : ""; };
+async function laadVpBeoordelen() {
+  if (!CLOUD || !sb) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  toonMelding("melding-vpb", "ok", "Antwoorden ophalen…");
+  try {
+    vpbData = await vpRoep({ actie: "alle_antwoorden", standen: [vpbStand] });
+  } catch (e) { toonMelding("melding-vpb", "fout", "Kon de antwoorden niet ophalen: " + escapeHtml(e.message)); return; }
+  const offices = [...new Set(vpbData.antwoorden.map(a => a.administratie))];
+  await Promise.all(offices.filter(o => !vpbSchemas.has(o)).map(async o => vpbSchemas.set(o, await vpSchema(o))));
+  document.getElementById("melding-vpb").innerHTML = "";
+  vpbTeken();
+  // Nieuwe antwoorden zonder voorstel: Shai stelt meteen voor.
+  if (vpbStand === "nieuw") {
+    const zonder = vpbData.antwoorden.filter(a => a.status === "nieuw" && !a.voorstel);
+    if (zonder.length) vpbVoorstellen(zonder);
+  }
+}
+/** Wat al in de velden getypt is, bewaren vóór het opnieuw tekenen (anders verdwijnt het bij een andere actie). */
+function vpbBewaarInvoer() {
+  for (const el of document.querySelectorAll("#tabel-vpb [data-vpb-veld]")) {
+    const a = vpbData?.antwoorden.find(x => x.id === el.dataset.vpbId);
+    if (a) a["_" + el.dataset.vpbVeld] = el.value;
+  }
+}
+function vpbTeken() {
+  vpbBewaarInvoer();
+  const tel = vpbData?.tellingen || {};
+  // Telling in het tabje bovenaan (subnav) en in de tabjes van deze pagina
+  const sub = document.querySelector('#subnav button[data-sub="vp-beoordelen"]');
+  if (sub) sub.textContent = `Vraagposten te beoordelen (${tel.nieuw || 0})`;
+  document.getElementById("vpb-tabjes").innerHTML = VPB_TABJES.map(([s, tekst]) =>
+    `<button class="knop ${s === vpbStand ? "" : "stil"}" data-vpb-tabje="${s}" style="padding:4px 12px">${escapeHtml(tekst)} (${tel[s] || 0})</button>`).join("");
+  const alle = vpbData?.antwoorden || [];
+  // Klantkeuze: alle klanten in dit tabje
+  const klanten = [...new Map(alle.map(a => [a.administratie, a.customers?.name || a.administratie])).entries()].sort((x, y) => x[1].localeCompare(y[1]));
+  if (vpbKlant && !klanten.some(([o]) => o === vpbKlant)) vpbKlant = "";
+  document.getElementById("vpb-klant").innerHTML = `<option value="">Alle klanten (${alle.length})</option>` +
+    klanten.map(([o, n]) => `<option value="${escapeHtml(o)}"${o === vpbKlant ? " selected" : ""}>${escapeHtml(n)} · ${escapeHtml(o)} (${alle.filter(a => a.administratie === o).length})</option>`).join("");
+  // Zoeklijsten voor het rekeningveld, één per administratie
+  document.getElementById("vpb-lijsten").innerHTML = [...vpbSchemas.entries()].map(([o, s]) =>
+    `<datalist id="vpb-dl-${escapeHtml(o)}">${s.map(x => `<option value="${escapeHtml(x.code + " " + x.naam)}"></option>`).join("")}</datalist>`).join("");
+  const lijst = alle.filter(a => !vpbKlant || a.administratie === vpbKlant);
+  const tbody = document.querySelector("#tabel-vpb tbody");
+  if (!lijst.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="vp-uitleg">${vpbStand === "nieuw" ? "Niets te beoordelen. 🎉" : "Geen antwoorden in dit tabje."}</td></tr>`;
+    return;
+  }
+  const bewerkbaar = vpbStand === "nieuw";
+  let vorige = null, html = "";
+  for (const a of lijst) {
+    if (a.administratie !== vorige) {
+      vorige = a.administratie;
+      const b = a.task_deliverable_uploads;
+      html += `<tr class="vp-regels"><td colspan="7" style="padding-left:12px"><b>${escapeHtml(a.customers?.name || a.administratie)}</b> · ${escapeHtml(a.administratie)}` +
+        (b ? `<span class="vp-uitleg" style="margin-left:10px">${escapeHtml(b.bestandsnaam || "")} — teruggestuurd${b.door_naam ? ` door ${escapeHtml(b.door_naam)}` : ""} op ${escapeHtml(vwDatum(b.geupload_op))}</span>` : "") +
+        `${bewerkbaar ? ` <button class="knop stil" data-vpb-actie="voorstellen" data-office="${escapeHtml(a.administratie)}" style="padding:2px 8px; font-size:12px; margin-left:8px"${vpbBezig ? " disabled" : ""}>✨ Shai opnieuw laten voorstellen</button>` : ""}</td></tr>`;
+    }
+    const d = `data-vpb-id="${a.id}"`;
+    const rekTekst = a._rekening ?? vpbRekTekst(a.administratie, a.keuze?.rekening ?? a.voorstel?.rekening ?? "");
     const rel = a._relatie ?? a.keuze?.relatie ?? a.voorstel?.relatie ?? "";
     const oms = a._omschrijving ?? a.keuze?.omschrijving ?? a.voorstel?.omschrijving ?? (a.antwoord || "").slice(0, 40);
-    const d = `data-klant="${r.klant_id}" data-id="${a.id}"`;
-    const keuzeTekst = a.keuze ? `${escapeHtml(a.keuze.rekening)} ${escapeHtml((st.schema.find(s => s.code === a.keuze.rekening) || {}).naam || "")}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : "";
-    return `<tr>
+    html += `<tr>
       <td style="white-space:nowrap">${escapeHtml(vpDatum(a.datum))}</td>
       <td style="white-space:nowrap">${escapeHtml(a.dagboek)} ${escapeHtml(a.boekstuk || "")}</td>
       <td>${escapeHtml(a.omschrijving || "")}</td>
       <td class="num">${vpBedragHtml(a.bedrag)}</td>
-      <td style="min-width:160px"><b>${escapeHtml(a.antwoord)}</b>${a.opmerking ? `<div class="vp-uitleg" style="margin:2px 0 0">Endura: ${escapeHtml(a.opmerking)}</div>` : ""}</td>
-      <td style="min-width:240px">${bewerkbaar
-        ? `<select data-vpa-veld="rekening" ${d} style="min-width:220px">${opties(rek)}</select>
-           <input type="text" data-vpa-veld="relatie" ${d} value="${escapeHtml(rel)}" placeholder="relatie (alleen bij debiteur/crediteur)" style="margin-top:4px">
-           <input type="text" data-vpa-veld="omschrijving" ${d} value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px">
-           ${a.voorstel ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">${a.voorstel.zeker ? "✨" : "❔"} ${escapeHtml(a.voorstel.toelichting || "")}</div>` : ""}`
-        : keuzeTekst}</td>
+      <td style="min-width:170px"><b>${escapeHtml(a.antwoord)}</b>${a.opmerking ? `<div class="vp-uitleg" style="margin:2px 0 0">Endura: ${escapeHtml(a.opmerking)}</div>` : ""}</td>
+      <td style="min-width:280px">${bewerkbaar
+        ? `<input type="text" list="vpb-dl-${escapeHtml(a.administratie)}" ${d} data-vpb-veld="rekening" value="${escapeHtml(rekTekst)}" placeholder="rekening — typ nummer of naam" autocomplete="off">
+           <input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie (alleen bij debiteur/crediteur)" style="margin-top:4px" autocomplete="off">
+           <input type="text" ${d} data-vpb-veld="omschrijving" value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px" autocomplete="off">
+           ${a.voorstel ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">${a.voorstel.zeker ? "✨" : "❔"} ${escapeHtml(a.voorstel.toelichting || "")}</div>` : (vpbBezig ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">Shai denkt na…</div>` : "")}`
+        : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
       <td style="white-space:nowrap">${bewerkbaar
-        ? `<button class="knop" data-vpa="goedkeuren" ${d} style="padding:4px 10px">Goedkeuren</button> <button class="knop stil" data-vpa="overslaan" ${d} style="padding:4px 10px">Overslaan</button>`
-        : `<span class="vp-stand ${a.status === "doorgevoerd" ? "verstuurd" : a.status === "goedgekeurd" ? "klaar" : "geen"}">${escapeHtml(VPA_STAND[a.status] || a.status)}${a.memoriaal ? ` · ${escapeHtml(a.memoriaal)}` : ""}</span>
-           ${["goedgekeurd", "overgeslagen"].includes(a.status) ? ` <button class="knop stil" data-vpa="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug</button>` : ""}`}</td>
+        ? `<button class="knop" data-vpb-actie="goedkeuren" ${d} style="padding:4px 10px">Goedkeuren</button> <button class="knop stil" data-vpb-actie="overslaan" ${d} style="padding:4px 10px">Overslaan</button>`
+        : ["goedgekeurd", "overgeslagen"].includes(a.status) ? `<button class="knop stil" data-vpb-actie="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug naar te beoordelen</button>` : ""}</td>
     </tr>`;
-  }).join("");
-  return kop + `<div class="vp-uitleg" style="margin:0 0 8px">${bestanden || "Nog geen teruggestuurd bestand."}</div>
-    <div id="melding-vpa-${r.klant_id}">${st.melding ? `<div class="melding ${st.melding[0]}">${st.melding[1]}</div>` : ""}</div>
-    <p style="margin:0 0 8px">
-      <button class="knop" data-vpa="doorvoeren" data-klant="${r.klant_id}"${goed && !st.bezig ? "" : " disabled"}>Doorvoeren in Twinfield (${goed} goedgekeurd)</button>
-      <button class="knop stil" data-vpa="voorstellen" data-klant="${r.klant_id}"${st.bezig ? " disabled" : ""}>✨ Shai opnieuw laten voorstellen</button>
-      ${st.bezig ? `<span class="vp-uitleg"> ${escapeHtml(st.bezig)}</span>` : ""}
-    </p>
-    <table><thead><tr><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead><tbody>${rijen}</tbody></table>
-  </td></tr>`;
+  }
+  tbody.innerHTML = html;
 }
-async function vpAntwOpslaan(items) {
+/** Opnieuw tekenen zonder eerst de velden te bewaren (na een vers voorstel). */
+function vpbTekenZonderBewaren() { const b = vpbBewaarInvoer; vpbBewaarInvoer = () => {}; try { vpbTeken(); } finally { vpbBewaarInvoer = b; } }
+async function vpbOpslaan(items) {
   const r = await vpRoep({ actie: "antwoorden_opslaan", items });
   const mis = (r.uitkomsten || []).filter(u => !u.ok);
   if (mis.length) throw new Error(mis.map(u => u.fout).join("; "));
 }
-async function vpAntwActie(actie, klantId, id) {
-  const st = vpAntw.get(klantId); if (!st) return;
-  const k = vpData.klanten.find(x => x.klant_id === klantId);
-  const a = id ? st.antwoorden.find(x => x.id === id) : null;
-  st.melding = null;
+/** Shai's voorstel (vraagpost-voorstel) voor deze antwoorden; per administratie, in delen van 40. */
+async function vpbVoorstellen(lijst) {
+  if (vpbBezig) return;
+  vpbBezig = "Shai leest de antwoorden…"; vpbTeken();
+  toonMelding("melding-vpb", "ok", "Shai leest de antwoorden en maakt voorstellen…");
   try {
-    if (actie === "goedkeuren") {
-      const rekening = a._rekening ?? a.keuze?.rekening ?? a.voorstel?.rekening ?? "";
-      if (!rekening) { st.melding = ["fout", "Kies eerst een rekening."]; vpTeken(); return; }
-      const keuze = { rekening, relatie: (a._relatie ?? a.keuze?.relatie ?? a.voorstel?.relatie ?? "") || null,
-        omschrijving: (a._omschrijving ?? a.keuze?.omschrijving ?? a.voorstel?.omschrijving ?? a.antwoord).slice(0, 40) };
-      await vpAntwOpslaan([{ id, keuze, status: "goedgekeurd" }]);
-      Object.assign(a, { keuze, status: "goedgekeurd" });
-    } else if (actie === "overslaan") {
-      await vpAntwOpslaan([{ id, status: "overgeslagen" }]); a.status = "overgeslagen";
-    } else if (actie === "terug") {
-      await vpAntwOpslaan([{ id, status: "nieuw" }]); a.status = "nieuw";
-    } else if (actie === "voorstellen") {
-      const open = st.antwoorden.filter(x => x.status === "nieuw");
-      if (!open.length) return;
-      st.bezig = "Shai leest de antwoorden…"; vpTeken();
-      for (let i = 0; i < open.length; i += 40) {
-        const deel = open.slice(i, i + 40);
-        const { data, error } = await sb.functions.invoke("vraagpost-voorstel", { body: { office: k.administratie,
+    for (const office of [...new Set(lijst.map(a => a.administratie))]) {
+      const eigen = lijst.filter(a => a.administratie === office);
+      for (let i = 0; i < eigen.length; i += 40) {
+        const deel = eigen.slice(i, i + 40);
+        const { data, error } = await sb.functions.invoke("vraagpost-voorstel", { body: { office,
           regels: deel.map(x => ({ id: x.id, datum: x.datum, bedrag: Number(x.bedrag), omschrijving: x.omschrijving, antwoord: x.antwoord })) } });
         if (error) { let t = error.message; try { t = (await error.context.json()).fout || t; } catch (_) {} throw new Error(t); }
         const items = (data.voorstellen || []).map(v => ({ id: v.id, voorstel: { rekening: v.rekening, rekeningnaam: v.rekeningnaam, relatie: v.relatie, omschrijving: v.omschrijving, toelichting: v.toelichting, zeker: v.zeker } }));
-        if (items.length) await vpAntwOpslaan(items);
-        for (const it of items) { const x = st.antwoorden.find(y => y.id === it.id); if (x) { x.voorstel = it.voorstel; delete x._rekening; delete x._relatie; delete x._omschrijving; } }
+        if (items.length) await vpbOpslaan(items);
+        vpbTeken();   // eerst wat er getypt was bewaren …
+        for (const it of items) { const x = vpbData.antwoorden.find(y => y.id === it.id); if (x) { x.voorstel = it.voorstel; delete x._rekening; delete x._relatie; delete x._omschrijving; } }
+        vpbTekenZonderBewaren();
       }
-      st.melding = ["ok", "Shai heeft voorstellen gemaakt. Kijk ze na en keur goed."];
-    } else if (actie === "doorvoeren") {
-      await vpDoorvoeren(k, st);
     }
-  } catch (e) { st.melding = ["fout", escapeHtml(e.message)]; }
-  st.bezig = null;
-  vpTeken();
+    toonMelding("melding-vpb", "ok", "Shai heeft voorstellen gemaakt. Kijk ze na, pas aan waar nodig en keur goed.");
+  } catch (e) { toonMelding("melding-vpb", "fout", "Voorstellen maken lukte niet: " + escapeHtml(e.message)); }
+  vpbBezig = null; vpbTeken();
 }
-/**
- * Doorvoeren: per boekstuk één CONCEPT-memoriaal (zoals memoriaalXmlGroep van de oude Doorvoeren): de gekozen rekening
- * aan dezelfde kant als de post op 2999, de tegenregel op 2999 met "Bankboeker <DAGBOEK> <NUMMER>". Datum = die van de
- * oorspronkelijke post. Bedragen in florin (basisbedrag, ook bij een creditcard in dollars).
- */
-async function vpDoorvoeren(k, st) {
-  const office = k.administratie;
-  const profiel = profielen.find(p => p.code === office) || {};
-  const dagboek = profiel.memoDagboek || "MEMO", vraagposten = profiel.vraagposten || "2999";
-  const klaar = st.antwoorden.filter(a => a.status === "goedgekeurd" && a.keuze?.rekening && a.boekstuk);
-  if (!klaar.length) return;
-  const groepen = new Map();
-  for (const a of klaar) { const s = `${a.dagboek} ${a.boekstuk}`; if (!groepen.has(s)) groepen.set(s, []); groepen.get(s).push(a); }
-  if (!confirm(`${klaar.length} goedgekeurde ${klaar.length === 1 ? "post" : "posten"} van ${k.klant} doorvoeren?\n\nShai maakt ${groepen.size} concept-memoriaal${groepen.size === 1 ? "" : "boekingen"} (dagboek ${dagboek}) in ${office}: van ${vraagposten} naar de gekozen rekening. Definitief maken doe je in Twinfield.`)) return;
-  let gelukt = 0;
-  for (const [referentie, rijen] of groepen) {
-    st.bezig = `Memoriaal voor ${referentie}…`; vpTeken();
-    const ref = ("Bankboeker " + referentie).substring(0, 40);
-    const lijnen = rijen.map(a => {
-      const bedrag = Math.abs(Number(a.bedrag)).toFixed(2);
-      const zijde = Number(a.bedrag) > 0 ? "debit" : "credit", tegen = zijde === "debit" ? "credit" : "debit";
-      return `<line type="detail"><dim1>${xmlEsc(a.keuze.rekening)}</dim1>${a.keuze.relatie ? `<dim2>${xmlEsc(a.keuze.relatie)}</dim2>` : ""}<value>${bedrag}</value><debitcredit>${zijde}</debitcredit><description>${xmlEsc((a.keuze.omschrijving || "").substring(0, 40))}</description></line>` +
-        `<line type="detail"><dim1>${xmlEsc(vraagposten)}</dim1><value>${bedrag}</value><debitcredit>${tegen}</debitcredit><description>${xmlEsc(ref)}</description></line>`;
-    }).join("");
-    const datum = String(rijen[0].datum || new Date().toISOString().slice(0, 10)).replace(/-/g, "");
-    const xml = `<transaction destiny="temporary"><header><office>${xmlEsc(office)}</office><code>${xmlEsc(dagboek)}</code><date>${datum}</date></header><lines>${lijnen}</lines></transaction>`;
-    const raw = await dlVerstuur(xml);
-    let tekst = raw;
-    try { const j = JSON.parse(raw); tekst = j.response || j.result || j.data || j.xml || j.body || raw; } catch (_) {}
-    const doc = new DOMParser().parseFromString(tekst, "application/xml");
-    const t = doc.getElementsByTagName("transaction")[0];
-    if (!(t && t.getAttribute("result") === "1")) throw new Error(`Twinfield wees het memoriaal voor ${referentie} af: ${t ? (twinfieldFoutenUit(t) || "onbekende reden") : String(tekst).replace(/</g, " ").slice(0, 250)}` + (gelukt ? ` (${gelukt} eerdere posten zijn wél doorgevoerd)` : ""));
-    const nummer = (t.getElementsByTagName("number")[0] || {}).textContent || "?";
-    await vpAntwOpslaan(rijen.map(a => ({ id: a.id, status: "doorgevoerd", memoriaal: `${dagboek} ${nummer}` })));
-    for (const a of rijen) Object.assign(a, { status: "doorgevoerd", memoriaal: `${dagboek} ${nummer}` });
-    gelukt += rijen.length;
-    if (typeof audit === "function") audit("memoriaal-aangemaakt", office, `${dagboek} ${nummer} ← vraagpost-antwoorden ${referentie} (${rijen.length} regels)`);
-  }
-  st.melding = ["ok", `${gelukt} ${gelukt === 1 ? "post" : "posten"} doorgevoerd als concept-memoriaal. Definitief maken doe je in Twinfield.`];
+async function vpbActie(actie, id, office) {
+  const a = id ? vpbData.antwoorden.find(x => x.id === id) : null;
+  try {
+    if (actie === "goedkeuren") {
+      const veld = (n) => (document.querySelector(`[data-vpb-id="${id}"][data-vpb-veld="${n}"]`)?.value || "").trim();
+      const code = veld("rekening").split(/\s+/)[0] || "";
+      if (!(vpbSchemas.get(a.administratie) || []).some(s => s.code === code)) {
+        toonMelding("melding-vpb", "fout", `Kies bij ${escapeHtml(a.omschrijving || "deze post")} een rekening uit de lijst (typ een stukje van het nummer of de naam).`);
+        return;
+      }
+      const keuze = { rekening: code, relatie: veld("relatie") || null, omschrijving: (veld("omschrijving") || a.antwoord).slice(0, 40) };
+      await vpbOpslaan([{ id, keuze, status: "goedgekeurd" }]);
+      Object.assign(a, { keuze, status: "goedgekeurd" });
+    } else if (actie === "overslaan") {
+      await vpbOpslaan([{ id, status: "overgeslagen" }]); a.status = "overgeslagen";
+    } else if (actie === "terug") {
+      await vpbOpslaan([{ id, status: "nieuw" }]); a.status = "nieuw";
+    } else if (actie === "voorstellen") {
+      return vpbVoorstellen(vpbData.antwoorden.filter(x => x.administratie === office && x.status === "nieuw"));
+    }
+    // Uit dit tabje: weg uit de lijst, tellingen bijwerken
+    if (a && a.status !== vpbStand) {
+      vpbData.antwoorden = vpbData.antwoorden.filter(x => x.id !== id);
+      vpbData.tellingen[vpbStand] = Math.max(0, (vpbData.tellingen[vpbStand] || 1) - 1);
+      vpbData.tellingen[a.status] = (vpbData.tellingen[a.status] || 0) + 1;
+    }
+    document.getElementById("melding-vpb").innerHTML = "";
+    vpbTeken();
+  } catch (e) { toonMelding("melding-vpb", "fout", escapeHtml(e.message)); }
 }
+document.getElementById("btn-vpb-verversen").addEventListener("click", () => laadVpBeoordelen());
+document.getElementById("vpb-klant").addEventListener("change", (e) => { vpbKlant = e.target.value; vpbTeken(); });
+document.getElementById("vpb-tabjes").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-vpb-tabje]");
+  if (b && b.dataset.vpbTabje !== vpbStand) { vpbStand = b.dataset.vpbTabje; laadVpBeoordelen(); }
+});
+document.querySelector("#tabel-vpb tbody").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-vpb-actie]");
+  if (b) vpbActie(b.dataset.vpbActie, b.dataset.vpbId, b.dataset.office);
+});
 
 async function laadVerwijderd() {
   const { data, error } = await sb.from("basecone_documenten")

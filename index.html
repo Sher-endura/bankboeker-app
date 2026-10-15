@@ -6269,20 +6269,34 @@ function bkDetailRij(r) {
     if (zf && !lijst.length) zf.checked = true;
     // Factuur van een andere klant zoeken en toevoegen (aangevinkt).
     const az = vak.querySelector(".bk-andere-zoek"), al = vak.querySelector(".bk-andere-lijst");
-    if (az) az.addEventListener("input", () => {
+    // Bij klikken meteen suggesties (Shereen 15 okt: "ik kan hier niet op klikken" — er gebeurde pas iets bij typen):
+    // eerst facturen waarvan het nummer in de banktekst staat ("0348/0330"), anders de nieuwste open facturen.
+    const toonAndere = () => {
       const w = az.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-      if (!w.length) { al.innerHTML = ""; return; }
-      const hits = aflet.open.filter(o => o.relatie !== rel && !extraFacturen.has(sleutel(o)) &&
-        w.every(x => [o.factuur, o.code, o.nummer, o.relatie, o.relatienaam, faBedrag(o.open), o.open.toFixed(2)].join(" ").toLowerCase().includes(x))).slice(0, 8);
-      al.innerHTML = hits.length ? hits.map(o => `<button type="button" class="bk-andere-optie" data-k="${escapeHtml(sleutel(o))}">${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(o.relatie)} ${escapeHtml(o.relatienaam || "")} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></button>`).join("")
-        : `<span class="fa-uitleg">Geen open ${K.facturen} gevonden.</span>`;
+      const kandidaat = aflet.open.filter(o => o.relatie !== rel && !extraFacturen.has(sleutel(o)));
+      let hits, kop = "";
+      if (w.length) hits = kandidaat.filter(o => w.every(x => [o.factuur, o.code, o.nummer, o.relatie, o.relatienaam, faBedrag(o.open), o.open.toFixed(2)].join(" ").toLowerCase().includes(x)));
+      else {
+        const nrs = (String(r.omschrijving || "").match(/\d{3,}/g) || []);
+        const uitTekst = kandidaat.filter(o => nrs.some(n => String(o.factuur || "").replace(/\D/g, "").endsWith(n) || String(o.nummer || "").endsWith(n)));
+        hits = uitTekst.length ? uitTekst : [...kandidaat].sort((a, b) => String(b.datum).localeCompare(String(a.datum)));
+        kop = uitTekst.length ? "Nummer uit de banktekst:" : "Nieuwste open facturen — typ om te zoeken:";
+      }
+      hits = hits.slice(0, 8);
+      al.innerHTML = (kop ? `<span class="fa-uitleg">${kop}</span>` : "") + (hits.length ? hits.map(o => `<button type="button" class="bk-andere-optie" data-k="${escapeHtml(sleutel(o))}">${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(o.relatie)} ${escapeHtml(o.relatienaam || "")} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></button>`).join("")
+        : `<span class="fa-uitleg">Geen open ${K.facturen} gevonden.</span>`);
       al.querySelectorAll(".bk-andere-optie").forEach(b => b.addEventListener("click", (e) => {
         e.stopPropagation();
         extraFacturen.add(b.dataset.k); aanErbij.add(b.dataset.k);
         const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true;
         toonFacturen();
       }));
-    });
+    };
+    if (az) {
+      az.addEventListener("input", toonAndere);
+      az.addEventListener("focus", toonAndere);
+      az.addEventListener("click", (e) => { e.stopPropagation(); toonAndere(); });
+    }
     const fzoek = vak.querySelector(".bk-fzoek");
     if (fzoek) fzoek.addEventListener("input", () => {
       const w = fzoek.value.trim().toLowerCase().split(/\s+/).filter(Boolean);

@@ -727,7 +727,7 @@
 
   <div class="kaart" id="kaart-gebruikers" style="display:none">
     <h2>Gebruikers (medewerkers)</h2>
-    <p class="hint">Nieuwe accounts krijgen het standaardwachtwoord <b>enter123</b> en moeten bij de eerste inlog verplicht een eigen wachtwoord kiezen. Resetten zet het wachtwoord terug naar enter123, opnieuw met verplichte wijziging. Alleen @endura-aruba.com-adressen.</p>
+    <p class="hint">Nieuwe accounts krijgen een willekeurig tijdelijk wachtwoord (dat zie je hier één keer in beeld) en moeten bij de eerste inlog verplicht een eigen wachtwoord kiezen. Resetten geeft weer een nieuw tijdelijk wachtwoord, opnieuw met verplichte wijziging. Alleen @endura-aruba.com-adressen.</p>
     <div class="rij">
       <div style="flex:2"><label>E-mailadres nieuwe medewerker</label><input type="email" id="gb-email" placeholder="naam@endura-aruba.com"></div>
       <div style="flex:1; display:flex; align-items:flex-end"><button class="knop" id="btn-gb-aanmaken">+ Account aanmaken</button></div>
@@ -1078,7 +1078,7 @@
           <select id="kb-hard-richting" style="max-width:300px"><option value="">Allebei</option><option value="bij">Alleen ontvangsten (geld komt binnen)</option><option value="af">Alleen betalingen (geld gaat eruit)</option></select></div>
         <div class="kb-stap"><b>3 · Wat doet Shai dan?</b>
           <label>Omschrijving in Twinfield — klik op een knopje om het in te voegen; Shai vult het per bankregel in</label>
-          <input type="text" id="kb-hard-oms" placeholder="bv. {factuur} Kuster Advocaten" maxlength="80">
+          <input type="text" id="kb-hard-oms" placeholder="bv. {factuur} Jansen Advocaten" maxlength="80">
           <div class="kb-chips">
             <button type="button" data-v="{factuur}" title="Het factuurnummer dat Shai koppelt (of dat in de banktekst staat)">factuurnummer</button>
             <button type="button" data-v="{periode}" title="Maand + jaar uit de banktekst of de datum, bv. sep 2026">periode</button>
@@ -1091,7 +1091,7 @@
             <input type="text" id="kb-hard-rekening" placeholder="bv. 9070" style="max-width:200px"></div>
         </div>
         <div class="kb-stap"><b>4 · Waarom?</b> <span class="fa-uitleg">Zodat collega's (en Claude) later snappen waarom deze regel er is.</span>
-          <input type="text" id="kb-hard-reden" placeholder="bv. Shereen: bij Kuster alleen factuurnummer en Kuster Advocaten, geen banktekst"></div>
+          <input type="text" id="kb-hard-reden" placeholder="bv. Shereen: bij Jansen alleen factuurnummer en Jansen Advocaten, geen banktekst"></div>
         <p><button class="knop" id="btn-kb-hard-opslaan">Regel opslaan</button> <span id="kb-hard-melding"></span></p>
       </div>
     </details>
@@ -1151,7 +1151,7 @@
   </div>
 </div>
 
-<!-- ============ WACHTWOORD-WIJZIGEN-OVERLAY (verplicht na enter123) ============ -->
+<!-- ============ WACHTWOORD-WIJZIGEN-OVERLAY (verplicht na een tijdelijk wachtwoord) ============ -->
 <div id="wachtwoord-overlay" style="display:none; position:fixed; inset:0; background:var(--grijs); z-index:100; align-items:center; justify-content:center;">
   <div class="kaart" style="max-width:380px; text-align:left; padding:32px;">
     <h2 style="margin-bottom:6px; text-align:center">Kies je eigen wachtwoord</h2>
@@ -1207,7 +1207,7 @@ async function initAuth() {
     await sb.auth.signOut();
     return false;
   }
-  // Standaardwachtwoord (enter123)? Dan eerst een eigen wachtwoord kiezen.
+  // Tijdelijk wachtwoord? Dan eerst een eigen wachtwoord kiezen.
   if (gebruiker.user_metadata && gebruiker.user_metadata.moet_wachtwoord_wijzigen === true) {
     document.getElementById("wachtwoord-overlay").style.display = "flex";
     return false;
@@ -1414,7 +1414,7 @@ const SOORTEN = [
 const OMS_RUIS = new Set(["IFO", "MR", "MRS", "MS", "DHR", "MEVR", "THE", "AND", "VAN", "DEN", "DER", "WEEK",
   // Betaalwijze-woorden van de bank zijn geen naam: anders werd "POS BIX BRANDSIMPORT" herkend als "POS PONSON S" (11 okt).
   "POS", "MAESTRO", "ACH", "TRANSFER", "PAYMENT", "PURCHASE", "MCDT", "EDC",
-  // "InternetBanking Tfr Debit CMS REF-DC…" is alleen de manier van betalen (Shereen 12 okt): KUSTER-verzekeringen
+  // "InternetBanking Tfr Debit CMS REF-DC…" is alleen de manier van betalen (Shereen 12 okt): JANSEN-verzekeringen
   // werden herkend op "INTERNETBANKING TFR DEBIT" → 4831 Telefoon/Fax/Internet.
   "INTERNETBANKING", "INTERNET", "TFR", "DEBIT", "CREDIT", "CMS", "REF", "DC", "MOBILEWEB", "MOBILEIOS", "NETTO", "OUTWARD", "LOC", "CLEARING", "PARTIAL",
   // RBC (Shereen 13 okt): "Sundry Debtor … Wash Thru PCN … PCN-Processed Transaction", "POS Suspense".
@@ -1424,7 +1424,7 @@ function soortVan(omschrijving) {
   return SOORTEN.find(s => s.her.test(b)) || null;
 }
 /* Salaris en tips (Shereen 10 okt 2026, voor alle klanten): altijd eerst de naam, dan de maand:
-   "Nathan Joe Lacle - September salaris", "Alicia Noelia Yu - Oktober tip". De maand komt uit de
+   "Kees Willem de Vries - September salaris", "Anna Maria Bakker - Oktober tip". De maand komt uit de
    omschrijving (SEPTEMBER, SEPT, 09/2026, 2026-09); anders een weeknummer; anders de maand van de
    bankdatum. Maandwoorden tellen niet als naam. */
 const MAANDEN_NL = ["Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
@@ -1478,7 +1478,7 @@ function naamVoorOmschrijving(ruw, ruimte = 40, eenVoornaam = false) {
   if (a < 0) a = Math.max(1, w.length - 1);                          // anders het laatste woord
   const voluit = w.slice(0, a).filter((x) => x.length > 1);
   const voor = voluit.length ? voluit : w.slice(0, 1);
-  if (eenVoornaam) voor.splice(1);   // deelbetaling (Shereen 12 okt): "Allan Kuster", zonder tweede voornaam
+  if (eenVoornaam) voor.splice(1);   // deelbetaling (Shereen 12 okt): "Jan Jansen", zonder tweede voornaam
   const achter = w.slice(a).filter((x) => x.length > 1);
   const kast = (x) => (TUSSENVOEGSELS.has(x) && achter.indexOf(x) < achter.length - 1 ? x.toLowerCase()
     : OMS_KAPITALEN.has(x) ? x : x.charAt(0) + x.slice(1).toLowerCase());
@@ -1525,8 +1525,8 @@ function netteOmschrijving(ruw, rekeningNaam, datum, bedrijf, eigen = []) {   //
   const week = boven.match(/\bWEEK\s*(\d{1,2})\b/);
   // Salaris en tips (Shereen 10 okt): "<Naam> - <Maand> salaris" en "<Naam> - week <nr> tip";
   // een tip gaat over de week vóór de betaling.
-  // Deelbetaling (Shereen 12 okt): "2nd Partial Payment Netto salaris september … Allan Franz Kuster" →
-  // "Allan Kuster - September 2nd prt".
+  // Deelbetaling (Shereen 12 okt): "2nd Partial Payment Netto salaris september … Jan Piet Jansen" →
+  // "Jan Jansen - September 2nd prt".
   const deel = boven.match(/\b(\d{1,2})\s?(ST|ND|RD|TH|STE|DE|E)\s+(?:PARTIAL\s+PAYMENT|DEEL\s?BETAL\s?ING|TERMIJN)\b/);
   const bron = naamBron(knipBijEigen(deel ? ruw.slice(0, deel.index) + " " + ruw.slice(deel.index + deel[0].length) : ruw, eigen));
   const naam = [...new Set(naamWoorden(bron))];
@@ -1611,7 +1611,7 @@ function algemeen(ruw, bedrijf) {
   // Blijft er geen woord over (bv. "$67.00/2296062" → "67.00"), dan de RAW-tekst (Shereen 12 okt).
   return kortOpWoord(/[A-Za-z]{2}/.test(uit) ? uit : (ruw || "").replace(/\s{2,}/g, " ").trim(), 40);
 }
-/* CMB-bankteksten (KUSTER, 12 okt): "InternetBanking Tfr Debit CMS REF-DC67251890 <eigen tekst> Kuster LawMO BILEWEB
+/* CMB-bankteksten (JANSEN, 12 okt): "InternetBanking Tfr Debit CMS REF-DC12345678 <eigen tekst> Jansen LawMO BILEWEB
    <ontvanger> FT26266K8320". Kop, referentie en alles vanaf MOBILEWEB/MOBILEIOS (de bank breekt het woord soms af)
    is bankinfo. "InternetBanking Tfr" = alleen de manier van betalen (Shereen 12 okt). "Fees Debited" blijft staan:
    dat is de bankkosten-regel (1,75) bij een overboeking. */
@@ -1622,11 +1622,11 @@ function zonderBankstaart(ruw) {
     .replace(/^\s*(?:INTERNET\s?BANKING\s+TFR\s+DEBIT|INTERNET\s+TRANSFER\s+CREDIT|OUTWARD\s+LOC\s+CLEARING\s+PAYMENT)\b/i, " ")
     .replace(/\bCMS\s+REF-?[A-Z]{0,3}\d*/gi, " ").replace(/\s{2,}/g, " ").trim();
 }
-/* Waar de naam in staat, zonder de staart die de bank herhaalt (KUSTER, 12 okt): "… Allan Franz Kuster K uster Law"
-   — vanaf een tweede keer dezelfde naam (ook afgebroken: "K USTER") is het de rekeninghouder (Kuster Law), niet de
+/* Waar de naam in staat, zonder de staart die de bank herhaalt (JANSEN, 12 okt): "… Jan Piet Jansen J ansen Law"
+   — vanaf een tweede keer dezelfde naam (ook afgebroken: "J ANSEN") is het de rekeninghouder (Jansen Law), niet de
    werknemer. Een door de bank afgebroken maand ("S EPTEMBER") is geen naam. */
 function naamBron(ruw) {
-  // Alleen een DIRECTE herhaling knipt ("Kuster Kuster Law", "Kuster K uster Law"); "Curt I.F.O. Curt D Harms" niet.
+  // Alleen een DIRECTE herhaling knipt ("Jansen Jansen Law", "Jansen J ansen Law"); "Piet I.F.O. Piet D Smit" niet.
   const w = String(ruw || "").split(/\s+/), uit = [];
   const kaal = (x) => (x || "").toUpperCase().replace(/[^A-Z]/g, "");
   let vorige = "";
@@ -1640,10 +1640,10 @@ function naamBron(ruw) {
   return uit.join(" ");
 }
 /* De eigen naam van de klant (Shereen 12 okt: "bouw dat Shai de klantnaam kent"). Twee bronnen:
-   - de naam in het klantprofiel / Twinfield ("Advocatenpraktijk Mr Allan Franz Kuster");
-   - de naam die de bank (CMB) vóór MOBILEWEB plakt — de rekeninghouder ("… Kuster LawMOBILEWEB"). Die leert Shai uit
+   - de naam in het klantprofiel / Twinfield ("Advocatenpraktijk Mr Jan Piet Jansen");
+   - de naam die de bank (CMB) vóór MOBILEWEB plakt — de rekeninghouder ("… Jansen LawMOBILEWEB"). Die leert Shai uit
      alle regels van de klant: het langste stuk (letters, zonder spaties) waarmee minstens de helft van de regels vóór
-     MOBILEWEB eindigt ("KUSTERLAW"). De bank breekt woorden af ("K uster L aw"), daarom zonder spaties vergelijken. */
+     MOBILEWEB eindigt ("JANSENLAW"). De bank breekt woorden af ("J ansen L aw"), daarom zonder spaties vergelijken. */
 const MOBIEL = /M\s?O\s?B\s?I\s?L\s?E\s?(?:W\s?E\s?B|I\s?O\s?S)/i;
 function rekeninghouderUit(teksten) {
   const staarten = [];
@@ -1653,25 +1653,25 @@ function rekeninghouderUit(teksten) {
   }
   if (staarten.length < 3) return null;
   // Niet elke regel draagt de naam (InternetBanking-regels niet): genoeg = minstens 3 en een kwart. Langer maken tot
-  // het aantal ineens zakt — dan begint het woord ervóór ("…KUSTER|LAW" → "KUSTERLAW", niet "RKUSTERLAW").
+  // het aantal ineens zakt — dan begint het woord ervóór ("…JANSEN|LAW" → "JANSENLAW", niet "RJANSENLAW").
   let beste = null, vorig = 0;
   for (let n = 5; n <= 40; n++) {
     const tel = new Map();
     for (const s of staarten) if (s.length >= n) tel.set(s.slice(-n), (tel.get(s.slice(-n)) || 0) + 1);
     const top = [...tel].sort((a, b) => b[1] - a[1])[0];
-    // Ook ≥ 15% van álle regels: bij ENDURA betaalt "Kuster Law" facturen — dat is niet de rekeninghouder van ENDURA.
+    // Ook ≥ 15% van álle regels: bij ENDURA betaalt "Jansen Law" facturen — dat is niet de rekeninghouder van ENDURA.
     if (!top || top[1] < Math.max(3, staarten.length / 4, (teksten || []).length * 0.15) || (vorig && top[1] < vorig * 0.8)) break;
     beste = top[0]; vorig = top[1];
   }
   return beste;
 }
-/* Een eigen naam als zoekpatroon, ongevoelig voor spaties en hoofdletters ("Kuster L aw" = KUSTERLAW). */
+/* Een eigen naam als zoekpatroon, ongevoelig voor spaties en hoofdletters ("Jansen L aw" = JANSENLAW). */
 function eigenPatroon(naam) {
   const letters = String(naam || "").toUpperCase().replace(/\b(N\.?\s?V|B\.?\s?V|V\.?\s?B\.?\s?A|INC|LTD)\.?\s*$/, "").replace(/[^A-Z]/g, "");
   return letters.length >= 5 ? new RegExp("(^|[^A-Za-z])" + letters.split("").join("\\s*"), "i") : null;
 }
 /* Bij de naam van een werknemer: de tekst vanaf de eigen naam van de klant afknippen — wat erna komt is van de
-   rekeninghouder ("Nubia Ojeda Lozano Kuster Law", "Elton S Paskel Kuster Law minus 88ste aflossing Lening").
+   rekeninghouder ("Els Maria Visser Jansen Law", "Henk S Mulder Jansen Law minus 88ste aflossing Lening").
    Alleen als er vóór de eigen naam nog een naam staat. Niet in andere omschrijvingen: daar sloopte het te veel
    ("Discover Cafe Restaurant Bingo" → "Discover", factuurnummer "Endura-2026-0266"). */
 function knipBijEigen(tekst, eigen) {
@@ -1800,7 +1800,7 @@ function pastUitlegRegel(regel, ruw, bedrag, relatie) {
   const tekst = uitlegNorm(ruw), z = (regel && regel.zoek) || {};
   const heeft = (w) => { const n = uitlegNorm(w).trim(); return n.length >= 2 && tekst.includes(" " + n + " "); };
   const eenVan = (z.een_van || []).filter(Boolean), alle = (z.alle || []).filter(Boolean);
-  // Harde regel voor één klant/leverancier (Shereen 14 okt, Kuster D10110): geldt als die relatie gekoppeld is,
+  // Harde regel voor één klant/leverancier (Shereen 14 okt, Jansen D10110): geldt als die relatie gekoppeld is,
   // ook zonder woorden uit de banktekst.
   if (z.relatie && String(relatie || "").toUpperCase() !== String(z.relatie).toUpperCase()) return false;
   if (!eenVan.length && !alle.length && !z.relatie) return false;
@@ -1813,7 +1813,7 @@ function pastUitlegRegel(regel, ruw, bedrag, relatie) {
 /* Sjabloon voor de omschrijving: {periode} {maand} {jaar} {naam} {tekst} {factuur}. Max 40 tekens. */
 function vulSjabloon(sjabloon, ruw, datum, facturen) {
   const p = periodeDelen(ruw, datum);
-  // {factuur}: eerst de gekoppelde factuur (14 okt: Kuster "Endura 2026 0195" in de banktekst werd niet herkend), anders uit de banktekst.
+  // {factuur}: eerst de gekoppelde factuur (14 okt: Jansen "Endura 2026 0195" in de banktekst werd niet herkend), anders uit de banktekst.
   const gekoppeld = [...new Set((facturen || []).filter(Boolean))].join(", ");
   const factuur = gekoppeld || (String(ruw || "").toUpperCase().match(/\b\d{1,5}-[A-Z]{1,3}-\d{2,4}\b|\b(?:INV|INVOICE|FACT|FACTUUR)[\s#:.-]*[A-Z0-9-]{3,}\b|\b20\d{2}-\d{3,4}\b/) || [""])[0];
   const waarde = {
@@ -4110,7 +4110,7 @@ function metTweedeKlik(knop, vraagTekst, fn) {
 /* ================= Gebruikersbeheer =================
    Accounts voor medewerkers, via de edge function "gebruikers" (service-rol).
    Alleen beheerders (secret BANKBOEKER_BEHEERDERS) zien dit blok en mogen
-   aanmaken/resetten/verwijderen. Standaardwachtwoord enter123; de app dwingt
+   aanmaken/resetten/verwijderen. Willekeurig tijdelijk wachtwoord (15 okt 2026, was enter123); de app dwingt
    daarna een eigen wachtwoord af (vlag moet_wachtwoord_wijzigen). */
 async function gebruikersAanroep(actie, email) {
   const { data: { session } } = await sb.auth.getSession();
@@ -4148,7 +4148,7 @@ async function laadGebruikers() {
     const ikzelf = gebruiker && u.email === gebruiker.email;
     tr.innerHTML = `<td><b>${escapeHtml(u.email)}</b>${ikzelf ? ' <span class="hint">(jij)</span>' : ""}</td>
       <td>${gbDatum(u.aangemaakt)}</td><td>${gbDatum(u.laatste_inlog)}</td>
-      <td>${u.moet_wijzigen ? '<span class="badge zwak">enter123 — moet nog wijzigen</span>' : '<span class="badge regel">eigen wachtwoord</span>'}</td>
+      <td>${u.moet_wijzigen ? '<span class="badge zwak">tijdelijk wachtwoord — moet nog wijzigen</span>' : '<span class="badge regel">eigen wachtwoord</span>'}</td>
       <td style="white-space:nowrap"></td>`;
     const acties = tr.lastElementChild;
     const knop = (tekst, klasse, vraagTekst, fn) => {
@@ -4158,7 +4158,7 @@ async function laadGebruikers() {
       metTweedeKlik(b, vraagTekst, fn);
       acties.appendChild(b);
     };
-    knop("Wachtwoord resetten", "stil", "Zeker? Terug naar enter123", async () => {
+    knop("Wachtwoord resetten", "stil", "Zeker? Nieuw tijdelijk wachtwoord", async () => {
       try {
         const r = await gebruikersAanroep("reset", u.email);
         audit("wachtwoord gereset", "", u.email);
@@ -5866,7 +5866,7 @@ function bkStandaardGoedkeuring(r) {
   // die nog met oudere regels gemaakt kan zijn ("… B.O.O. Sera Fina Tradin").
   const oms = (bkOmsTekst(r) || v.omschrijving || "").slice(0, 40);
   if (v.soort === "twinfield" && r.twinfield_bak === "Proposed") return { soort: "twinfield", omschrijving: oms };
-  // Alleen als de factuur precies het betaalde bedrag is (14 okt, Kuster 26175/5: 0195 open 24.100, betaald 6.450, met het vinkje
+  // Alleen als de factuur precies het betaalde bedrag is (14 okt, Jansen 26175/5: 0195 open 24.100, betaald 6.450, met het vinkje
   // goedgekeurd zonder deelbetaling) — anders eerst in het uitklapvak kiezen: deelbetaling, op-/afboeking, …
   if (v.soort === "klant" && v.regels && v.regels.length === 1 && v.regels[0].boekstuk && Math.abs(Math.abs(Number(v.regels[0].bedrag)) - Math.abs(Number(r.bedrag))) < 0.005) return { soort: "klant", ...(v.kant === "crediteur" ? { kant: v.kant } : {}), regels: [v.regels[0]], omschrijving: oms };
   if (v.soort === "grootboek" && v.regels && v.regels.length === 1 && v.regels[0].rekening)
@@ -7201,7 +7201,7 @@ document.getElementById("regels-zoek").addEventListener("input", vernieuwRegels)
     if (aanmaakKnop.dataset.zeker !== "1") {
       document.getElementById("melding-gebruikers").innerHTML = "";
       aanmaakKnop.dataset.zeker = "1";
-      aanmaakKnop.textContent = "Zeker? Wachtwoord wordt enter123";
+      aanmaakKnop.textContent = "Zeker? Klik nog eens om aan te maken";
       setTimeout(() => { if (aanmaakKnop.dataset.zeker === "1") wapenUit(); }, 5000);
       return;
     }

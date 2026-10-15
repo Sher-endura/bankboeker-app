@@ -6184,12 +6184,12 @@ function bkDetailRij(r) {
         <select class="bk-s-soort"${beoordelen ? "" : " disabled"}>${SPLITS_SOORT.map(([w, t]) => `<option value="${w}"${s.soort === w ? " selected" : ""}>${t}</option>`).join("")}</select>
         <span class="fa-crd-vak bk-s-codevak"><input type="text" class="bk-s-code" value="${escapeHtml(s.code)}" placeholder="${s.soort === "grootboek" ? "rekening: nummer of naam" : BK_KANT[s.soort].relatie + ": nummer of naam"}" autocomplete="off"${beoordelen ? "" : " disabled"}><span class="fa-crd-naam">${escapeHtml(naamTekst)}</span></span>
         ${s.soort !== "grootboek" ? `<select class="bk-s-factuur"${beoordelen ? "" : " disabled"}><option value="">zonder factuur</option>${open.map(o => `<option value="${escapeHtml(o.code + "|" + o.nummer)}"${s.factuur === o.code + "|" + o.nummer ? " selected" : ""}>${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open ${faBedrag(o.open)}</option>`).join("")}</select>` : ""}
-        <input type="text" class="bk-s-bedrag" inputmode="decimal" value="${s.bedrag ? faBedrag(s.bedrag) : ""}" placeholder="bedrag"${s.factuur ? ' readonly title="Het openstaande bedrag van de factuur"' : ""}${beoordelen ? "" : " disabled"}>
+        <input type="text" class="bk-s-bedrag" inputmode="decimal" value="${s.bedrag ? faBedrag(s.bedrag) : ""}" placeholder="bedrag"${s.factuur ? ' title="Standaard het hele openstaande bedrag. Minder invullen = deelbetaling: de rest blijft open op de factuur."' : ""}${beoordelen ? "" : " disabled"}>
         ${splits.length > 2 && beoordelen ? `<button type="button" class="knop stil bk-s-weg" title="Deze toewijzing weghalen">✕</button>` : ""}
         ${opRelatie ? `<div class="fa-uitleg" style="flex-basis:100%; color:var(--oranje)">↑ ${escapeHtml(s.code)} is de ${/crediteur|payable/i.test(nm) ? "crediteuren" : "debiteuren"}rekening — kies links <b>${/crediteur|payable/i.test(nm) ? "Leverancier" : "Klant"}</b>, dan kun je de ${/crediteur|payable/i.test(nm) ? "leverancier" : "klant"} (nummer of naam) en de factuur kiezen.</div>` : ""}
       </div>`; }).join("") +
       `<div style="margin-top:4px; font-size:13px">${beoordelen ? `<button type="button" class="knop stil" id="bk-s-erbij">＋ toewijzing</button> ` : ""}<span id="bk-s-som"></span></div>
-       <div class="fa-uitleg" style="margin-top:4px">Een factuur gaat altijd voor het hele openstaande bedrag. Zonder factuur kan één keer, en Shai zet die als laatste.</div>`;
+       <div class="fa-uitleg" style="margin-top:4px">Bij een factuur staat standaard het hele openstaande bedrag; vul je minder in, dan is het een deelbetaling (de rest blijft open op de factuur). Maar één deelbetaling per betaling, en dan geen "zonder factuur" erbij. Zonder factuur kan één keer; Shai zet die als laatste.</div>`;
     splitsSom();
     vak.querySelectorAll(".bk-splits-rij").forEach(rij => {
       const s = splits[+rij.dataset.i];
@@ -6233,15 +6233,20 @@ function bkDetailRij(r) {
       if (s.factuur) {
         const o = (d.open || []).find(x => x.code + "|" + x.nummer === s.factuur);
         if (!o) return fout(`Factuur ${escapeHtml(s.factuur)} staat niet (meer) open bij ${escapeHtml(k.naam)}.`);
+        if (b > o.open + 0.004) return fout(`Op factuur ${escapeHtml(o.factuur || s.factuur)} staat ${faBedrag(b)}, maar er staat maar ${faBedrag(o.open)} open.`);
+        // Minder dan open = deelbetaling (Shereen 15 okt: het bedrag moet invulbaar zijn).
         tw.push({ soort: "facturen", kant: s.soort, relatie: k.code, relatienaam: k.naam, rekening: o.rekening || BK_KANT[s.soort].rekening,
-          facturen: [{ boekstuk: s.factuur, factuur: o.factuur || `${o.code} ${o.nummer}`, open: o.open }], bedrag: teken * o.open });
+          facturen: [{ boekstuk: s.factuur, factuur: o.factuur || `${o.code} ${o.nummer}`, open: o.open, bedrag: teken * b }], bedrag: teken * b,
+          ...(b < o.open - 0.004 ? { deelbetaling: true } : {}) });
       } else tw.push({ soort: "relatie", kant: s.soort, relatie: k.code, relatienaam: k.naam, bedrag: teken * b });
     }
     const som = rond(tw.reduce((t, x) => t + Math.abs(x.bedrag), 0));
     if (Math.abs(som - absBedrag) > 0.004) return fout(`De toewijzingen tellen op tot ${faBedrag(som)}; het bankbedrag is ${faBedrag(absBedrag)}.`);
-    const zonder = tw.filter(x => x.soort === "relatie");
+    const zonder = tw.filter(x => x.soort === "relatie"), deel = tw.filter(x => x.deelbetaling);
     if (zonder.length > 1) return fout("Zonder factuur kan maar één keer (Shai zet die als laatste).");
-    return { soort: "splitsen", toewijzingen: [...tw.filter(x => x.soort !== "relatie"), ...zonder],
+    if (deel.length > 1) return fout("Maar één factuur kan een deelbetaling krijgen (Twinfield) — boek de andere facturen helemaal af.");
+    if (deel.length && zonder.length) return fout("Een deelbetaling en \"zonder factuur\" samen kan niet in Twinfield — kies één van de twee.");
+    return { soort: "splitsen", toewijzingen: [...tw.filter(x => x.soort !== "relatie" && !x.deelbetaling), ...deel, ...zonder],
       omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden };
   };
   const knop = (id, fn) => { const b = tr.querySelector("#" + id); if (b) b.addEventListener("click", async (e) => {

@@ -7678,9 +7678,29 @@ async function vpbVerwerk(actie, ids) {
       Object.assign(a, it.keuze ? { keuze: it.keuze, status: it.status } : { status: it.status });
       vpbVink.delete(it.id);
     }
+    await vpbGeheugen(items);
   } catch (e) { toonMelding("melding-vpb", "fout", escapeHtml(e.message)); }
   for (const it of items) vpbRijBezig.delete(it.id);
   vernieuwBkFilters();   // tellingen in de tabjes (en via vpbModus de lijst) bijwerken
+}
+/* Geheugen van de bank-Shai (Shereen 15 okt): een goedgekeurd antwoord = banktekst → gekozen rekening, met het antwoord
+   van de klant als reden (tabel bank_vraagpost_kennis, update 13). Bij deze klant een gewoon voorstel; bij andere
+   klanten voorleggen via de rekening met dezelfde naam. Terug of Overslaan haalt het weer weg. Een keuze op een
+   debiteur/crediteur leert niets (net als bij de bank). */
+async function vpbGeheugen(items) {
+  const weg = [], erbij = [];
+  for (const it of items) {
+    const a = vpbData.antwoorden.find(x => x.id === it.id);
+    const k = it.status === "goedgekeurd" && it.keuze;
+    if (!a || !k || k.relatie || k.rekening === vraagpostenRekening(a.administratie) || !a.omschrijving) { weg.push(it.id); continue; }
+    const s = (vpbSchemas.get(a.administratie) || []).find(x => x.code === k.rekening);
+    erbij.push({ vraagpost_id: it.id, office: a.administratie, omschrijving: a.omschrijving, rekening: k.rekening, rekening_naam: s ? s.naam : null,
+      antwoord: a.antwoord || null, datum: a.datum || null, goedgekeurd_door: gebruiker ? gebruiker.email : null, goedgekeurd_op: new Date().toISOString() });
+  }
+  const fouten = [];
+  if (erbij.length) { const { error } = await sb.from("bank_vraagpost_kennis").upsert(erbij, { onConflict: "vraagpost_id" }); if (error) fouten.push(error.message); }
+  if (weg.length) { const { error } = await sb.from("bank_vraagpost_kennis").delete().in("vraagpost_id", weg); if (error) fouten.push(error.message); }
+  if (fouten.length) toonMelding("melding-vpb", "fout", "Opgeslagen, maar niet in het geheugen van Shai gezet: " + escapeHtml(fouten.join("; ")));
 }
 async function vpbActie(actie, id, office) {
   if (actie === "voorstellen") return vpbVoorstellen(vpbData.antwoorden.filter(x => x.administratie === office && x.status === "nieuw"));

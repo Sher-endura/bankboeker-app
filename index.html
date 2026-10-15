@@ -7268,7 +7268,7 @@ function vpTeken() {
       <td class="num">${r.aantal ?? ""}</td>
       <td class="num">${r.saldo !== undefined && r.saldo !== null && r.aantal ? vpBedragHtml(r.saldo) : ""}</td>
       <td>${r.id && r.stand !== "weg" ? `<button class="knop stil vp-bekijk" data-id="${r.id}" style="padding:4px 10px" title="${escapeHtml(r.bestandsnaam || "")}">📄 Bekijken</button>` : ""}</td>
-      <td>${stand}</td>
+      <td>${stand}${vpAntwKnop(r)}</td>
       <td>${r.stand === "klaar" ? `<button class="knop vp-stuur" data-id="${r.id}" style="padding:5px 12px; white-space:nowrap">In aanleverlijst</button>` : ""}</td>
     </tr>`;
     const regels = open ? `<tr class="vp-regels"><td colspan="7">
@@ -7276,7 +7276,7 @@ function vpTeken() {
       <table><thead><tr><th>Boekdatum</th><th>Dagboek</th><th>Periode</th><th>Omschrijving</th><th class="num">Bedrag</th></tr></thead><tbody>
       ${r.regels.map(x => `<tr><td>${escapeHtml(vpDatum(x.datum))}</td><td>${escapeHtml(x.dagboek || "")}</td><td>${escapeHtml(x.periode || "")}</td><td>${escapeHtml(x.omschrijving || "")}</td><td class="num">${vpBedragHtml(x.bedrag)}</td></tr>`).join("")}
       </tbody></table></td></tr>` : "";
-    return rij + regels;
+    return rij + regels + (vpAntwOpen.has(r.klant_id) ? vpAntwPaneel(r) : "");
   }).join("");
   const klaar = k.filter(x => x.stand === "klaar");
   const alles = document.getElementById("vp-alles");
@@ -7323,6 +7323,10 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
     catch (err) { toonMelding("melding-vp", "fout", "Kon het bestand niet openen: " + escapeHtml(err.message)); }
     return;
   }
+  const antw = e.target.closest(".vp-antw");
+  if (antw) { vpAntwOpenDicht(antw.dataset.klant); return; }
+  const actie = e.target.closest("[data-vpa]");
+  if (actie) { vpAntwActie(actie.dataset.vpa, actie.dataset.klant, actie.dataset.id); return; }
   const naam = e.target.closest("td.vp-naam");
   if (naam) {
     const id = naam.parentElement.dataset.id;
@@ -7331,6 +7335,180 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
     vpTeken();
   }
 });
+// Wat je in het antwoordenpaneel kiest of typt, onthouden tot Goedkeuren (zonder het paneel opnieuw te tekenen).
+document.querySelector("#tabel-vp tbody").addEventListener("change", (e) => {
+  const veld = e.target.closest("[data-vpa-veld]");
+  if (!veld) return;
+  const a = vpAntw.get(veld.dataset.klant)?.antwoorden.find(x => x.id === veld.dataset.id);
+  if (a) a["_" + veld.dataset.vpaVeld] = veld.value.trim();
+});
+
+/* ===== Vraagposten — antwoorden van de klant (Shereen 15 okt) =====
+   De klant stuurt de lijst ingevuld terug via zijn aanleverpagina; E-Board (shai-vraagposten) pakt het bestand zelf op
+   uit SharePoint en zoekt elke beantwoorde regel terug op 2999. Hier: per regel het antwoord, Shai's voorstel
+   (functie vraagpost-voorstel: Haiku kiest uit het rekeningschema van de klant), Goedkeuren / Overslaan, en Doorvoeren:
+   per boekstuk een CONCEPT-memoriaal van 2999 naar de gekozen rekening, met "Bankboeker <DAGBOEK> <NUMMER>" op de
+   tegenregel — dezelfde route als de oude Doorvoeren (memoriaalXmlGroep), zodat Shai de post daarna als opgelost
+   herkent en hij niet opnieuw in de lijst komt. Onbeantwoord schuift de 5e vanzelf mee naar de volgende maand. */
+const vpAntw = new Map(), vpAntwOpen = new Set();
+const VPA_STAND = { nieuw: "Te beoordelen", goedgekeurd: "Goedgekeurd", doorgevoerd: "Doorgevoerd", overgeslagen: "Overgeslagen", niet_gevonden: "Niet meer open op 2999" };
+function vpAntwKnop(r) {
+  const t = r.antwoorden || {};
+  const totaal = Object.values(t).reduce((s, n) => s + n, 0);
+  if (!totaal) return "";
+  const te = (t.nieuw || 0) + (t.goedgekeurd || 0);
+  return `<div style="margin-top:4px"><button class="knop ${te ? "" : "stil"} vp-antw" data-klant="${r.klant_id}" style="padding:3px 10px; font-size:12px">💬 ${te ? `${te} antwoord${te === 1 ? "" : "en"} te verwerken` : "Antwoorden (alles verwerkt)"}</button></div>`;
+}
+async function vpAntwOpenDicht(klantId) {
+  if (vpAntwOpen.has(klantId)) { vpAntwOpen.delete(klantId); vpTeken(); return; }
+  vpAntwOpen.add(klantId);
+  await vpAntwLaad(klantId);
+}
+async function vpAntwLaad(klantId) {
+  const k = vpData.klanten.find(x => x.klant_id === klantId);
+  const st = vpAntw.get(klantId) || { antwoorden: [], bestanden: [], schema: [], laden: true };
+  st.laden = true; vpAntw.set(klantId, st); vpTeken();
+  try {
+    const [r, schema] = await Promise.all([vpRoep({ actie: "antwoorden", klant_id: klantId }), vpSchema(k.administratie)]);
+    Object.assign(st, { antwoorden: r.antwoorden || [], bestanden: r.bestanden || [], schema, fout: null });
+  } catch (e) { st.fout = e.message; }
+  st.laden = false; vpTeken();
+  // Voorstellen maken voor wat nog geen voorstel heeft (één keer per keer openen).
+  if (!st.fout && st.antwoorden.some(a => a.status === "nieuw" && !a.voorstel)) vpAntwActie("voorstellen", klantId);
+}
+/** Rekeningschema: wat Shai van Twinfield bewaarde (stamdata BAS), anders het klantprofiel. */
+async function vpSchema(office) {
+  const { data } = await sb.from("twinfield_stamdata").select("data").eq("office", office).eq("soort", "BAS").maybeSingle();
+  let s = (data?.data || []).filter(x => x.code && x.naam).map(x => ({ code: String(x.code), naam: String(x.naam) }));
+  if (!s.length) s = ((profielen.find(p => p.code === office) || {}).schema || []).map(x => ({ code: String(x.gl), naam: String(x.naam || "") }));
+  return s.filter(x => x.code !== "2999" && x.code !== "2998");
+}
+function vpAntwPaneel(r) {
+  const st = vpAntw.get(r.klant_id);
+  const kop = `<tr class="vp-regels"><td colspan="7">`;
+  if (!st || st.laden) return kop + `<div class="vp-uitleg">Antwoorden ophalen…</div></td></tr>`;
+  if (st.fout) return kop + `<div class="melding fout">${escapeHtml(st.fout)}</div></td></tr>`;
+  const bestanden = st.bestanden.map(b => `${escapeHtml(b.task_deliverable_uploads?.bestandsnaam || "bestand")} — teruggestuurd${b.task_deliverable_uploads?.door_naam ? ` door ${escapeHtml(b.task_deliverable_uploads.door_naam)}` : ""} op ${escapeHtml(vwDatum(b.task_deliverable_uploads?.geupload_op))} · ${b.beantwoord} beantwoord, ${b.gevonden} teruggevonden${b.fout ? ` · <b>${escapeHtml(b.fout)}</b>` : ""}`).join("<br>");
+  const goed = st.antwoorden.filter(a => a.status === "goedgekeurd").length;
+  const opties = (gekozen) => `<option value="">— rekening kiezen —</option>` + st.schema.map(s => `<option value="${escapeHtml(s.code)}"${s.code === gekozen ? " selected" : ""}>${escapeHtml(s.code + " " + s.naam)}</option>`).join("");
+  const rijen = st.antwoorden.map(a => {
+    const bewerkbaar = a.status === "nieuw";
+    const rek = a._rekening ?? a.keuze?.rekening ?? a.voorstel?.rekening ?? "";
+    const rel = a._relatie ?? a.keuze?.relatie ?? a.voorstel?.relatie ?? "";
+    const oms = a._omschrijving ?? a.keuze?.omschrijving ?? a.voorstel?.omschrijving ?? (a.antwoord || "").slice(0, 40);
+    const d = `data-klant="${r.klant_id}" data-id="${a.id}"`;
+    const keuzeTekst = a.keuze ? `${escapeHtml(a.keuze.rekening)} ${escapeHtml((st.schema.find(s => s.code === a.keuze.rekening) || {}).naam || "")}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : "";
+    return `<tr>
+      <td style="white-space:nowrap">${escapeHtml(vpDatum(a.datum))}</td>
+      <td style="white-space:nowrap">${escapeHtml(a.dagboek)} ${escapeHtml(a.boekstuk || "")}</td>
+      <td>${escapeHtml(a.omschrijving || "")}</td>
+      <td class="num">${vpBedragHtml(a.bedrag)}</td>
+      <td style="min-width:160px"><b>${escapeHtml(a.antwoord)}</b>${a.opmerking ? `<div class="vp-uitleg" style="margin:2px 0 0">Endura: ${escapeHtml(a.opmerking)}</div>` : ""}</td>
+      <td style="min-width:240px">${bewerkbaar
+        ? `<select data-vpa-veld="rekening" ${d} style="min-width:220px">${opties(rek)}</select>
+           <input type="text" data-vpa-veld="relatie" ${d} value="${escapeHtml(rel)}" placeholder="relatie (alleen bij debiteur/crediteur)" style="margin-top:4px">
+           <input type="text" data-vpa-veld="omschrijving" ${d} value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px">
+           ${a.voorstel ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">${a.voorstel.zeker ? "✨" : "❔"} ${escapeHtml(a.voorstel.toelichting || "")}</div>` : ""}`
+        : keuzeTekst}</td>
+      <td style="white-space:nowrap">${bewerkbaar
+        ? `<button class="knop" data-vpa="goedkeuren" ${d} style="padding:4px 10px">Goedkeuren</button> <button class="knop stil" data-vpa="overslaan" ${d} style="padding:4px 10px">Overslaan</button>`
+        : `<span class="vp-stand ${a.status === "doorgevoerd" ? "verstuurd" : a.status === "goedgekeurd" ? "klaar" : "geen"}">${escapeHtml(VPA_STAND[a.status] || a.status)}${a.memoriaal ? ` · ${escapeHtml(a.memoriaal)}` : ""}</span>
+           ${["goedgekeurd", "overgeslagen"].includes(a.status) ? ` <button class="knop stil" data-vpa="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug</button>` : ""}`}</td>
+    </tr>`;
+  }).join("");
+  return kop + `<div class="vp-uitleg" style="margin:0 0 8px">${bestanden || "Nog geen teruggestuurd bestand."}</div>
+    <div id="melding-vpa-${r.klant_id}">${st.melding ? `<div class="melding ${st.melding[0]}">${st.melding[1]}</div>` : ""}</div>
+    <p style="margin:0 0 8px">
+      <button class="knop" data-vpa="doorvoeren" data-klant="${r.klant_id}"${goed && !st.bezig ? "" : " disabled"}>Doorvoeren in Twinfield (${goed} goedgekeurd)</button>
+      <button class="knop stil" data-vpa="voorstellen" data-klant="${r.klant_id}"${st.bezig ? " disabled" : ""}>✨ Shai opnieuw laten voorstellen</button>
+      ${st.bezig ? `<span class="vp-uitleg"> ${escapeHtml(st.bezig)}</span>` : ""}
+    </p>
+    <table><thead><tr><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead><tbody>${rijen}</tbody></table>
+  </td></tr>`;
+}
+async function vpAntwOpslaan(items) {
+  const r = await vpRoep({ actie: "antwoorden_opslaan", items });
+  const mis = (r.uitkomsten || []).filter(u => !u.ok);
+  if (mis.length) throw new Error(mis.map(u => u.fout).join("; "));
+}
+async function vpAntwActie(actie, klantId, id) {
+  const st = vpAntw.get(klantId); if (!st) return;
+  const k = vpData.klanten.find(x => x.klant_id === klantId);
+  const a = id ? st.antwoorden.find(x => x.id === id) : null;
+  st.melding = null;
+  try {
+    if (actie === "goedkeuren") {
+      const rekening = a._rekening ?? a.keuze?.rekening ?? a.voorstel?.rekening ?? "";
+      if (!rekening) { st.melding = ["fout", "Kies eerst een rekening."]; vpTeken(); return; }
+      const keuze = { rekening, relatie: (a._relatie ?? a.keuze?.relatie ?? a.voorstel?.relatie ?? "") || null,
+        omschrijving: (a._omschrijving ?? a.keuze?.omschrijving ?? a.voorstel?.omschrijving ?? a.antwoord).slice(0, 40) };
+      await vpAntwOpslaan([{ id, keuze, status: "goedgekeurd" }]);
+      Object.assign(a, { keuze, status: "goedgekeurd" });
+    } else if (actie === "overslaan") {
+      await vpAntwOpslaan([{ id, status: "overgeslagen" }]); a.status = "overgeslagen";
+    } else if (actie === "terug") {
+      await vpAntwOpslaan([{ id, status: "nieuw" }]); a.status = "nieuw";
+    } else if (actie === "voorstellen") {
+      const open = st.antwoorden.filter(x => x.status === "nieuw");
+      if (!open.length) return;
+      st.bezig = "Shai leest de antwoorden…"; vpTeken();
+      for (let i = 0; i < open.length; i += 40) {
+        const deel = open.slice(i, i + 40);
+        const { data, error } = await sb.functions.invoke("vraagpost-voorstel", { body: { office: k.administratie,
+          regels: deel.map(x => ({ id: x.id, datum: x.datum, bedrag: Number(x.bedrag), omschrijving: x.omschrijving, antwoord: x.antwoord })) } });
+        if (error) { let t = error.message; try { t = (await error.context.json()).fout || t; } catch (_) {} throw new Error(t); }
+        const items = (data.voorstellen || []).map(v => ({ id: v.id, voorstel: { rekening: v.rekening, rekeningnaam: v.rekeningnaam, relatie: v.relatie, omschrijving: v.omschrijving, toelichting: v.toelichting, zeker: v.zeker } }));
+        if (items.length) await vpAntwOpslaan(items);
+        for (const it of items) { const x = st.antwoorden.find(y => y.id === it.id); if (x) { x.voorstel = it.voorstel; delete x._rekening; delete x._relatie; delete x._omschrijving; } }
+      }
+      st.melding = ["ok", "Shai heeft voorstellen gemaakt. Kijk ze na en keur goed."];
+    } else if (actie === "doorvoeren") {
+      await vpDoorvoeren(k, st);
+    }
+  } catch (e) { st.melding = ["fout", escapeHtml(e.message)]; }
+  st.bezig = null;
+  vpTeken();
+}
+/**
+ * Doorvoeren: per boekstuk één CONCEPT-memoriaal (zoals memoriaalXmlGroep van de oude Doorvoeren): de gekozen rekening
+ * aan dezelfde kant als de post op 2999, de tegenregel op 2999 met "Bankboeker <DAGBOEK> <NUMMER>". Datum = die van de
+ * oorspronkelijke post. Bedragen in florin (basisbedrag, ook bij een creditcard in dollars).
+ */
+async function vpDoorvoeren(k, st) {
+  const office = k.administratie;
+  const profiel = profielen.find(p => p.code === office) || {};
+  const dagboek = profiel.memoDagboek || "MEMO", vraagposten = profiel.vraagposten || "2999";
+  const klaar = st.antwoorden.filter(a => a.status === "goedgekeurd" && a.keuze?.rekening && a.boekstuk);
+  if (!klaar.length) return;
+  const groepen = new Map();
+  for (const a of klaar) { const s = `${a.dagboek} ${a.boekstuk}`; if (!groepen.has(s)) groepen.set(s, []); groepen.get(s).push(a); }
+  if (!confirm(`${klaar.length} goedgekeurde ${klaar.length === 1 ? "post" : "posten"} van ${k.klant} doorvoeren?\n\nShai maakt ${groepen.size} concept-memoriaal${groepen.size === 1 ? "" : "boekingen"} (dagboek ${dagboek}) in ${office}: van ${vraagposten} naar de gekozen rekening. Definitief maken doe je in Twinfield.`)) return;
+  let gelukt = 0;
+  for (const [referentie, rijen] of groepen) {
+    st.bezig = `Memoriaal voor ${referentie}…`; vpTeken();
+    const ref = ("Bankboeker " + referentie).substring(0, 40);
+    const lijnen = rijen.map(a => {
+      const bedrag = Math.abs(Number(a.bedrag)).toFixed(2);
+      const zijde = Number(a.bedrag) > 0 ? "debit" : "credit", tegen = zijde === "debit" ? "credit" : "debit";
+      return `<line type="detail"><dim1>${xmlEsc(a.keuze.rekening)}</dim1>${a.keuze.relatie ? `<dim2>${xmlEsc(a.keuze.relatie)}</dim2>` : ""}<value>${bedrag}</value><debitcredit>${zijde}</debitcredit><description>${xmlEsc((a.keuze.omschrijving || "").substring(0, 40))}</description></line>` +
+        `<line type="detail"><dim1>${xmlEsc(vraagposten)}</dim1><value>${bedrag}</value><debitcredit>${tegen}</debitcredit><description>${xmlEsc(ref)}</description></line>`;
+    }).join("");
+    const datum = String(rijen[0].datum || new Date().toISOString().slice(0, 10)).replace(/-/g, "");
+    const xml = `<transaction destiny="temporary"><header><office>${xmlEsc(office)}</office><code>${xmlEsc(dagboek)}</code><date>${datum}</date></header><lines>${lijnen}</lines></transaction>`;
+    const raw = await dlVerstuur(xml);
+    let tekst = raw;
+    try { const j = JSON.parse(raw); tekst = j.response || j.result || j.data || j.xml || j.body || raw; } catch (_) {}
+    const doc = new DOMParser().parseFromString(tekst, "application/xml");
+    const t = doc.getElementsByTagName("transaction")[0];
+    if (!(t && t.getAttribute("result") === "1")) throw new Error(`Twinfield wees het memoriaal voor ${referentie} af: ${t ? (twinfieldFoutenUit(t) || "onbekende reden") : String(tekst).replace(/</g, " ").slice(0, 250)}` + (gelukt ? ` (${gelukt} eerdere posten zijn wél doorgevoerd)` : ""));
+    const nummer = (t.getElementsByTagName("number")[0] || {}).textContent || "?";
+    await vpAntwOpslaan(rijen.map(a => ({ id: a.id, status: "doorgevoerd", memoriaal: `${dagboek} ${nummer}` })));
+    for (const a of rijen) Object.assign(a, { status: "doorgevoerd", memoriaal: `${dagboek} ${nummer}` });
+    gelukt += rijen.length;
+    if (typeof audit === "function") audit("memoriaal-aangemaakt", office, `${dagboek} ${nummer} ← vraagpost-antwoorden ${referentie} (${rijen.length} regels)`);
+  }
+  st.melding = ["ok", `${gelukt} ${gelukt === 1 ? "post" : "posten"} doorgevoerd als concept-memoriaal. Definitief maken doe je in Twinfield.`];
+}
 
 async function laadVerwijderd() {
   const { data, error } = await sb.from("basecone_documenten")

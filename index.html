@@ -306,6 +306,30 @@
   .bk-google-balk input { flex: 1; font-size: 16px; padding: 8px 14px; border-radius: 20px; }
   .bk-detail td { background: #fbfcfe; border-bottom: 2px solid var(--blauw); }
   .bk-detail .rij > div { min-width: 200px; }
+  /* Rustiger uitklapvak (Shereen 15 okt): strook, drie blokjes, alleen de gekozen keuze open, knoppen rechts. */
+  #tabel-bank tr.bk-detail > td { padding: 12px 14px 16px; }
+  .bkx-strook { display: flex; gap: 8px; align-items: flex-start; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; font-size: 13px; color: var(--tekst); }
+  .bkx-strook.let { background: #fff4e0; border: 1px solid #f0d58a; font-weight: 600; }
+  .bkx-strook.info { background: #eef4fb; border: 1px solid #c9dcf1; }
+  .bkx-meer { display: inline; } .bkx-meer summary { display: inline; color: var(--blauw); cursor: pointer; text-decoration: underline; }
+  .bkx-meer[open] summary { display: block; margin-bottom: 2px; }
+  .bkx-blok { background: #fff; border: 1px solid var(--rand); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .bkx-blok h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--tekst); }
+  .bkx-keuze { border: 1px solid var(--rand); border-radius: 6px; margin-bottom: 6px; background: #fff; }
+  label.bkx-keuze-kop { display: flex; gap: 8px; align-items: center; padding: 8px 10px; margin: 0; cursor: pointer; font-size: 13px; color: var(--tekst); }
+  .bkx-keuze-kop b { font-weight: 600; white-space: nowrap; } .bkx-kort { font-weight: 400; flex: 1; }
+  .bkx-keuze:has(> .bkx-keuze-kop input:checked) { border-color: var(--blauw); box-shadow: 0 0 0 1px var(--blauw) inset; }
+  .bkx-keuze:has(> .bkx-keuze-kop input:checked) > .bkx-keuze-kop { background: #f1f7fd; border-radius: 6px 6px 0 0; }
+  .bkx-inhoud { padding: 10px 12px 12px 34px; border-top: 1px solid var(--rand); }
+  .bkx-keuze:not(:has(> .bkx-keuze-kop input:checked)) > .bkx-inhoud { display: none; }
+  .bkx-rij { display: flex; gap: 12px; align-items: center; }
+  label.bkx-zonder { display: flex; gap: 6px; align-items: center; flex: 1; margin: 0; font-size: 13px; color: var(--tekst); }
+  .bkx-som { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--grijs); border: 1px solid var(--rand); font-size: 13px; }
+  .bkx-som:has(#bk-verschil:not([style*="none"])) { background: #fff8e1; border-color: #f0d58a; }
+  .bkx-som:has(#bk-aflet-som:empty):has(#bk-verschil[style*="none"]) { display: none; }
+  .bkx-waarom summary { cursor: pointer; font-size: 13px; }
+  .bkx-knoppen { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+  .bkx-wie { margin-right: auto; font-size: 13px; }
   .bk-zeker.hoog { color: var(--groen); font-weight: 600; } .bk-zeker.middel { color: var(--oranje); font-weight: 600; } .bk-zeker.laag { color: var(--rood); font-weight: 600; }
   .fa-voorleg { background: #fff4e0; border-left: 4px solid var(--oranje); border-radius: 6px; padding: 10px 14px; margin: 8px 0; font-size: 14px; color: var(--tekst); line-height: 1.5; }
   .fa-punten { margin: 8px 0; padding-left: 0; list-style: none; font-size: 14px; color: var(--tekst); line-height: 1.5; }
@@ -5966,42 +5990,56 @@ function bkDetailRij(r) {
   const startTwFacturen = new Set(twKlant.map(x => x.relatie + "|" + x.factuur));
   const toonOpties = bkHistOpen === r.id && (beoordelen || r.status === "fout");
   const omsOpties = toonOpties ? bkOmsOpties(r) : [];
-  tr.innerHTML = `<td></td><td colspan="${BK_KOLOMMEN - 1}">
-    ${/^Niet gelukt in Twinfield/.test(r.opmerking || "") && BK_BEOORDELEN.includes(r.status) ? `<p style="margin:4px 0 8px; color:var(--rood); font-weight:600">⚠ ${escapeHtml(r.opmerking)}</p>` : ""}
-    ${(v.historie || []).length ? `<p class="fa-uitleg" style="margin:4px 0">Historie: ${v.historie.map(h => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`).join("<br>")}</p>` : ""}
-    ${twVoorstel ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="twinfield"${keuzeTw ? " checked" : ""}${beoordelen ? "" : " disabled"}> Twinfields voorstel accepteren: ${(v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + ")}</label>` : ""}
-    ${toonKlant ? `<label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="klant"${keuzeKlant ? " checked" : ""}${beoordelen ? "" : " disabled"}> Op ${K.relatie} boeken — met een of meer ${K.facturen}, of zonder factuur (rest = vooruitbetaling op de ${K.relatie}):</label>
-      <div class="bk-aflet" style="margin:0 0 8px 24px">
-        <div class="fa-crd-vak" style="max-width:460px"><input type="text" id="bk-relatie" value="${escapeHtml(startRelatie)}" placeholder="${K.relatie}: nummer of naam" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-relatie-naam" class="fa-crd-naam"></span></div>
-        <div id="bk-niet-open" style="margin:6px 0 2px; color:var(--rood); font-weight:600"></div>
-        <label style="display:block; margin:6px 0 2px; font-size:13px"><input type="checkbox" id="bk-zonder-factuur"${g.soort === "klant" && !(g.regels || []).length ? " checked" : ""}${beoordelen ? "" : " disabled"}> <b>Zonder factuur op de ${K.relatie} boeken</b> — het hele bedrag komt open op de ${kant}; afletteren kan later in Twinfield</label>
-        <div id="bk-facturen" class="fa-uitleg" style="margin:6px 0"></div>
-        <div id="bk-aflet-som" style="font-size:13px"></div>
-        <div id="bk-verschil" style="display:none; margin-top:6px; font-size:13px">
-          ${[["vooruitbetaling", `vooruitbetaling op de ${K.relatie}`], ["deelbetaling", "deelbetaling — restant blijft open op de factuur"],["afboeking", "op-/afboeking"], ["bankkosten", "bankkosten"], ["koersverschil", "koersverschil"]].map(([w, t]) =>
-            `<label style="display:inline-block; margin:2px 14px 2px 0; white-space:nowrap" data-verschil="${w}"><input type="radio" name="bk-verschil" value="${w}"${(g.verschil || {}).soort === w || (w === "vooruitbetaling" && Number(g.vooruitbetaling) > 0.004) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${t}</label>`).join("")}
-          <div class="fa-crd-vak" id="bk-verschil-rekvak" style="max-width:460px; margin-top:4px; display:none"><input type="text" id="bk-verschil-rek" value="${escapeHtml((g.verschil || {}).rekening || "")}" placeholder="grootboekrekening voor het verschil" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-verschil-rek-naam" class="fa-crd-naam"></span></div>
-        </div>
-      </div>` : ""}
-    <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="splitsen"${keuzeSplits ? " checked" : ""}${beoordelen ? "" : " disabled"}> Splitsen — een deel op de ene rekening, ${K.relatie} of factuur, de rest op een andere (zoals "Restant" in Twinfield):</label>
-    <div id="bk-splits" style="margin:0 0 8px 24px; display:${keuzeSplits ? "" : "none"}"></div>
-    <label style="display:block; margin:6px 0"><input type="radio" name="bk-keuze" value="grootboek"${keuzeTw || keuzeKlant || keuzeSplits ? "" : " checked"}${beoordelen ? "" : " disabled"}> Toewijzen aan grootboekrekening (hele bedrag ${faBedrag(r.bedrag)}):</label>
-    <div class="rij">
-      <div><label>Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div>${histAdvies ? `<button type="button" class="bk-hist-advies" title="Vult deze rekening in en kiest &quot;Toewijzen aan grootboekrekening&quot;">↳ Historie adviseert: <b>${escapeHtml(histAdvies.rekening)}</b> ${escapeHtml(histAdvies.naam || bkRekNamen[`${r.office}|${histAdvies.rekening}`] || "")} (${escapeHtml(datumNlKort(histAdvies.datum))}) — gebruik deze</button>` : ""}</div>
-      <div style="flex:2"><label>REFINED bankomschrijving (max 40) — zo zet Shai hem in Twinfield</label><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen || r.status === "fout" ? "" : " disabled"}></div>
+  // Rustiger uitklapvak (Shereen 15 okt, voorbeeld docs/voorbeeld-rustig-uitklapvak.html): zelfde velden, id's en knoppen,
+  // alleen anders geordend — strook met waarschuwing/historie, drie blokjes (waar boeken · omschrijving · waarom), knoppen
+  // in één rij rechts. Alleen de gekozen keuze staat open (CSS :has op de radio, geen extra code).
+  const histRegel = (h) => `${escapeHtml(datumNlKort(h.datum))} op <b>${escapeHtml(h.rekening)}</b> ${escapeHtml(h.naam || "")} — "${escapeHtml(h.omschrijving)}"`;
+  const histRegels = v.historie || [];
+  const keuzeKop = (waarde, aan, titel, uitleg) => `<label class="bkx-keuze-kop"><input type="radio" name="bk-keuze" value="${waarde}"${aan ? " checked" : ""}${beoordelen ? "" : " disabled"}> <b>${titel}</b><span class="bkx-kort">${uitleg}</span></label>`;
+  tr.innerHTML = `<td colspan="${BK_KOLOMMEN}"><div class="bkx">
+    ${/^Niet gelukt in Twinfield/.test(r.opmerking || "") && BK_BEOORDELEN.includes(r.status) ? `<div class="bkx-strook let">⚠ <span>${escapeHtml(r.opmerking)}</span></div>` : ""}
+    ${histRegels.length ? `<div class="bkx-strook info">📚 <span>Historie: ${histRegel(histRegels[0])}${histRegels.length > 1 ? ` <details class="bkx-meer"><summary>meer (${histRegels.length - 1})…</summary>${histRegels.slice(1).map(histRegel).join("<br>")}</details>` : ""}</span></div>` : ""}
+    <div class="bkx-blok"><h4>1 · Waar boeken we het?</h4>
+      ${twVoorstel ? `<div class="bkx-keuze">${keuzeKop("twinfield", keuzeTw, "Twinfields voorstel accepteren", " — " + (v.regels || []).map(x => bkRekTekst(r.office, x) + ` (${faBedrag(x.bedrag)})`).join(" + "))}</div>` : ""}
+      ${toonKlant ? `<div class="bkx-keuze">${keuzeKop("klant", keuzeKlant, `Op ${K.relatie} boeken`, ` — met een of meer ${K.facturen}, of zonder factuur (rest = vooruitbetaling op de ${K.relatie})`)}
+        <div class="bkx-inhoud bk-aflet">
+          <div class="bkx-rij">
+            <div class="fa-crd-vak" style="flex:0 1 460px; min-width:240px"><input type="text" id="bk-relatie" value="${escapeHtml(startRelatie)}" placeholder="${K.relatie}: nummer of naam" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-relatie-naam" class="fa-crd-naam"></span></div>
+            <label class="bkx-zonder"><input type="checkbox" id="bk-zonder-factuur"${g.soort === "klant" && !(g.regels || []).length ? " checked" : ""}${beoordelen ? "" : " disabled"}> <span><b>Zonder factuur op de ${K.relatie} boeken</b> — het hele bedrag komt open op de ${kant}; afletteren kan later in Twinfield</span></label>
+          </div>
+          <div id="bk-niet-open" style="margin:6px 0 2px; color:var(--rood); font-weight:600"></div>
+          <div id="bk-facturen" class="fa-uitleg" style="margin:6px 0"></div>
+          <div class="bkx-som">
+            <div id="bk-aflet-som"></div>
+            <div id="bk-verschil" style="display:none; margin-top:6px; font-size:13px">
+              ${[["vooruitbetaling", `vooruitbetaling op de ${K.relatie}`], ["deelbetaling", "deelbetaling — restant blijft open op de factuur"],["afboeking", "op-/afboeking"], ["bankkosten", "bankkosten"], ["koersverschil", "koersverschil"]].map(([w, t]) =>
+                `<label style="display:inline-block; margin:2px 14px 2px 0; white-space:nowrap" data-verschil="${w}"><input type="radio" name="bk-verschil" value="${w}"${(g.verschil || {}).soort === w || (w === "vooruitbetaling" && Number(g.vooruitbetaling) > 0.004) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${t}</label>`).join("")}
+              <div class="fa-crd-vak" id="bk-verschil-rekvak" style="max-width:460px; margin-top:4px; display:none"><input type="text" id="bk-verschil-rek" value="${escapeHtml((g.verschil || {}).rekening || "")}" placeholder="grootboekrekening voor het verschil" autocomplete="off"${beoordelen ? "" : " disabled"}><span id="bk-verschil-rek-naam" class="fa-crd-naam"></span></div>
+            </div>
+          </div>
+        </div></div>` : ""}
+      <div class="bkx-keuze">${keuzeKop("splitsen", keuzeSplits, "Splitsen", ` — een deel op de ene rekening, ${K.relatie} of factuur, de rest op een andere (zoals "Restant" in Twinfield)`)}
+        <div class="bkx-inhoud"><div id="bk-splits" style="display:${keuzeSplits ? "" : "none"}"></div></div></div>
+      <div class="bkx-keuze">${keuzeKop("grootboek", !(keuzeTw || keuzeKlant || keuzeSplits), "Toewijzen aan grootboekrekening", ` — hele bedrag ${faBedrag(r.bedrag)}`)}
+        <div class="bkx-inhoud"><label style="margin-top:0">Rekening (zoek op nummer of naam)</label><div class="fa-crd-vak" style="max-width:460px"><input type="text" id="bk-rekening" value="${escapeHtml(eigen)}"${beoordelen ? "" : " disabled"} autocomplete="off" placeholder="nummer of naam"><span id="bk-rek-naam" class="fa-crd-naam"></span></div>${histAdvies ? `<button type="button" class="bk-hist-advies" title="Vult deze rekening in en kiest &quot;Toewijzen aan grootboekrekening&quot;">↳ Historie adviseert: <b>${escapeHtml(histAdvies.rekening)}</b> ${escapeHtml(histAdvies.naam || bkRekNamen[`${r.office}|${histAdvies.rekening}`] || "")} (${escapeHtml(datumNlKort(histAdvies.datum))}) — gebruik deze</button>` : ""}</div></div>
     </div>
-    ${toonOpties ? `<div class="bk-oms-opties"><b>Kies een omschrijving</b> (of typ zelf in het vak hierboven): ${omsOpties.map((o, i) => `<button type="button" class="bk-oms-optie" data-i="${i}">${escapeHtml(o.t)}<span>${escapeHtml(o.bron)}</span></button>`).join("")}</div>` : ""}
-    ${beoordelen ? `<label style="display:block; margin:8px 0 3px; font-size:12px; font-weight:600">Waarom verbeter je dit? (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</label>
-      <input type="text" id="bk-reden" value="${escapeHtml(g.concept && g.reden || "")}" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%">` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
-    <p style="margin:10px 0 4px">
-      ${beoordelen ? `<button class="knop" id="btn-bk-opslaan" title="Bewaart je keuze bij deze regel, zonder goed te keuren. De regel blijft in Te beoordelen.">💾 Opslaan</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button> <button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button>` : ""}
-      ${beoordelen && g.concept ? `<span style="font-size:13px">💾 Opgeslagen door ${escapeHtml(g.opgeslagen_door || "?")} — nog niet goedgekeurd</span>` : ""}
+    <div class="bkx-blok"><h4>2 · Omschrijving (max 40) — zo zet Shai hem in Twinfield</h4>
+      <div class="bkx-rij"><input type="text" id="bk-oms" maxlength="40" value="${escapeHtml(eigenOms)}"${beoordelen || r.status === "fout" ? "" : " disabled"} style="flex:1">${beoordelen || r.status === "fout" ? `<button type="button" class="bk-hist bkx-oms-hist" title="Andere omschrijvingen zoeken (historie, eerder goedgekeurd, banktekst)">↻</button>` : ""}</div>
+      ${toonOpties ? `<div class="bk-oms-opties"><b>Kies een omschrijving</b> (of typ zelf in het vak hierboven): ${omsOpties.map((o, i) => `<button type="button" class="bk-oms-optie" data-i="${i}">${escapeHtml(o.t)}<span>${escapeHtml(o.bron)}</span></button>`).join("")}</div>` : ""}
+    </div>
+    ${beoordelen ? `<div class="bkx-blok"><details class="bkx-waarom"${g.concept && g.reden ? " open" : ""}><summary><b>3 · Waarom verbeter je dit?</b> (optioneel — Shai onthoudt het bij deze naam, bij deze klant)</summary>
+      <input type="text" id="bk-reden" value="${escapeHtml(g.concept && g.reden || "")}" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%; margin-top:8px"></details></div>` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
+    <div class="bkx-knoppen">
+      <span class="bkx-wie">${beoordelen && g.concept ? `💾 Opgeslagen door ${escapeHtml(g.opgeslagen_door || "?")} — nog niet goedgekeurd` : ""}${r.goedgekeurd_door ? `Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}` : ""}</span>
+      ${beoordelen ? `<button class="knop stil" id="btn-bk-opslaan" title="Bewaart je keuze bij deze regel, zonder goed te keuren. De regel blijft in Te beoordelen.">💾 Opslaan</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button> <button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button>` : ""}
       ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
       ${r.status === "fout" ? ` <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button>` : ""}
-      ${r.goedgekeurd_door ? `<span style="font-size:13px">Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}</span>` : ""}
-    </p>
+    </div>
     ${bkVerwijderBlok(r)}
-    <div id="melding-bk-detail"></div></td>`;
+    <div id="melding-bk-detail"></div></div></td>`;
+  // ↻ naast de omschrijving doet hetzelfde als ↻ in de regel: de lijst andere omschrijvingen open/dicht.
+  const omsHist = tr.querySelector(".bkx-oms-hist");
+  if (omsHist) omsHist.addEventListener("click", (e) => { e.stopPropagation(); bkHistOpen = bkHistOpen === r.id ? null : r.id; bkGekozen = r.id; vernieuwBkTabel(); });
   const naam = () => { const c = tr.querySelector("#bk-rekening").value.trim(); const n = bkRekNamen[`${r.office}|${c}`];
     const el = tr.querySelector("#bk-rek-naam"); const zoekt = !n && /[a-z]/i.test(c);   // zoekt op naam: niets over de getypte tekst heen
     el.textContent = c && !zoekt ? (n || "onbekende rekening") : ""; el.classList.toggle("onbekend", !!c && !n && !zoekt);

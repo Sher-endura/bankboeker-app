@@ -7234,7 +7234,7 @@ function vpVulMaanden(extra = []) {
   keuze.innerHTML = [...maanden].sort().reverse().map(p => `<option value="${p}"${p === gekozen ? " selected" : ""}>${escapeHtml(vpLabel(p))}</option>`).join("");
 }
 async function laadVraagposten() {
-  if (!CLOUD) return;
+  if (!CLOUD || !sb) return;   // bij het opstarten bestaat de verbinding nog niet
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
   if (!document.getElementById("vp-maand").value) vpVulMaanden();

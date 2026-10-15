@@ -93,6 +93,9 @@
   .vp-stand.geen { background: #eef0f2; color: var(--tekst); }
   .vp-stand.let-op { background: #fdf0dc; color: #7a4a00; }
   .vp-bedrag-min { color: var(--rood); }
+  #tab-bank:not(.vp-modus) #bk-vp { display: none; }
+  #tab-bank.vp-modus .fa-balk, #tab-bank.vp-modus #bk-bulk, #tab-bank.vp-modus #melding-bank,
+  #tab-bank.vp-modus #bk-scroll, #tab-bank.vp-modus #bk-zoek { display: none !important; }
   /* Facturen (Basecone-robot) — bijschriften in de gewone tekstkleur, geen lichtgrijs */
   .fa-uitleg { font-size: 13px; color: var(--tekst); line-height: 1.5; margin: 6px 0 12px; }
   .fa-robot { padding: 9px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; background: var(--grijs); color: var(--tekst); }
@@ -341,30 +344,7 @@
      afgelopen maand. Hier ziet zij per maand wat er voor wie is gemaakt, en zet ze het met "In aanleverlijst"
      op de maandkaart in E-Board (functie shai-vraagposten): dan gaat NVT weg en ziet de klant het bestand.
      De oude pagina's (Ronde / Inlezen / Controleren / Doorvoeren) staan hieronder nog, maar zijn verborgen. -->
-<!-- Vraagposten te beoordelen (Shereen 15 okt avond): de antwoorden van klanten, alle klanten in één lijst, zonder maand.
-     Een eigen tabje en niet bij Twinfield Bank → Te beoordelen: daar staan bankregels met een eigen werkwijze (bank-Shai),
-     en deze posten boekt Shai straks via een aparte taak in de oorspronkelijke boeking (geen memoriaal). -->
-<section id="tab-vp-beoordelen" style="display:none">
-  <div class="kaart">
-    <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap">
-      <h2 style="margin:0; flex:1">Vraagposten te beoordelen</h2>
-      <div><label for="vpb-klant" style="margin-top:0">Klant</label><select id="vpb-klant" style="min-width:260px"></select></div>
-      <button class="knop stil" id="btn-vpb-verversen">↻ Verversen</button>
-    </div>
-    <p class="vp-uitleg">Antwoorden die klanten via hun aanleverpagina terugstuurden op de vraagpostenlijst. Shai pakt ze vanzelf op en stelt per post een rekening voor. Pas aan waar nodig — in het rekeningveld typ je een stukje van het nummer of de naam — en keur goed.</p>
-    <div id="vpb-tabjes" style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px"></div>
-    <div id="melding-vpb"></div>
-    <div id="vpb-lijsten"></div>
-    <div style="overflow-x:auto">
-      <table id="tabel-vpb">
-        <thead><tr><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<section id="tab-vp-overzicht" style="display:none">
+<section id="tab-vraagposten" style="display:none">
   <div class="kaart">
     <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap">
       <h2 style="margin:0; flex:1">Vraagposten — maandoverzicht</h2>
@@ -964,6 +944,26 @@
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
     <div class="status-tabjes" id="bk-tabjes"></div>
+    <!-- Vraagposten (Shereen 15 okt laat: "liever een tab erbij in Twinfield Bank, dan is alles te beoordelen bij elkaar").
+         Het tabje "Vraagposten (n)" staat achter Te beoordelen / Fout / Overgeslagen; gekozen = de bankregels maken plaats
+         voor de antwoorden van klanten op hun vraagpostenlijst (CSS #tab-bank.vp-modus). Boeken doet Shai met een eigen taak
+         in de oorspronkelijke boeking (nog te leren), niet als bankregel. -->
+    <div id="bk-vp">
+      <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:4px">
+        <p class="vp-uitleg" style="flex:1 1 420px; margin:0">Antwoorden die klanten via hun aanleverpagina terugstuurden op de vraagpostenlijst. Shai pakt ze vanzelf op en stelt per post een rekening voor. Pas aan waar nodig — in het rekeningveld typ je een stukje van het nummer of de naam — en keur goed.</p>
+        <div><label for="vpb-klant" style="margin-top:0">Klant</label><select id="vpb-klant" style="min-width:260px"></select></div>
+        <button class="knop stil" id="btn-vpb-verversen">↻ Verversen</button>
+      </div>
+      <div id="vpb-tabjes" style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px"></div>
+      <div id="melding-vpb"></div>
+      <div id="vpb-lijsten"></div>
+      <div style="overflow-x:auto">
+        <table id="tabel-vpb">
+          <thead><tr><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
       <button class="knop stil" id="btn-bk-vraagposten" title="Keurt de aangevinkte regels goed op de vraagpostenrekening van die klant (uit het klantprofiel, anders herkend aan de naam: Vraagposten / Ask the accountant / Uit te zoeken posten); Shai wijst ze daarna toe en boekt ze (concept).">→ Aangevinkte naar Vraagposten</button>
@@ -5586,6 +5586,7 @@ const bkRekTekst = (office, r) => `<b>${escapeHtml(r.rekening || "")}</b> ${esca
 async function laadBank() {
   if (!CLOUD) { toonMelding("melding-bank", "fout", "Het tabblad Bank werkt alleen in cloud-modus (met inlog)."); return; }
   laadBankStatus();
+  laadVpBeoordelen();   // het tabje Vraagposten: teller (en de lijst als dat tabje gekozen is)
   // In delen van 1000: de database geeft er nooit meer per keer (anders bleef "Alles" op 1000 staan).
   let data = [], error = null;
   for (let van = 0; ; van += 1000) {
@@ -5677,6 +5678,7 @@ function vernieuwBkFilters() {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
   }, BK_TABJES_DOEN);
+  vpbBankTabje();   // + het tabje Vraagposten (15 okt laat)
   toonSubstatus("bk-substatus", bkTabje === "beoordelen");
   bkStatusKnop();
 }
@@ -6725,14 +6727,12 @@ document.getElementById("bk-zekerheid").addEventListener("change", () => { bkGek
 /* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de
    Boekingsregels onder de Knowledgebase. Een groep onthoudt welk sub-tabblad laatst open stond. */
 const TAB_GROEPEN = {
-  // Vraagposten (15 okt avond): eerst wat je moet beoordelen, dan het maandoverzicht.
-  vraagposten: [["vp-beoordelen", "Vraagposten te beoordelen"], ["vp-overzicht", "📋 Maandoverzicht"]],
   // Vraagposten is sinds 15 okt één pagina (maandoverzicht). De oude subtabjes Ronde / Inlezen / Controleren /
   // Doorvoeren zijn verborgen (Shereen: "eerst verbergen"); hun secties staan nog in de pagina.
   kennisbank: [["kennis", "🧠 Knowledgebase Shai"], ["regels", "Boekingsregels (2999)"]],
   basecone: [["facturen", "🧾 Documenten"], ["verwijderd", "🗑️ DELETED"]],
 };
-const laatsteInGroep = { vraagposten: "vp-beoordelen", kennisbank: "kennis", basecone: "facturen" };
+const laatsteInGroep = { kennisbank: "kennis", basecone: "facturen" };
 const groepVan = (naam) => Object.keys(TAB_GROEPEN).find(g => TAB_GROEPEN[g].some(t => t[0] === naam)) || null;
 function kiesTab(naam) {
   if (TAB_GROEPEN[naam]) naam = laatsteInGroep[naam];
@@ -6744,13 +6744,12 @@ function kiesTab(naam) {
   sub.style.display = groep ? "" : "none";
   sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "");   // (de oude kop "Actieve klant" hoorde bij de verborgen pagina's)
   sub.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.sub)));
-  for (const s of ["vp-beoordelen","vp-overzicht","ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
+  for (const s of ["vraagposten","ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
-  if (naam === "vp-overzicht") laadVraagposten();
-  if (naam === "vp-beoordelen") laadVpBeoordelen();
+  if (naam === "vraagposten") laadVraagposten();
   if (naam === "herhaal") laadHerhaal();
   if (naam === "verwijderd") laadVerwijderd();
-  document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank" || naam === "verwijderd" || naam === "vp-beoordelen");
+  document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank" || naam === "verwijderd");
   if (naam === "bank") { laadBank(); requestAnimationFrame(bkHoogte); }
   if (naam === "facturen") { laadFacturen(); requestAnimationFrame(faHoogte); }
   if (naam === "kennis") laadKennisTab();
@@ -7347,7 +7346,7 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
     return;
   }
   const antw = e.target.closest(".vp-antw");
-  if (antw) { vpbKlant = antw.dataset.office; vpbStand = "nieuw"; kiesTab("vp-beoordelen"); return; }
+  if (antw) { vpbKlant = antw.dataset.office; vpbStand = "nieuw"; bkVpZet(true); kiesTab("bank"); return; }
   const naam = e.target.closest("td.vp-naam");
   if (naam) {
     const id = naam.parentElement.dataset.id;
@@ -7360,7 +7359,7 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
 /* ===== Vraagposten te beoordelen (Shereen 15 okt avond) =====
    De klant stuurt de vraagpostenlijst ingevuld terug via zijn aanleverpagina; E-Board (shai-vraagposten) pakt het
    bestand zelf op uit SharePoint en zoekt elke beantwoorde regel terug op 2999. Hier staan ze van alle klanten in één
-   lijst, zonder maandkeuze: antwoord + Shai's voorstel (functie vraagpost-voorstel, Sonnet 5.5, kiest uit het
+   lijst, zonder maandkeuze (tabje "Vraagposten" in Twinfield Bank, Shereen 15 okt laat): antwoord + Shai's voorstel (functie vraagpost-voorstel, Sonnet 5.5, kiest uit het
    rekeningschema van de klant), aanpassen (rekening = zoekveld: typ een stukje nummer of naam), Goedkeuren/Overslaan.
    Boeken: NIET met een memoriaal (Shereen: "dan krijg je nooit een schone vraagpostenrekening"). Shai gaat de
    oorspronkelijke boeking in Twinfield aanpassen (2999 → goedgekeurde rekening) als aparte taak na de bankverwerking;
@@ -7382,6 +7381,34 @@ async function vpSchema(office) {
   return s.filter(x => x.code !== "2999" && x.code !== "2998");
 }
 const vpbRekTekst = (office, code) => { const s = (vpbSchemas.get(office) || []).find(x => x.code === code); return code ? (s ? `${s.code} ${s.naam}` : code) : ""; };
+/** Vraagposten-modus in Twinfield Bank aan/uit (het tabje "Vraagposten" gekozen of niet). */
+let bkVp = false;
+function bkVpZet(aan) {
+  bkVp = aan;
+  document.getElementById("tab-bank").classList.toggle("vp-modus", aan);
+  vpbBankTabje();
+}
+/** Het tabje "Vraagposten (n)" achteraan de doe-tabjes van Twinfield Bank; fel zolang er iets te beoordelen is. */
+function vpbBankTabje() {
+  const rij = document.getElementById("bk-tabjes");
+  if (!rij) return;
+  rij.querySelector("[data-vp-tab]")?.remove();
+  const n = vpbData?.tellingen?.nieuw || 0;
+  const knop = document.createElement("button");
+  knop.type = "button"; knop.dataset.vpTab = "1";
+  knop.className = [n ? "doen" : "", bkVp ? "actief" : ""].filter(Boolean).join(" ");
+  knop.title = "Antwoorden van klanten op hun vraagpostenlijst";
+  knop.textContent = `Vraagposten (${n})`;
+  knop.addEventListener("click", () => { if (!bkVp) { bkVpZet(true); laadVpBeoordelen(); } });
+  // Na de laatste fel gekleurde tabjes (Te beoordelen, Fout, Overgeslagen); anders vooraan.
+  const doen = [...rij.querySelectorAll("button.doen:not([data-vp-tab])")];
+  if (doen.length) doen[doen.length - 1].after(knop); else rij.prepend(knop);
+  // Een gewoon banktabje gekozen: terug naar de bankregels. (Banktabjes zijn in vraagposten-modus niet "actief".)
+  if (bkVp) rij.querySelectorAll("button.actief:not([data-vp-tab])").forEach(b => b.classList.remove("actief"));
+}
+document.getElementById("bk-tabjes").addEventListener("click", (e) => {
+  if (e.target.closest("button[data-tab]")) bkVpZet(false);
+}, true);
 async function laadVpBeoordelen() {
   if (!CLOUD || !sb) return;
   const { data: { session } } = await sb.auth.getSession();
@@ -7389,6 +7416,7 @@ async function laadVpBeoordelen() {
   toonMelding("melding-vpb", "ok", "Antwoorden ophalen…");
   try {
     vpbData = await vpRoep({ actie: "alle_antwoorden", standen: [vpbStand] });
+    if (!bkVp) { document.getElementById("melding-vpb").innerHTML = ""; vpbBankTabje(); return; }   // alleen de teller
   } catch (e) { toonMelding("melding-vpb", "fout", "Kon de antwoorden niet ophalen: " + escapeHtml(e.message)); return; }
   const offices = [...new Set(vpbData.antwoorden.map(a => a.administratie))];
   await Promise.all(offices.filter(o => !vpbSchemas.has(o)).map(async o => vpbSchemas.set(o, await vpSchema(o))));
@@ -7411,8 +7439,7 @@ function vpbTeken() {
   vpbBewaarInvoer();
   const tel = vpbData?.tellingen || {};
   // Telling in het tabje bovenaan (subnav) en in de tabjes van deze pagina
-  const sub = document.querySelector('#subnav button[data-sub="vp-beoordelen"]');
-  if (sub) sub.textContent = `Vraagposten te beoordelen (${tel.nieuw || 0})`;
+  vpbBankTabje();
   document.getElementById("vpb-tabjes").innerHTML = VPB_TABJES.map(([s, tekst]) =>
     `<button class="knop ${s === vpbStand ? "" : "stil"}" data-vpb-tabje="${s}" style="padding:4px 12px">${escapeHtml(tekst)} (${tel[s] || 0})</button>`).join("");
   const alle = vpbData?.antwoorden || [];

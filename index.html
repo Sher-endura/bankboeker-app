@@ -1139,8 +1139,13 @@
 <div id="login-overlay" style="display:none; position:fixed; inset:0; background:var(--grijs); z-index:100; align-items:center; justify-content:center;">
   <div class="kaart" style="max-width:380px; text-align:left; padding:32px;">
     <h2 style="margin-bottom:6px; text-align:center"><img src="shai-logo.png" alt="Shai Booking by Endura" style="height:72px; width:auto"></h2>
-    <p class="hint" style="margin-bottom:22px; text-align:center">Endura Accounting &amp; Advisory — log in met je werkaccount.</p>
-    <form id="login-form">
+    <p class="hint" style="margin-bottom:22px; text-align:center">Endura Accounting &amp; Advisory</p>
+    <div id="login-via-eboard">
+      <p style="margin-bottom:16px">Shai Booking open je via <b>E-Board</b>: klik daar in het menu links op <b>Shai Booking</b>. Je bent dan meteen ingelogd, beveiligd met de tweestapsverificatie van E-Board.</p>
+      <button class="knop" type="button" onclick="location.href='https://app.enduraaccounting.com/'" style="width:100%; padding:12px;">Naar E-Board</button>
+    </div>
+    <p style="margin:14px 0 0; text-align:center; font-size:12px"><a href="#" id="toon-noodinlog" style="color:inherit">Noodinlog (werkt alleen als de noodschakelaar uit staat)</a></p>
+    <form id="login-form" style="display:none">
       <label>E-mailadres</label>
       <input type="email" id="login-email" autocomplete="username" placeholder="naam@endura-aruba.com" style="width:100%; margin-bottom:10px" required>
       <label>Wachtwoord</label>
@@ -1200,6 +1205,11 @@ async function initAuth() {
     return false;
   }
   gebruiker = session.user;
+  if (!sessieViaEboard(session) && !(await noodschakelaarUit())) {
+    toonLogin();
+    toonMelding("melding-login", "fout", "Open Shai Booking via E-Board (menu links). Rechtstreeks inloggen met alleen een wachtwoord kan niet meer.");
+    return false;
+  }
   const domein = (CFG.TOEGESTAAN_DOMEIN || "").toLowerCase();
   if (domein && !(gebruiker.email || "").toLowerCase().endsWith("@" + domein)) {
     toonLogin();
@@ -1222,6 +1232,24 @@ async function initAuth() {
 }
 function toonLogin() {
   document.getElementById("login-overlay").style.display = "flex";
+}
+
+/* Veiligheid 15 okt 2026 (optie 2): mensen alleen via E-Board. Zelfde regel als op de server:
+   sessie via E-Board (inlogmanier 'otp'), met tweestaps (aal2), of de robot shai@. Anders tonen we
+   het scherm "open via E-Board" (de server geeft zo'n sessie toch niets). */
+/* De database beslist (public.sessie_toegestaan, update 14): die kent ook de noodschakelaar. */
+async function noodschakelaarUit() {
+  try { const { data, error } = await sb.rpc("sessie_toegestaan"); return !error && data === true; }
+  catch (e) { return false; }
+}
+function sessieViaEboard(session) {
+  try {
+    const p = JSON.parse(atob(session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const amr = Array.isArray(p.amr) ? p.amr : [];
+    if (amr.some(a => a && (a.method === "otp" || a.method === "magiclink"))) return true;
+    if (p.aal === "aal2") return true;
+    return ["shai@endura-aruba.com"].includes(String(p.email || "").toLowerCase());
+  } catch (e) { return false; }
 }
 /* Geopend vanuit E-Board (update 5 / E-Board update 145): het adres eindigt op
    #doorgeven=<code>. Die eenmalige code (60 s) ruilen we bij edge function `doorgeven` in
@@ -1249,15 +1277,16 @@ async function doorgeefbriefjeInwisselen() {
   };
   const eerste = await poging();
   if (eerste.klaar) return eerste.fout;
-  // Nog niet binnen: inlogscherm tonen met "bezig", en op de achtergrond doorproberen (±12 s).
-  // Lukt het, dan herlaadt de pagina vanzelf (SIGNED_IN terwijl het inlogscherm open staat).
+  // Nog niet binnen: inlogscherm tonen met "bezig", en op de achtergrond doorproberen. Sinds 15 okt 2026
+  // ±55 s (was ±12 s): E-Board kan na een rustige periode langer nodig hebben om de code aan te melden,
+  // en de code is 60 s geldig. Lukt het, dan herlaadt de pagina vanzelf (SIGNED_IN terwijl het inlogscherm open staat).
   (async () => {
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 70; i++) {
       await new Promise(ok => setTimeout(ok, 750));
       const p = await poging();
       if (p.klaar) { if (p.fout) toonMelding("melding-login", "fout", escapeHtml(p.fout)); return; }
     }
-    toonMelding("melding-login", "fout", "Automatisch inloggen via E-Board lukte niet (staat tweestapsverificatie aan in E-Board?). Log hier gewoon in.");
+    toonMelding("melding-login", "fout", "Automatisch inloggen via E-Board lukte niet. Ga terug naar E-Board en klik nog een keer op Shai Booking (staat tweestapsverificatie aan in E-Board?).");
   })();
   return "BEZIG";
 }
@@ -7946,6 +7975,16 @@ document.getElementById("hh-klant").addEventListener("change", () => {
   vernieuwHhRegels(leesRegelRijen());
 });
 ["exp-dagboek","exp-valuta","exp-kpl"].forEach(id => document.getElementById(id).addEventListener("input", vernieuwPreviews));
+/* Noodinlog (vangnet, 15 okt 2026): normaal open je Shai Booking via E-Board. Werkt E-Board niet,
+   dan kan Shereen in Supabase de noodschakelaar "alleen_via_eboard" op "nee" zetten (zie
+   NOODSCHAKELAAR-SHAI-EN-PUP.md); daarna werkt inloggen met wachtwoord hier weer. Staat de
+   schakelaar aan, dan krijg je na het inloggen gewoon de melding "open via E-Board". */
+document.getElementById("toon-noodinlog").addEventListener("click", (e) => {
+  e.preventDefault();
+  document.getElementById("login-form").style.display = "";
+  document.getElementById("toon-noodinlog").parentElement.style.display = "none";
+  document.getElementById("login-email").focus();
+});
 document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const knop = document.getElementById("btn-login");

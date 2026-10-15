@@ -101,6 +101,10 @@
     border-radius: 50%; animation: vpb-draai .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
   @keyframes vpb-draai { to { transform: rotate(360deg); } }
   #tabel-vpb .fa-vink { width: 34px; text-align: center; }
+  #tabel-vpb tr.vpb-klant { cursor: pointer; user-select: none; }
+  #tabel-vpb tr.vpb-klant td { background: var(--zalm); color: #1f2937; font-weight: 700; font-size: 15px; padding-top: 10px; padding-bottom: 10px; }
+  #tabel-vpb .bk-klap-pijl { display: inline-block; width: 16px; }
+  #tabel-vpb tr.vpb-kop td { background: var(--grijs); color: var(--tekst); font-size: 13px; }
   #tabel-vpb .fa-vink input { width: 17px; height: 17px; cursor: pointer; }
   /* Facturen (Basecone-robot) — bijschriften in de gewone tekstkleur, geen lichtgrijs */
   .fa-uitleg { font-size: 13px; color: var(--tekst); line-height: 1.5; margin: 6px 0 12px; }
@@ -7379,6 +7383,15 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
 let vpbData = null, vpbStand = null, vpbBezig = null, bkVp = false;
 const vpbVink = new Set(), vpbRijBezig = new Set();   // aangevinkte regels; regels die nu worden opgeslagen (laadicoon)
 const VPB_DRAAI = '<span class="vpb-spin"></span>';
+/* Inklappen per administratie (Shereen 15 okt: "werkwijze zelfde als Twinfield Bank, per klant inklapbaar"): zoals
+   bkDicht/bkOpen — in Goedgekeurd vraagposten standaard ingeklapt, elders open tot je inklapt. */
+const VPB_STANDAARD_DICHT = ["goedgekeurd"];
+const vpbDicht = new Set(), vpbOpenGeklapt = new Set();   // "stand|office"
+const vpbIsDicht = (o) => (VPB_STANDAARD_DICHT.includes(vpbStand) ? !vpbOpenGeklapt.has(`${vpbStand}|${o}`) : vpbDicht.has(`${vpbStand}|${o}`));
+function vpbKlap(o) {
+  const k = `${vpbStand}|${o}`, s = VPB_STANDAARD_DICHT.includes(vpbStand) ? vpbOpenGeklapt : vpbDicht;
+  s.has(k) ? s.delete(k) : s.add(k);
+}
 const vpbSchemas = new Map();   // administratie → [{ code, naam }]
 const bkOffice = () => document.getElementById("bk-office")?.value || "";
 const vpbAantal = (stand) => (vpbData?.antwoorden || []).filter(a => a.status === stand && (!bkOffice() || a.administratie === bkOffice())).length;
@@ -7459,7 +7472,7 @@ function vpbTeken(bewaren = true) {
   if (bewaren) vpbBewaarInvoer();
   if (!vpbData || !vpbStand) return;
   const lijst = vpbLijst();
-  for (const id of [...vpbVink]) if (!lijst.some(a => a.id === id)) vpbVink.delete(id);   // alleen wat je nu ziet
+  for (const id of [...vpbVink]) if (!lijst.some(a => a.id === id && !vpbIsDicht(a.administratie))) vpbVink.delete(id);   // alleen wat je nu ziet
   vpbBulkBalk(lijst);
   document.getElementById("vpb-kop").textContent = `${VPB_KOP[vpbStand]} (${lijst.length})`;
   // Zoeklijsten voor het rekeningveld, één per administratie
@@ -7475,11 +7488,13 @@ function vpbTeken(bewaren = true) {
   for (const a of lijst) {
     if (a.administratie !== vorige) {
       vorige = a.administratie;
-      const b = a.task_deliverable_uploads;
-      html += `<tr class="vp-regels"><td colspan="8" style="padding-left:12px"><b>${escapeHtml(a.customers?.name || a.administratie)}</b> · ${escapeHtml(a.administratie)}` +
-        (b ? `<span class="vp-uitleg" style="margin-left:10px">${escapeHtml(b.bestandsnaam || "")} — teruggestuurd${b.door_naam ? ` door ${escapeHtml(b.door_naam)}` : ""} op ${escapeHtml(vwDatum(b.geupload_op))}</span>` : "") +
+      const b = a.task_deliverable_uploads, n = lijst.filter(x => x.administratie === a.administratie).length, dicht = vpbIsDicht(a.administratie);
+      html += `<tr class="vpb-klant" data-office="${escapeHtml(a.administratie)}" title="Klik om ${dicht ? "uit" : "in"} te klappen"><td colspan="8"><span class="bk-klap-pijl">${dicht ? "▸" : "▾"}</span> ${escapeHtml(a.administratie)} · ${escapeHtml(a.customers?.name || "")} <span style="font-weight:600">— ${n} vraagpost${n === 1 ? "" : "en"}</span></td></tr>`;
+      if (!dicht && (b || bewerkbaar)) html += `<tr class="vpb-kop"><td colspan="8">` +
+        (b ? `${escapeHtml(b.bestandsnaam || "")} — teruggestuurd${b.door_naam ? ` door ${escapeHtml(b.door_naam)}` : ""} op ${escapeHtml(vwDatum(b.geupload_op))}` : "") +
         `${bewerkbaar ? ` <button class="knop stil" data-vpb-actie="voorstellen" data-office="${escapeHtml(a.administratie)}" style="padding:2px 8px; font-size:12px; margin-left:8px"${vpbBezig ? " disabled" : ""}>✨ Shai opnieuw laten voorstellen</button>` : ""}</td></tr>`;
     }
+    if (vpbIsDicht(a.administratie)) continue;   // ingeklapt
     const d = `data-vpb-id="${a.id}"`;
     const rekTekst = a._rekening ?? vpbRekTekst(a.administratie, a.keuze?.rekening ?? a.voorstel?.rekening ?? "");
     const rel = a._relatie ?? a.keuze?.relatie ?? a.voorstel?.relatie ?? "";
@@ -7547,7 +7562,8 @@ function vpbBulkBalk(lijst) {
   for (const id of ["btn-vpb-goed", "btn-vpb-over", "btn-vpb-terug"]) document.getElementById(id).disabled = bezig;
   document.getElementById("vpb-bulk-tekst").innerHTML = bezig ? `${VPB_DRAAI}Bezig met ${vpbRijBezig.size} ${vpbRijBezig.size === 1 ? "regel" : "regels"}…` : `${n} aangevinkt`;
   const alles = document.getElementById("vpb-alles");
-  alles.checked = lijst.length > 0 && lijst.every(a => vpbVink.has(a.id));
+  const zichtbaar = lijst.filter(a => !vpbIsDicht(a.administratie));
+  alles.checked = zichtbaar.length > 0 && zichtbaar.every(a => vpbVink.has(a.id));
   alles.indeterminate = n > 0 && !alles.checked;
 }
 /** De keuze uit de velden van één regel; null + melding als de rekening niet in het schema staat. */
@@ -7597,13 +7613,15 @@ document.querySelector("#tabel-vpb tbody").addEventListener("change", (e) => {
   vpbBulkBalk(vpbLijst());
 });
 document.getElementById("vpb-alles").addEventListener("change", (e) => {
-  for (const a of vpbLijst()) e.target.checked ? vpbVink.add(a.id) : vpbVink.delete(a.id);
+  for (const a of vpbLijst().filter(x => !vpbIsDicht(x.administratie))) e.target.checked ? vpbVink.add(a.id) : vpbVink.delete(a.id);
   vpbTeken();
 });
 document.getElementById("btn-vpb-goed").addEventListener("click", () => vpbVerwerk("goedkeuren", [...vpbVink]));
 document.getElementById("btn-vpb-over").addEventListener("click", () => vpbVerwerk("overslaan", [...vpbVink]));
 document.getElementById("btn-vpb-terug").addEventListener("click", () => vpbVerwerk("terug", [...vpbVink]));
 document.querySelector("#tabel-vpb tbody").addEventListener("click", (e) => {
+  const balk = e.target.closest("tr.vpb-klant");
+  if (balk) { vpbKlap(balk.dataset.office); vpbTeken(); return; }
   const b = e.target.closest("[data-vpb-actie]");
   if (b) vpbActie(b.dataset.vpbActie, b.dataset.vpbId, b.dataset.office);
 });

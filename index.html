@@ -5542,6 +5542,12 @@ function vernieuwFaKennis() {
    (concept). goedgekeurd = {soort: "twinfield"} (Twinfields voorstel accepteren) of
    {soort: "grootboek", regels: [{rekening, bedrag}], omschrijving}. */
 const BK_BEOORDELEN = ["voorstel", "voorleggen"];
+/* Ook in Fout en Overgeslagen bewerken, opslaan, goedkeuren en naar Vraagposten sturen (Shereen 15 okt) — behalve wat
+   Shai oversloeg omdat het al in Twinfield geboekt staat (DUBBEL, of het afschrift is elders verwerkt): dat nog eens
+   goedkeuren zou dubbel boeken. Die blijven alleen-lezen, met "Terug naar beoordelen" en het afschrift-verwijderblok. */
+const BK_BEWERK_STATUS = [...BK_BEOORDELEN, "fout", "overgeslagen"];
+const bkAlGeboekt = (r) => /^DUBBEL:|^Afschrift is al in Twinfield verwerkt/.test(r.opmerking || "");
+const bkBewerkbaar = (r) => BK_BEOORDELEN.includes(r.status) || (["fout", "overgeslagen"].includes(r.status) && !bkAlGeboekt(r));
 /* Bron en Uitleg klappen naar rechts open (Shereen 10 okt) — dicht nemen ze bijna geen ruimte in;
    de keuze blijft per computer bewaard. */
 const BK_KOLOMMEN = 11;
@@ -5621,7 +5627,7 @@ function bkGoogleBalk(knop, r) {
 function bkOmsTekst(r) {
   if (r.goedgekeurd && r.goedgekeurd.omschrijving) return r.goedgekeurd.omschrijving;
   const v = r.voorstel || {};
-  if (!BK_BEOORDELEN.includes(r.status)) return v.omschrijving || "";
+  if (!bkBewerkbaar(r)) return v.omschrijving || "";
   const regel = (v.regels || [])[0] || {};
   // Harde regel per klant (BINGO: "<Maand> statement <crediteur>") gaat voor alles.
   const crd = crediteurVan(v);
@@ -5943,8 +5949,8 @@ function vernieuwBkTabel() {
       <td class="num ${Number(r.bedrag) < 0 ? "bk-betaling" : "bk-ontvangst"}" style="white-space:nowrap">${faBedrag(r.bedrag)}<div class="bk-richting">${Number(r.bedrag) < 0 ? "betaling" : "ontvangst"}</div></td>
       <td>${(v.regels || []).map(x => bkRekTekst(r.office, x) + (v.regels.length > 1 ? ` <span>(${faBedrag(x.bedrag)})</span>` : "")).join("<br>") || "<i>geen</i>"}</td>
       <td>${r.voorstel ? `<span class="bk-zeker ${bkZeker(z)}">${bkZeker(z)} (${z})</span>` : ""}</td>
-      ${bkUitklap ? `<td class="bk-bron">${BK_BEOORDELEN.includes(r.status) ? `<button type="button" class="bk-hist" title="Andere omschrijvingen zoeken (historie, eerder goedgekeurd, banktekst)">↻</button> ` : ""}${escapeHtml(bron)} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
-        : `<td colspan="2" class="bk-info">${BK_BEOORDELEN.includes(r.status) ? `<button type="button" class="bk-hist" title="Andere omschrijvingen zoeken (historie, eerder goedgekeurd, banktekst)">↻</button> ` : ""}${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td>`}`;
+      ${bkUitklap ? `<td class="bk-bron">${bkBewerkbaar(r) ? `<button type="button" class="bk-hist" title="Andere omschrijvingen zoeken (historie, eerder goedgekeurd, banktekst)">↻</button> ` : ""}${escapeHtml(bron)} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td><td class="bk-uitleg">${escapeHtml(uitleg)}</td>`
+        : `<td colspan="2" class="bk-info">${bkBewerkbaar(r) ? `<button type="button" class="bk-hist" title="Andere omschrijvingen zoeken (historie, eerder goedgekeurd, banktekst)">↻</button> ` : ""}${uitleg || bron ? `<span title="${escapeHtml((bron ? "Bron: " + bron + "\n" : "") + uitleg)}">ⓘ</span>` : ""} <button type="button" class="bk-g" title="Zoek op Google">${BK_G_LOGO}</button></td>`}`;
     tr.addEventListener("click", (e) => {
       if (e.target.closest(".fa-vink") || e.target.closest(".bk-g") || e.target.closest(".bk-hist")) return;
       // Tekst uit de bankomschrijving kopiëren (Shereen 12 okt): selecteren of dubbelklikken klapt niets open/dicht,
@@ -5992,7 +5998,7 @@ function bkDetailRij(r) {
   // Wijkt de historie af van Twinfield, dan als advies onder het rekeningvak — één klik (Shereen 13 okt: "jij kan de historie
   // wel adviseren, dan klik ik daarop als die beter is").
   const hist0 = (v.historie || [])[0];
-  const histAdvies = BK_BEOORDELEN.includes(r.status) && twRek && hist0 && hist0.rekening && hist0.rekening !== twRek ? hist0 : null;
+  const histAdvies = bkBewerkbaar(r) && twRek && hist0 && hist0.rekening && hist0.rekening !== twRek ? hist0 : null;
   const eigen = g.soort === "grootboek" ? g.regels[0].rekening
     : (v.soort === "grootboek" && v.regels && v.regels[0] ? v.regels[0].rekening : twRek || ((v.historie || [])[0] || {}).rekening || "");
   const eigenOms = g.omschrijving || bkOmsTekst(r) || netteOmschrijving(r.omschrijving, bkRekNamen[`${r.office}|${eigen}`], r.datum, null, bkEigen[r.office]);
@@ -6001,7 +6007,7 @@ function bkDetailRij(r) {
   const keuzeSplits = g.soort === "splitsen";
   const keuzeKlant = !keuzeSplits && (g.soort === "klant" || (g.soort !== "grootboek" && (v.soort === "klant" || v.soort === "relatie")));
   const keuzeTw = !keuzeKlant && !keuzeSplits && twVoorstel && g.soort !== "grootboek";
-  const beoordelen = BK_BEOORDELEN.includes(r.status);
+  const beoordelen = bkBewerkbaar(r);
   // Afletteren op klant (Shereen 12 okt): elke ontvangst kan op een klant, met één of meer openstaande facturen;
   // is de betaling hoger dan de facturen samen, dan blijft het verschil als vooruitbetaling op de klant staan.
   // Crediteuren (Shereen 13 okt, "dezelfde werkwijze"): elke betaling op een leverancier met openstaande inkoopfacturen.
@@ -6067,9 +6073,9 @@ function bkDetailRij(r) {
       <input type="text" id="bk-reden" value="${escapeHtml(g.concept && g.reden || "")}" placeholder="bv. Ling & Sons is de supermarkt — boodschappen gaan op 4137 keukenbenodigdheden" style="width:100%; margin-top:8px"></details></div>` : (r.goedgekeurd && r.goedgekeurd.reden ? `<p class="fa-uitleg" style="margin:6px 0">Waarom: ${escapeHtml(r.goedgekeurd.reden)}</p>` : "")}
     <div class="bkx-knoppen">
       <span class="bkx-wie">${beoordelen && g.concept ? `💾 Opgeslagen door ${escapeHtml(g.opgeslagen_door || "?")} — nog niet goedgekeurd` : ""}${r.goedgekeurd_door ? `Goedgekeurd door ${escapeHtml(r.goedgekeurd_door)}` : ""}</span>
-      ${beoordelen ? `<button class="knop stil" id="btn-bk-opslaan" title="Bewaart je keuze bij deze regel, zonder goed te keuren. De regel blijft in Te beoordelen.">💾 Opslaan</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> <button class="knop stil" id="btn-bk-overslaan">Overslaan</button> <button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button>` : ""}
+      ${beoordelen ? `<button class="knop stil" id="btn-bk-opslaan" title="Bewaart je keuze bij deze regel, zonder goed te keuren. De regel blijft in Te beoordelen.">💾 Opslaan</button> <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button> ${r.status === "overgeslagen" ? "" : `<button class="knop stil" id="btn-bk-overslaan">Overslaan</button> `}<button class="knop" id="btn-bk-goedkeuren">✓ Goedkeuren</button>` : ""}
       ${["goedgekeurd", "overgeslagen", "fout"].includes(r.status) ? `<button class="knop stil" id="btn-bk-terug">Terug naar beoordelen</button>` : ""}
-      ${r.status === "fout" ? ` <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button>` : ""}
+      ${r.status === "fout" && !beoordelen ? ` <button class="knop stil" id="btn-bk-naar-vp" title="Keurt deze regel goed op de vraagpostenrekening van de klant (met de omschrijving hierboven); Shai wijst toe en boekt als concept.">→ Naar Vraagposten${vraagpostenRekening(r.office) ? ` (${escapeHtml(vraagpostenRekening(r.office))})` : ""}</button>` : ""}
     </div>
     ${bkVerwijderBlok(r)}
     <div id="melding-bk-detail"></div></div></td>`;
@@ -6474,7 +6480,7 @@ function bkDetailRij(r) {
     if (!bkRekNamen[`${r.office}|${rek}`]) return toonMelding("melding-bk-detail", "fout", "Kies een rekening uit het rekeningschema van " + escapeHtml(r.office) + ".");
     return ({ soort: "grootboek", regels: [{ rekening: rek, bedrag: Number(r.bedrag) }], omschrijving: tr.querySelector("#bk-oms").value.trim().slice(0, 40), reden });
   };
-  const bkGoedkeurUitVak = (reden) => { const g = bkKeuzeUitVak(reden); return g ? bkGoedkeuren([r], () => g, "melding-bk-detail") : 0; };
+  const bkGoedkeurUitVak = (reden) => { const g = bkKeuzeUitVak(reden); return g ? bkGoedkeuren([r], () => g, "melding-bk-detail", BK_BEWERK_STATUS) : 0; };
   // Opslaan zonder goedkeuren (Shereen 13 okt: "zodat de transactie wordt bijgewerkt en niet gelijk naar goedkeuren gaat
   // en ik weer opnieuw moet scrollen"): de keuze blijft als concept bij de regel (goedgekeurd.concept = true). Shai doet
   // er niets mee zolang de status niet "goedgekeurd" is; het uitklapvak blijft open en de lijst springt niet weg.
@@ -6484,7 +6490,7 @@ function bkDetailRij(r) {
     if (!g) return;
     const door = gebruiker ? gebruiker.email : null;
     const concept = { ...g, concept: true, opgeslagen_door: door, opgeslagen_op: new Date().toISOString() };
-    const { data, error } = await sb.from("bank_regels").update({ goedgekeurd: concept, updated_by: door }).eq("id", r.id).in("status", BK_BEOORDELEN).select("id");
+    const { data, error } = await sb.from("bank_regels").update({ goedgekeurd: concept, updated_by: door }).eq("id", r.id).in("status", BK_BEWERK_STATUS).select("id");
     if (error) return toonMelding("melding-bk-detail", "fout", escapeHtml(error.message));
     if (!data || !data.length) return toonMelding("melding-bk-detail", "fout", "Niet opgeslagen (regel is intussen veranderd — ververs de pagina).");
     await sb.from("bank_log").insert({ regel_id: r.id, office: r.office, actie: "opgeslagen", details: concept, door });
@@ -6763,7 +6769,7 @@ const bkGeenVp = (offices) => "Geen vraagpostenrekening gevonden bij: " + escape
 function bkNaarVraagposten(regels, meldingId = "melding-bank", reden) {
   const zonder = [...new Set(regels.filter(r => !vraagpostenRekening(r.office)).map(r => r.office))];
   if (zonder.length) return toonMelding(meldingId, "fout", bkGeenVp(zonder) + " Er is niets goedgekeurd.");
-  return bkGoedkeuren(regels, (r) => bkVraagpostGoedkeuring(r, reden), meldingId, [...BK_BEOORDELEN, "fout"]);   // ook vanuit Fout (Shereen 13 okt)
+  return bkGoedkeuren(regels, (r) => bkVraagpostGoedkeuring(r, reden), meldingId, BK_BEWERK_STATUS);   // ook vanuit Fout (13 okt) en Overgeslagen (15 okt)
 }
 document.getElementById("btn-bk-vraagposten").addEventListener("click", () => bkNaarVraagposten(bkRegels.filter(r => bkVink.has(r.id))));
 document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);

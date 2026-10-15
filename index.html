@@ -79,6 +79,20 @@
   .stat b { font-size: 20px; display: block; }
   .stat span { font-size: 12px; color: #666; }
   .hint { font-size: 12px; color: #666; line-height: 1.5; }
+  /* Vraagposten-maandoverzicht (15 okt) — tekst donker genoeg om goed te lezen. */
+  .vp-uitleg { font-size: 13px; color: var(--tekst); line-height: 1.5; margin: 10px 0; }
+  #tabel-vp .vp-vink { width: 34px; text-align: center; }
+  #tabel-vp .vp-vink input { width: 17px; height: 17px; cursor: pointer; }
+  #tabel-vp tr.vp-klant td.vp-naam { cursor: pointer; font-weight: 600; }
+  #tabel-vp tr.vp-klant td.vp-naam:hover { color: var(--blauw); }
+  #tabel-vp tr.vp-regels > td { background: #f8fafc; padding: 6px 12px 12px 46px; }
+  #tabel-vp tr.vp-regels table { font-size: 12px; background: #fff; border: 1px solid var(--rand); }
+  .vp-stand { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .vp-stand.klaar { background: #e3eefa; color: var(--blauw-d); }
+  .vp-stand.verstuurd { background: #e5f5ec; color: #14653a; }
+  .vp-stand.geen { background: #eef0f2; color: var(--tekst); }
+  .vp-stand.let-op { background: #fdf0dc; color: #7a4a00; }
+  .vp-bedrag-min { color: var(--rood); }
   /* Facturen (Basecone-robot) — bijschriften in de gewone tekstkleur, geen lichtgrijs */
   .fa-uitleg { font-size: 13px; color: var(--tekst); line-height: 1.5; margin: 6px 0 12px; }
   .fa-robot { padding: 9px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; background: var(--grijs); color: var(--tekst); }
@@ -321,6 +335,31 @@
 <div class="subnav" id="subnav" style="display:none"></div>
 <main>
 <div id="ai-waarschuwing" class="ai-waarschuwing" style="display:none"></div>
+
+<!-- ============ TAB: VRAAGPOSTEN — maandoverzicht (Shereen 15 okt) ============
+     Op de 5e maakt Shai (E-Board, functie vraagposten-maken) per klant een Excel van de 2999-regels van de
+     afgelopen maand. Hier ziet zij per maand wat er voor wie is gemaakt, en zet ze het met "In aanleverlijst"
+     op de maandkaart in E-Board (functie shai-vraagposten): dan gaat NVT weg en ziet de klant het bestand.
+     De oude pagina's (Ronde / Inlezen / Controleren / Doorvoeren) staan hieronder nog, maar zijn verborgen. -->
+<section id="tab-vraagposten" style="display:none">
+  <div class="kaart">
+    <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap">
+      <h2 style="margin:0; flex:1">Vraagposten</h2>
+      <div><label for="vp-maand" style="margin-top:0">Maand</label><select id="vp-maand" style="min-width:200px"></select></div>
+      <button class="knop stil" id="btn-vp-verversen">↻ Verversen</button>
+    </div>
+    <p class="vp-uitleg">Shai maakt rond de 5e van elke maand per klant een Excel-bestand van de vraagposten (2999) van de afgelopen maand. De klant ziet het pas als je op <b>In aanleverlijst</b> klikt: dan staat het op de maandkaart in E-Board en gaat "niet van toepassing" weg. Klik op een klant om de regels te zien.</p>
+    <div id="melding-vp"></div>
+    <p id="vp-telling" class="vp-uitleg" style="font-weight:600"></p>
+    <div style="overflow-x:auto">
+      <table id="tabel-vp">
+        <thead><tr><th class="vp-vink"><input type="checkbox" id="vp-alles" title="Alles aanvinken wat klaar staat"></th><th>Klant</th><th class="num">Posten</th><th class="num">Saldo</th><th>Bestand</th><th>Stand</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p style="margin-top:12px"><button class="knop" id="btn-vp-versturen" disabled>Aangevinkte in aanleverlijst zetten</button></p>
+  </div>
+</section>
 
 <!-- ============ TAB: RONDE ============ -->
 <section id="tab-ronde" style="display:none">
@@ -6663,11 +6702,12 @@ document.getElementById("bk-zekerheid").addEventListener("change", () => { bkGek
 /* Tabbladen in groepen (Shereen 10 okt): de oude 2999-route onder "Vraagposten (2999)", de
    Boekingsregels onder de Knowledgebase. Een groep onthoudt welk sub-tabblad laatst open stond. */
 const TAB_GROEPEN = {
-  vraagposten: [["ronde", "🔁 Ronde"], ["inlezen", "1 · Inlezen"], ["controleren", "2 · Controleren"], ["exporteren", "3 · Doorvoeren"]],
+  // Vraagposten is sinds 15 okt één pagina (maandoverzicht). De oude subtabjes Ronde / Inlezen / Controleren /
+  // Doorvoeren zijn verborgen (Shereen: "eerst verbergen"); hun secties staan nog in de pagina.
   kennisbank: [["kennis", "🧠 Knowledgebase Shai"], ["regels", "Boekingsregels (2999)"]],
   basecone: [["facturen", "🧾 Documenten"], ["verwijderd", "🗑️ DELETED"]],
 };
-const laatsteInGroep = { vraagposten: "inlezen", kennisbank: "kennis", basecone: "facturen" };
+const laatsteInGroep = { kennisbank: "kennis", basecone: "facturen" };
 const groepVan = (naam) => Object.keys(TAB_GROEPEN).find(g => TAB_GROEPEN[g].some(t => t[0] === naam)) || null;
 function kiesTab(naam) {
   if (TAB_GROEPEN[naam]) naam = laatsteInGroep[naam];
@@ -6680,8 +6720,9 @@ function kiesTab(naam) {
   sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "") +
     (groep === "vraagposten" ? `<span id="kop-klant" class="subnav-klant">${huidig ? escapeHtml(`Actieve klant: ${huidig.code} · ${huidig.naam}`) : ""}</span>` : "");
   sub.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.sub)));
-  for (const s of ["ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
+  for (const s of ["vraagposten","ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
     document.getElementById("tab-" + s).style.display = s === naam ? "" : "none";
+  if (naam === "vraagposten") laadVraagposten();
   if (naam === "herhaal") laadHerhaal();
   if (naam === "verwijderd") laadVerwijderd();
   document.querySelector("main").classList.toggle("breed", naam === "facturen" || naam === "bank" || naam === "verwijderd");
@@ -6731,7 +6772,7 @@ function allesVernieuwen() {
 document.addEventListener("dragover", e => e.preventDefault());
 document.addEventListener("drop", e => e.preventDefault());
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.tab)));
-kiesTab("inlezen");   // tot de inlog klaar is; daarna opent de app op Twinfield Bank
+kiesTab("vraagposten");   // tot de inlog klaar is; daarna opent de app op Twinfield Bank
 /* Administratie kiezen door te typen (Shereen 11 okt): een zoekveld met keuzelijst boven op de
    bestaande <select>, die onzichtbaar blijft en alles blijft doen (waarde, change-event). Typ een stukje
    van de code of de naam; kies uit de lijst. De opties volgen de select vanzelf. */
@@ -7154,6 +7195,142 @@ async function vwRoep(url, body) {
 }
 const vwEboard = (body) => vwRoep(`${EBOARD_FUNCTIES}/shai-klantcontacten`, body);
 const vwMailFunctie = (body) => vwRoep(`${CFG.SUPABASE_URL}/functions/v1/basecone-verwijderd-mail`, body);
+
+/* ===== Vraagposten — maandoverzicht (Shereen 15 okt: "alles via Shai") =====
+   Rond de 5e maakt E-Board (functie vraagposten-maken) per klant een Excel van de 2999-regels van de afgelopen
+   maand, als concept bij het punt Vraagposten op de maandkaart. Hier: per maand een regel per klant, de regels
+   uitklappen, Bekijken, en "In aanleverlijst" (functie shai-vraagposten): dan gaat NVT weg en ziet de klant het.
+   Inloggen: de E-Board-functie krijgt de openbare anon-sleutel van E-Board als Authorization (zodat de
+   JWT-controle daar aan blijft) en jouw Shai Booking-inlog in x-shai-token; die controleert hij zelf. */
+const EBOARD_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3c3d0YXJseXlnaWF5anJ6ZWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MDk2MjUsImV4cCI6MjA5OTA4NTYyNX0.9y2PtOJFoJk2kfPSZvPu1Jr8FZ0wbbeWh1ajwwCJMTA";   // openbare sleutel (staat ook in de E-Board-app)
+let vpData = null, vpVink = new Set(), vpOpen = new Set(), vpBezig = false;
+async function vpRoep(body) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error("Niet ingelogd.");
+  const resp = await fetch(`${EBOARD_FUNCTIES}/shai-vraagposten`, { method: "POST",
+    headers: { "Authorization": "Bearer " + EBOARD_ANON, "apikey": EBOARD_ANON, "x-shai-token": session.access_token, "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  const r = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(r.fout || r.message || `HTTP ${resp.status}`);
+  return r;
+}
+const vpLabel = (p) => `${MAANDEN[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}`;
+const vpBedrag = (n) => Number(n || 0).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const vpDatum = (d) => String(d || "").replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");   // geen tijdzone: anders schuift de dag
+const vpBedragHtml = (n) => `<span class="${Number(n) < 0 ? "vp-bedrag-min" : ""}">${vpBedrag(n)}</span>`;
+function vpVorigeMaand() {
+  const nu = new Date(Date.now() - 4 * 3600_000);   // Aruba = UTC−4
+  const d = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth() - 1, 1));
+  return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+/** Keuzelijst: de laatste 12 maanden plus alle maanden waar Shai iets voor maakte. */
+function vpVulMaanden(extra = []) {
+  const keuze = document.getElementById("vp-maand"), gekozen = keuze.value || vpVorigeMaand();
+  const nu = new Date(Date.now() - 4 * 3600_000), maanden = new Set(extra);
+  for (let i = 1; i <= 12; i++) {
+    const d = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth() - i, 1));
+    maanden.add(`${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  keuze.innerHTML = [...maanden].sort().reverse().map(p => `<option value="${p}"${p === gekozen ? " selected" : ""}>${escapeHtml(vpLabel(p))}</option>`).join("");
+}
+async function laadVraagposten() {
+  if (!CLOUD) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  if (!document.getElementById("vp-maand").value) vpVulMaanden();
+  const periode = document.getElementById("vp-maand").value;
+  toonMelding("melding-vp", "ok", "Overzicht ophalen…");
+  try {
+    vpData = await vpRoep({ actie: "overzicht", periode });
+  } catch (e) { toonMelding("melding-vp", "fout", "Kon het overzicht niet ophalen: " + escapeHtml(e.message)); return; }
+  document.getElementById("melding-vp").innerHTML = "";
+  vpVulMaanden(vpData.perioden || []);
+  const klaar = new Set(vpData.klanten.filter(k => k.stand === "klaar").map(k => k.id));
+  vpVink = new Set([...vpVink].filter(id => klaar.has(id)));
+  vpTeken();
+}
+const VP_STAND_KLASSE = { klaar: "klaar", verstuurd: "verstuurd", geen: "geen", nog_niet: "geen" };
+function vpTeken() {
+  const tbody = document.querySelector("#tabel-vp tbody");
+  if (!vpData) { tbody.innerHTML = ""; return; }
+  const k = vpData.klanten;
+  const tel = (s) => k.filter(x => x.stand === s).length;
+  const delen = [[tel("klaar"), "klaar om te versturen"], [tel("verstuurd"), "in aanleverlijst"], [tel("geen"), "geen vraagposten"],
+    [k.length - tel("klaar") - tel("verstuurd") - tel("geen") - tel("nog_niet"), "let op"], [tel("nog_niet"), "nog niet gemaakt"]].filter(([n]) => n > 0);
+  document.getElementById("vp-telling").textContent = `${vpLabel(vpData.periode)}: ` + (delen.map(([n, t]) => `${n} ${t}`).join(" · ") || "geen klanten");
+  tbody.innerHTML = k.map(r => {
+    const open = r.id && vpOpen.has(r.id) && (r.regels || []).length;
+    const stand = `<span class="vp-stand ${VP_STAND_KLASSE[r.stand] || "let-op"}">${escapeHtml(r.tekst)}</span>` +
+      (r.stand === "verstuurd" && r.verstuurd_op ? `<div class="vp-uitleg" style="margin:2px 0 0; font-size:12px">${escapeHtml(vwDatum(r.verstuurd_op))} · ${escapeHtml(r.verstuurd_door || "")}</div>` : "");
+    const rij = `<tr class="vp-klant" data-id="${r.id || ""}">
+      <td class="vp-vink">${r.stand === "klaar" ? `<input type="checkbox" class="vp-vinkje" data-id="${r.id}"${vpVink.has(r.id) ? " checked" : ""}>` : ""}</td>
+      <td class="vp-naam" title="${(r.regels || []).length ? "Klik om de regels te zien" : ""}">${(r.regels || []).length ? (open ? "▾ " : "▸ ") : ""}${escapeHtml(r.klant)} <span style="font-weight:400">· ${escapeHtml(r.administratie)}</span></td>
+      <td class="num">${r.aantal ?? ""}</td>
+      <td class="num">${r.saldo !== undefined && r.saldo !== null && r.aantal ? vpBedragHtml(r.saldo) : ""}</td>
+      <td>${r.id && r.stand !== "weg" ? `<button class="knop stil vp-bekijk" data-id="${r.id}" style="padding:4px 10px" title="${escapeHtml(r.bestandsnaam || "")}">📄 Bekijken</button>` : ""}</td>
+      <td>${stand}</td>
+      <td>${r.stand === "klaar" ? `<button class="knop vp-stuur" data-id="${r.id}" style="padding:5px 12px; white-space:nowrap">In aanleverlijst</button>` : ""}</td>
+    </tr>`;
+    const regels = open ? `<tr class="vp-regels"><td colspan="7">
+      <div class="vp-uitleg" style="margin:0 0 6px">${escapeHtml(r.bestandsnaam || "")}</div>
+      <table><thead><tr><th>Boekdatum</th><th>Dagboek</th><th>Periode</th><th>Omschrijving</th><th class="num">Bedrag</th></tr></thead><tbody>
+      ${r.regels.map(x => `<tr><td>${escapeHtml(vpDatum(x.datum))}</td><td>${escapeHtml(x.dagboek || "")}</td><td>${escapeHtml(x.periode || "")}</td><td>${escapeHtml(x.omschrijving || "")}</td><td class="num">${vpBedragHtml(x.bedrag)}</td></tr>`).join("")}
+      </tbody></table></td></tr>` : "";
+    return rij + regels;
+  }).join("");
+  const klaar = k.filter(x => x.stand === "klaar");
+  const alles = document.getElementById("vp-alles");
+  alles.disabled = klaar.length === 0;
+  alles.checked = klaar.length > 0 && klaar.every(x => vpVink.has(x.id));
+  const knop = document.getElementById("btn-vp-versturen");
+  knop.disabled = vpVink.size === 0 || vpBezig;
+  knop.textContent = vpVink.size ? `Aangevinkte in aanleverlijst zetten (${vpVink.size})` : "Aangevinkte in aanleverlijst zetten";
+}
+async function vpVersturen(ids) {
+  if (!ids.length || vpBezig) return;
+  const namen = vpData.klanten.filter(k => ids.includes(k.id)).map(k => k.klant);
+  if (!confirm(`${ids.length === 1 ? `De vraagposten van ${namen[0]}` : `${ids.length} vraagpostenbestanden`} in de aanleverlijst zetten?\n\nDe klant ziet het bestand daarna meteen op zijn aanleverpagina.`)) return;
+  vpBezig = true; vpTeken();
+  let melding;
+  try {
+    const r = await vpRoep({ actie: "versturen", ids });
+    const mis = (r.uitkomsten || []).filter(u => !u.ok);
+    const goed = (r.uitkomsten || []).length - mis.length;
+    for (const u of r.uitkomsten || []) if (u.ok) vpVink.delete(u.id);
+    melding = [mis.length ? "fout" : "ok", `${goed} in de aanleverlijst gezet.` + (mis.length ? " Niet gelukt: " +
+      mis.map(u => `${escapeHtml(vpData.klanten.find(k => k.id === u.id)?.klant || u.id)} (${escapeHtml(u.fout)})`).join(", ") : "")];
+  } catch (e) { melding = ["fout", "Versturen mislukt: " + escapeHtml(e.message)]; }
+  vpBezig = false;
+  await laadVraagposten();
+  toonMelding("melding-vp", melding[0], melding[1]);
+}
+document.getElementById("vp-maand").addEventListener("change", () => { vpVink.clear(); vpOpen.clear(); laadVraagposten(); });
+document.getElementById("btn-vp-verversen").addEventListener("click", () => laadVraagposten());
+document.getElementById("btn-vp-versturen").addEventListener("click", () => vpVersturen([...vpVink]));
+document.getElementById("vp-alles").addEventListener("change", (e) => {
+  for (const k of (vpData?.klanten || []).filter(x => x.stand === "klaar")) e.target.checked ? vpVink.add(k.id) : vpVink.delete(k.id);
+  vpTeken();
+});
+document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) => {
+  const vink = e.target.closest(".vp-vinkje");
+  if (vink) { vink.checked ? vpVink.add(vink.dataset.id) : vpVink.delete(vink.dataset.id); vpTeken(); return; }
+  const stuur = e.target.closest(".vp-stuur");
+  if (stuur) { vpVersturen([stuur.dataset.id]); return; }
+  const bekijk = e.target.closest(".vp-bekijk");
+  if (bekijk) {
+    // Downloaden via een link: een nieuw venster na het ophalen houdt de pop-upblokkeerder vaak tegen.
+    try { const r = await vpRoep({ actie: "openen", id: bekijk.dataset.id }); const a = document.createElement("a"); a.href = r.url; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+    catch (err) { toonMelding("melding-vp", "fout", "Kon het bestand niet openen: " + escapeHtml(err.message)); }
+    return;
+  }
+  const naam = e.target.closest("td.vp-naam");
+  if (naam) {
+    const id = naam.parentElement.dataset.id;
+    if (!id) return;
+    vpOpen.has(id) ? vpOpen.delete(id) : vpOpen.add(id);
+    vpTeken();
+  }
+});
 
 async function laadVerwijderd() {
   const { data, error } = await sb.from("basecone_documenten")

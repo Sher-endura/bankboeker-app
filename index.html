@@ -93,9 +93,10 @@
   .vp-stand.geen { background: #eef0f2; color: var(--tekst); }
   .vp-stand.let-op { background: #fdf0dc; color: #7a4a00; }
   .vp-bedrag-min { color: var(--rood); }
-  #tab-bank:not(.vp-modus) #bk-vp { display: none; }
-  #tab-bank.vp-modus .fa-balk, #tab-bank.vp-modus #bk-bulk, #tab-bank.vp-modus #melding-bank,
-  #tab-bank.vp-modus #bk-scroll, #tab-bank.vp-modus #bk-zoek { display: none !important; }
+  #tab-bank:not(.vp-zichtbaar) #bk-vp { display: none; }
+  #tab-bank.vp-modus #bk-bulk, #tab-bank.vp-modus #melding-bank, #tab-bank.vp-modus #bk-scroll, #tab-bank.vp-modus #bk-substatus,
+  #tab-bank.vp-modus #bk-substatus-info, #tab-bank.vp-modus #bk-richting-filter, #tab-bank.vp-modus #bk-zekerheid { display: none !important; }
+  #tab-bank.vp-werk #bk-woot { display: none !important; }
   /* Facturen (Basecone-robot) — bijschriften in de gewone tekstkleur, geen lichtgrijs */
   .fa-uitleg { font-size: 13px; color: var(--tekst); line-height: 1.5; margin: 6px 0 12px; }
   .fa-robot { padding: 9px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; background: var(--grijs); color: var(--tekst); }
@@ -944,20 +945,15 @@
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
     <div class="status-tabjes" id="bk-tabjes"></div>
-    <!-- Vraagposten (Shereen 15 okt laat: "liever een tab erbij in Twinfield Bank, dan is alles te beoordelen bij elkaar").
-         Het tabje "Vraagposten (n)" staat achter Te beoordelen / Fout / Overgeslagen; gekozen = de bankregels maken plaats
-         voor de antwoorden van klanten op hun vraagpostenlijst (CSS #tab-bank.vp-modus). Boeken doet Shai met een eigen taak
-         in de oorspronkelijke boeking (nog te leren), niet als bankregel. -->
+    <!-- Vraagposten (Shereen 15 okt laat): "alles in Te beoordelen; goedgekeurd gaat naar het tabje Goedgekeurd
+         vraagposten; Shai pakt het op uit die twee tabjes". Dit blok staat in Te beoordelen en Overgeslagen boven de
+         bankregels (als er vraagposten zijn) en vult het tabje Goedgekeurd vraagposten (dan maakt de banklijst plaats). -->
     <div id="bk-vp">
-      <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:4px">
-        <p class="vp-uitleg" style="flex:1 1 420px; margin:0">Antwoorden die klanten via hun aanleverpagina terugstuurden op de vraagpostenlijst. Shai pakt ze vanzelf op en stelt per post een rekening voor. Pas aan waar nodig — in het rekeningveld typ je een stukje van het nummer of de naam — en keur goed.</p>
-        <div><label for="vpb-klant" style="margin-top:0">Klant</label><select id="vpb-klant" style="min-width:260px"></select></div>
-        <button class="knop stil" id="btn-vpb-verversen">↻ Verversen</button>
-      </div>
-      <div id="vpb-tabjes" style="display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 10px"></div>
+      <h3 id="vpb-kop" style="margin:6px 0 2px"></h3>
+      <p class="vp-uitleg" style="margin:0 0 6px">Antwoorden die klanten via hun aanleverpagina terugstuurden op de vraagpostenlijst. Shai stelt per post een rekening voor; pas aan waar nodig — in het rekeningveld typ je een stukje van het nummer of de naam — en keur goed.</p>
       <div id="melding-vpb"></div>
       <div id="vpb-lijsten"></div>
-      <div style="overflow-x:auto">
+      <div style="overflow-x:auto; margin-bottom:14px">
         <table id="tabel-vpb">
           <thead><tr><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead>
           <tbody></tbody>
@@ -5678,7 +5674,7 @@ function vernieuwBkFilters() {
     bkTabje = t; bkStatusSel = new Set(BK_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.bank.tabje", t);
     bkGekozen = null; vernieuwBkFilters(); vernieuwBkTabel();
   }, BK_TABJES_DOEN);
-  vpbBankTabje();   // + het tabje Vraagposten (15 okt laat)
+  vpbModus();   // vraagposten bij Te beoordelen / Overgeslagen + tabje Goedgekeurd vraagposten (15 okt laat)
   toonSubstatus("bk-substatus", bkTabje === "beoordelen");
   bkStatusKnop();
 }
@@ -7346,7 +7342,7 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
     return;
   }
   const antw = e.target.closest(".vp-antw");
-  if (antw) { vpbKlant = antw.dataset.office; vpbStand = "nieuw"; bkVpZet(true); kiesTab("bank"); return; }
+  if (antw) { bkVp = false; kiesTab("bank"); setTimeout(() => document.querySelector('#bk-tabjes button[data-tab="beoordelen"]')?.click(), 400); return; }
   const naam = e.target.closest("td.vp-naam");
   if (naam) {
     const id = naam.parentElement.dataset.id;
@@ -7356,22 +7352,27 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
   }
 });
 
-/* ===== Vraagposten te beoordelen (Shereen 15 okt avond) =====
+/* ===== Vraagposten in Twinfield Bank (Shereen 15 okt laat) =====
    De klant stuurt de vraagpostenlijst ingevuld terug via zijn aanleverpagina; E-Board (shai-vraagposten) pakt het
-   bestand zelf op uit SharePoint en zoekt elke beantwoorde regel terug op 2999. Hier staan ze van alle klanten in één
-   lijst, zonder maandkeuze (tabje "Vraagposten" in Twinfield Bank, Shereen 15 okt laat): antwoord + Shai's voorstel (functie vraagpost-voorstel, Sonnet 5.5, kiest uit het
-   rekeningschema van de klant), aanpassen (rekening = zoekveld: typ een stukje nummer of naam), Goedkeuren/Overslaan.
-   Boeken: NIET met een memoriaal (Shereen: "dan krijg je nooit een schone vraagpostenrekening"). Shai gaat de
-   oorspronkelijke boeking in Twinfield aanpassen (2999 → goedgekeurde rekening) als aparte taak na de bankverwerking;
-   dat leert hij nog. Tot dan blijven goedgekeurde antwoorden in het tabje Goedgekeurd staan. */
-let vpbData = null, vpbStand = "nieuw", vpbKlant = "", vpbBezig = null;
+   bestand zelf op uit SharePoint en zoekt elke beantwoorde regel terug op 2999. Haar indeling: "alles in Te beoordelen,
+   en goedgekeurd gaat naar het tabje Goedgekeurd vraagposten; Shai pakt het op uit die twee tabjes (Goedgekeurd voor de
+   bank, Goedgekeurd vraagposten voor de vraagposten)".
+   - Te beoordelen: boven de bankregels het blok "Vraagposten van klanten" (antwoord, Shai's voorstel — functie
+     vraagpost-voorstel, Sonnet 5.5, kiest uit het rekeningschema — aanpassen, Goedkeuren / Overslaan). Telt mee in het tabje.
+   - Overgeslagen: hetzelfde blok met de overgeslagen antwoorden (↶ terug), telt mee.
+   - Goedgekeurd vraagposten: eigen tabje na Goedgekeurd; de banklijst maakt plaats (class vp-modus).
+   Klantkeuze = het bestaande administratiefilter (bk-office). Boeken: NIET met een memoriaal; Shai past de
+   oorspronkelijke boeking aan (aparte taak, nog te leren — docs/VRAAGPOSTEN-BOEKEN-IN-ORIGINEEL-START.md). */
+let vpbData = null, vpbStand = null, vpbBezig = null, bkVp = false;
 const vpbSchemas = new Map();   // administratie → [{ code, naam }]
-const VPB_TABJES = [["nieuw", "Te beoordelen"], ["goedgekeurd", "Goedgekeurd"], ["overgeslagen", "Overgeslagen"], ["doorgevoerd", "Geboekt"], ["niet_gevonden", "Niet meer open op 2999"]];
-/** In het maandoverzicht: knopje naar de antwoorden van deze klant. */
+const bkOffice = () => document.getElementById("bk-office")?.value || "";
+const vpbAantal = (stand) => (vpbData?.antwoorden || []).filter(a => a.status === stand && (!bkOffice() || a.administratie === bkOffice())).length;
+const VPB_KOP = { nieuw: "Vraagposten van klanten — te beoordelen", overgeslagen: "Vraagposten van klanten — overgeslagen", goedgekeurd: "Goedgekeurde vraagposten" };
+/** In het maandoverzicht (tab Vraagposten): knopje naar Te beoordelen in Twinfield Bank. */
 function vpAntwKnop(r) {
-  const t = r.antwoorden || {}, te = t.nieuw || 0, goed = t.goedgekeurd || 0;
-  if (!te && !goed) return "";
-  return `<div style="margin-top:4px"><button class="knop ${te ? "" : "stil"} vp-antw" data-office="${escapeHtml(r.administratie)}" style="padding:3px 10px; font-size:12px">💬 ${te ? `${te} antwoord${te === 1 ? "" : "en"} te beoordelen` : `${goed} goedgekeurd`}</button></div>`;
+  const t = r.antwoorden || {}, te = t.nieuw || 0;
+  if (!te) return "";
+  return `<div style="margin-top:4px"><button class="knop vp-antw" data-office="${escapeHtml(r.administratie)}" style="padding:3px 10px; font-size:12px">💬 ${te} antwoord${te === 1 ? "" : "en"} te beoordelen</button></div>`;
 }
 /** Rekeningschema: wat Shai van Twinfield bewaarde (stamdata BAS), anders het klantprofiel. */
 async function vpSchema(office) {
@@ -7381,53 +7382,57 @@ async function vpSchema(office) {
   return s.filter(x => x.code !== "2999" && x.code !== "2998");
 }
 const vpbRekTekst = (office, code) => { const s = (vpbSchemas.get(office) || []).find(x => x.code === code); return code ? (s ? `${s.code} ${s.naam}` : code) : ""; };
-/** Vraagposten-modus in Twinfield Bank aan/uit (het tabje "Vraagposten" gekozen of niet). */
-let bkVp = false;
-function bkVpZet(aan) {
-  bkVp = aan;
-  document.getElementById("tab-bank").classList.toggle("vp-modus", aan);
-  vpbBankTabje();
-}
-/** Het tabje "Vraagposten (n)" achteraan de doe-tabjes van Twinfield Bank; fel zolang er iets te beoordelen is. */
-function vpbBankTabje() {
-  const rij = document.getElementById("bk-tabjes");
-  if (!rij) return;
-  rij.querySelector("[data-vp-tab]")?.remove();
-  const n = vpbData?.tellingen?.nieuw || 0;
-  const knop = document.createElement("button");
-  knop.type = "button"; knop.dataset.vpTab = "1";
-  knop.className = [n ? "doen" : "", bkVp ? "actief" : ""].filter(Boolean).join(" ");
-  knop.title = "Antwoorden van klanten op hun vraagpostenlijst";
-  knop.textContent = `Vraagposten (${n})`;
-  knop.addEventListener("click", () => { if (!bkVp) { bkVpZet(true); laadVpBeoordelen(); } });
-  // Na de laatste fel gekleurde tabjes (Te beoordelen, Fout, Overgeslagen); anders vooraan.
-  const doen = [...rij.querySelectorAll("button.doen:not([data-vp-tab])")];
-  if (doen.length) doen[doen.length - 1].after(knop); else rij.prepend(knop);
-  // Een gewoon banktabje gekozen: terug naar de bankregels. (Banktabjes zijn in vraagposten-modus niet "actief".)
-  if (bkVp) rij.querySelectorAll("button.actief:not([data-vp-tab])").forEach(b => b.classList.remove("actief"));
-}
-document.getElementById("bk-tabjes").addEventListener("click", (e) => {
-  if (e.target.closest("button[data-tab]")) bkVpZet(false);
-}, true);
+/** Alle open werk van de vraagposten ophalen (te beoordelen, goedgekeurd, overgeslagen) — bij elke laadBank(). */
 async function laadVpBeoordelen() {
   if (!CLOUD || !sb) return;
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return;
-  toonMelding("melding-vpb", "ok", "Antwoorden ophalen…");
   try {
-    vpbData = await vpRoep({ actie: "alle_antwoorden", standen: [vpbStand] });
-    if (!bkVp) { document.getElementById("melding-vpb").innerHTML = ""; vpbBankTabje(); return; }   // alleen de teller
-  } catch (e) { toonMelding("melding-vpb", "fout", "Kon de antwoorden niet ophalen: " + escapeHtml(e.message)); return; }
+    vpbData = await vpRoep({ actie: "alle_antwoorden", standen: ["nieuw", "goedgekeurd", "overgeslagen"] });
+  } catch (e) { toonMelding("melding-vpb", "fout", "Kon de vraagposten niet ophalen: " + escapeHtml(e.message)); return; }
   const offices = [...new Set(vpbData.antwoorden.map(a => a.administratie))];
   await Promise.all(offices.filter(o => !vpbSchemas.has(o)).map(async o => vpbSchemas.set(o, await vpSchema(o))));
   document.getElementById("melding-vpb").innerHTML = "";
-  vpbTeken();
+  vpbModus();
   // Nieuwe antwoorden zonder voorstel: Shai stelt meteen voor.
-  if (vpbStand === "nieuw") {
-    const zonder = vpbData.antwoorden.filter(a => a.status === "nieuw" && !a.voorstel);
-    if (zonder.length) vpbVoorstellen(zonder);
-  }
+  const zonder = vpbData.antwoorden.filter(a => a.status === "nieuw" && !a.voorstel);
+  if (zonder.length) vpbVoorstellen(zonder);
 }
+/** Welk deel van de vraagposten hoort bij het gekozen banktabje; tabjes en tellingen bijwerken. */
+function vpbModus() {
+  const bank = document.getElementById("tab-bank");
+  vpbStand = bkVp ? "goedgekeurd" : bkTabje === "beoordelen" ? "nieuw" : bkTabje === "overgeslagen" ? "overgeslagen" : null;
+  bank.classList.toggle("vp-modus", bkVp);
+  bank.classList.toggle("vp-zichtbaar", !!vpbStand && (bkVp || vpbAantal(vpbStand) > 0));
+  bank.classList.toggle("vp-werk", !bkVp && bkTabje === "beoordelen" && vpbAantal("nieuw") > 0);   // dan geen WOOT
+  vpbBankTabjes();
+  if (vpbStand) vpbTeken();
+}
+function bkVpZet(aan) { bkVp = aan; vpbModus(); }
+/** Tellingen in Te beoordelen en Overgeslagen + het tabje "Goedgekeurd vraagposten" na Goedgekeurd. */
+function vpbBankTabjes() {
+  const rij = document.getElementById("bk-tabjes");
+  if (!rij || !rij.children.length) return;
+  rij.querySelector("[data-vp-tab]")?.remove();
+  for (const [tab, stand] of [["beoordelen", "nieuw"], ["overgeslagen", "overgeslagen"]]) {
+    const b = rij.querySelector(`button[data-tab="${tab}"]`), n = vpbAantal(stand);
+    if (!b || !n || b.dataset.vpGeteld) continue;
+    b.textContent = b.textContent.replace(/\((\d+)\)\s*$/, (m, x) => `(${Number(x) + n})`);
+    b.title = `waarvan ${n} ${n === 1 ? "vraagpost" : "vraagposten"} van klanten`;
+    b.dataset.vpGeteld = "1";
+  }
+  const knop = document.createElement("button");
+  knop.type = "button"; knop.dataset.vpTab = "1";
+  if (bkVp) knop.className = "actief";
+  knop.textContent = `Goedgekeurd vraagposten (${vpbAantal("goedgekeurd")})`;
+  knop.title = "Goedgekeurde antwoorden op vraagposten. Shai past daarvoor de oorspronkelijke boeking in Twinfield aan (aparte taak, nog te leren).";
+  knop.addEventListener("click", () => { if (!bkVp) bkVpZet(true); });
+  const goed = rij.querySelector('button[data-tab="goedgekeurd"]');
+  if (goed) goed.after(knop); else rij.append(knop);
+  if (bkVp) rij.querySelectorAll("button.actief:not([data-vp-tab])").forEach(b => b.classList.remove("actief"));
+}
+// Een gewoon banktabje kiezen = weg uit "Goedgekeurd vraagposten" (vóór de eigen klik-afhandeling van de banktabjes).
+document.getElementById("bk-tabjes").addEventListener("click", (e) => { if (e.target.closest("button[data-tab]")) bkVp = false; }, true);
 /** Wat al in de velden getypt is, bewaren vóór het opnieuw tekenen (anders verdwijnt het bij een andere actie). */
 function vpbBewaarInvoer() {
   for (const el of document.querySelectorAll("#tabel-vpb [data-vpb-veld]")) {
@@ -7435,26 +7440,17 @@ function vpbBewaarInvoer() {
     if (a) a["_" + el.dataset.vpbVeld] = el.value;
   }
 }
-function vpbTeken() {
-  vpbBewaarInvoer();
-  const tel = vpbData?.tellingen || {};
-  // Telling in het tabje bovenaan (subnav) en in de tabjes van deze pagina
-  vpbBankTabje();
-  document.getElementById("vpb-tabjes").innerHTML = VPB_TABJES.map(([s, tekst]) =>
-    `<button class="knop ${s === vpbStand ? "" : "stil"}" data-vpb-tabje="${s}" style="padding:4px 12px">${escapeHtml(tekst)} (${tel[s] || 0})</button>`).join("");
-  const alle = vpbData?.antwoorden || [];
-  // Klantkeuze: alle klanten in dit tabje
-  const klanten = [...new Map(alle.map(a => [a.administratie, a.customers?.name || a.administratie])).entries()].sort((x, y) => x[1].localeCompare(y[1]));
-  if (vpbKlant && !klanten.some(([o]) => o === vpbKlant)) vpbKlant = "";
-  document.getElementById("vpb-klant").innerHTML = `<option value="">Alle klanten (${alle.length})</option>` +
-    klanten.map(([o, n]) => `<option value="${escapeHtml(o)}"${o === vpbKlant ? " selected" : ""}>${escapeHtml(n)} · ${escapeHtml(o)} (${alle.filter(a => a.administratie === o).length})</option>`).join("");
+function vpbTeken(bewaren = true) {
+  if (bewaren) vpbBewaarInvoer();
+  if (!vpbData || !vpbStand) return;
+  const lijst = vpbData.antwoorden.filter(a => a.status === vpbStand && (!bkOffice() || a.administratie === bkOffice()));
+  document.getElementById("vpb-kop").textContent = `${VPB_KOP[vpbStand]} (${lijst.length})`;
   // Zoeklijsten voor het rekeningveld, één per administratie
   document.getElementById("vpb-lijsten").innerHTML = [...vpbSchemas.entries()].map(([o, s]) =>
     `<datalist id="vpb-dl-${escapeHtml(o)}">${s.map(x => `<option value="${escapeHtml(x.code + " " + x.naam)}"></option>`).join("")}</datalist>`).join("");
-  const lijst = alle.filter(a => !vpbKlant || a.administratie === vpbKlant);
   const tbody = document.querySelector("#tabel-vpb tbody");
   if (!lijst.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="vp-uitleg">${vpbStand === "nieuw" ? "Niets te beoordelen. 🎉" : "Geen antwoorden in dit tabje."}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="vp-uitleg">${vpbStand === "goedgekeurd" ? "Geen goedgekeurde vraagposten die nog op Shai wachten." : "Niets in deze lijst."}</td></tr>`;
     return;
   }
   const bewerkbaar = vpbStand === "nieuw";
@@ -7485,13 +7481,11 @@ function vpbTeken() {
         : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
       <td style="white-space:nowrap">${bewerkbaar
         ? `<button class="knop" data-vpb-actie="goedkeuren" ${d} style="padding:4px 10px">Goedkeuren</button> <button class="knop stil" data-vpb-actie="overslaan" ${d} style="padding:4px 10px">Overslaan</button>`
-        : ["goedgekeurd", "overgeslagen"].includes(a.status) ? `<button class="knop stil" data-vpb-actie="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug naar te beoordelen</button>` : ""}</td>
+        : `<button class="knop stil" data-vpb-actie="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug naar te beoordelen</button>`}</td>
     </tr>`;
   }
   tbody.innerHTML = html;
 }
-/** Opnieuw tekenen zonder eerst de velden te bewaren (na een vers voorstel). */
-function vpbTekenZonderBewaren() { const b = vpbBewaarInvoer; vpbBewaarInvoer = () => {}; try { vpbTeken(); } finally { vpbBewaarInvoer = b; } }
 async function vpbOpslaan(items) {
   const r = await vpRoep({ actie: "antwoorden_opslaan", items });
   const mis = (r.uitkomsten || []).filter(u => !u.ok);
@@ -7501,7 +7495,7 @@ async function vpbOpslaan(items) {
 async function vpbVoorstellen(lijst) {
   if (vpbBezig) return;
   vpbBezig = "Shai leest de antwoorden…"; vpbTeken();
-  toonMelding("melding-vpb", "ok", "Shai leest de antwoorden en maakt voorstellen…");
+  toonMelding("melding-vpb", "ok", "Shai leest de antwoorden van de klant en maakt voorstellen…");
   try {
     for (const office of [...new Set(lijst.map(a => a.administratie))]) {
       const eigen = lijst.filter(a => a.administratie === office);
@@ -7512,9 +7506,10 @@ async function vpbVoorstellen(lijst) {
         if (error) { let t = error.message; try { t = (await error.context.json()).fout || t; } catch (_) {} throw new Error(t); }
         const items = (data.voorstellen || []).map(v => ({ id: v.id, voorstel: { rekening: v.rekening, rekeningnaam: v.rekeningnaam, relatie: v.relatie, omschrijving: v.omschrijving, toelichting: v.toelichting, zeker: v.zeker } }));
         if (items.length) await vpbOpslaan(items);
-        vpbTeken();   // eerst wat er getypt was bewaren …
+        vpbBewaarInvoer();
+        // Een vers voorstel vervangt wat er (nog niet bewaard) in de velden stond: dat is de bedoeling van "opnieuw voorstellen".
         for (const it of items) { const x = vpbData.antwoorden.find(y => y.id === it.id); if (x) { x.voorstel = it.voorstel; delete x._rekening; delete x._relatie; delete x._omschrijving; } }
-        vpbTekenZonderBewaren();
+        vpbTeken(false);
       }
     }
     toonMelding("melding-vpb", "ok", "Shai heeft voorstellen gemaakt. Kijk ze na, pas aan waar nodig en keur goed.");
@@ -7541,22 +7536,10 @@ async function vpbActie(actie, id, office) {
     } else if (actie === "voorstellen") {
       return vpbVoorstellen(vpbData.antwoorden.filter(x => x.administratie === office && x.status === "nieuw"));
     }
-    // Uit dit tabje: weg uit de lijst, tellingen bijwerken
-    if (a && a.status !== vpbStand) {
-      vpbData.antwoorden = vpbData.antwoorden.filter(x => x.id !== id);
-      vpbData.tellingen[vpbStand] = Math.max(0, (vpbData.tellingen[vpbStand] || 1) - 1);
-      vpbData.tellingen[a.status] = (vpbData.tellingen[a.status] || 0) + 1;
-    }
     document.getElementById("melding-vpb").innerHTML = "";
-    vpbTeken();
+    vernieuwBkFilters();   // tellingen in de tabjes (en via vpbModus de lijst) bijwerken
   } catch (e) { toonMelding("melding-vpb", "fout", escapeHtml(e.message)); }
 }
-document.getElementById("btn-vpb-verversen").addEventListener("click", () => laadVpBeoordelen());
-document.getElementById("vpb-klant").addEventListener("change", (e) => { vpbKlant = e.target.value; vpbTeken(); });
-document.getElementById("vpb-tabjes").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-vpb-tabje]");
-  if (b && b.dataset.vpbTabje !== vpbStand) { vpbStand = b.dataset.vpbTabje; laadVpBeoordelen(); }
-});
 document.querySelector("#tabel-vpb tbody").addEventListener("click", (e) => {
   const b = e.target.closest("[data-vpb-actie]");
   if (b) vpbActie(b.dataset.vpbActie, b.dataset.vpbId, b.dataset.office);

@@ -97,6 +97,11 @@
   #tab-bank.vp-modus #bk-bulk, #tab-bank.vp-modus #melding-bank, #tab-bank.vp-modus #bk-scroll, #tab-bank.vp-modus #bk-substatus,
   #tab-bank.vp-modus #bk-substatus-info, #tab-bank.vp-modus #bk-richting-filter, #tab-bank.vp-modus #bk-zekerheid { display: none !important; }
   #tab-bank.vp-werk #bk-woot { display: none !important; }
+  .vpb-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: vpb-draai .7s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes vpb-draai { to { transform: rotate(360deg); } }
+  #tabel-vpb .fa-vink { width: 34px; text-align: center; }
+  #tabel-vpb .fa-vink input { width: 17px; height: 17px; cursor: pointer; }
   /* Facturen (Basecone-robot) — bijschriften in de gewone tekstkleur, geen lichtgrijs */
   .fa-uitleg { font-size: 13px; color: var(--tekst); line-height: 1.5; margin: 6px 0 12px; }
   .fa-robot { padding: 9px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 10px; background: var(--grijs); color: var(--tekst); }
@@ -952,10 +957,18 @@
       <h3 id="vpb-kop" style="margin:6px 0 2px"></h3>
       <p class="vp-uitleg" style="margin:0 0 6px">Antwoorden die klanten via hun aanleverpagina terugstuurden op de vraagpostenlijst. Shai stelt per post een rekening voor; pas aan waar nodig — in het rekeningveld typ je een stukje van het nummer of de naam — en keur goed.</p>
       <div id="melding-vpb"></div>
+      <!-- Vinkjes + acties voor meer regels tegelijk (Shereen 15 okt: "je moet de regels kunnen selecteren om goed te keuren
+           of een andere actie te gebruiken") — zelfde opzet als de bulkbalk van de bankregels. -->
+      <div class="fa-bulk" id="vpb-bulk" style="display:none; margin:0 0 8px">
+        <button class="knop" id="btn-vpb-goed">✓ Aangevinkte goedkeuren</button>
+        <button class="knop stil" id="btn-vpb-over">Aangevinkte overslaan</button>
+        <button class="knop stil" id="btn-vpb-terug">↶ Aangevinkte terug naar te beoordelen</button>
+        <span id="vpb-bulk-tekst"></span>
+      </div>
       <div id="vpb-lijsten"></div>
       <div style="overflow-x:auto; margin-bottom:14px">
         <table id="tabel-vpb">
-          <thead><tr><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead>
+          <thead><tr><th class="fa-vink"><input type="checkbox" id="vpb-alles" title="Alles in deze lijst aanvinken"></th><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -7364,6 +7377,8 @@ document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) =>
    Klantkeuze = het bestaande administratiefilter (bk-office). Boeken: NIET met een memoriaal; Shai past de
    oorspronkelijke boeking aan (aparte taak, nog te leren — docs/VRAAGPOSTEN-BOEKEN-IN-ORIGINEEL-START.md). */
 let vpbData = null, vpbStand = null, vpbBezig = null, bkVp = false;
+const vpbVink = new Set(), vpbRijBezig = new Set();   // aangevinkte regels; regels die nu worden opgeslagen (laadicoon)
+const VPB_DRAAI = '<span class="vpb-spin"></span>';
 const vpbSchemas = new Map();   // administratie → [{ code, naam }]
 const bkOffice = () => document.getElementById("bk-office")?.value || "";
 const vpbAantal = (stand) => (vpbData?.antwoorden || []).filter(a => a.status === stand && (!bkOffice() || a.administratie === bkOffice())).length;
@@ -7443,14 +7458,16 @@ function vpbBewaarInvoer() {
 function vpbTeken(bewaren = true) {
   if (bewaren) vpbBewaarInvoer();
   if (!vpbData || !vpbStand) return;
-  const lijst = vpbData.antwoorden.filter(a => a.status === vpbStand && (!bkOffice() || a.administratie === bkOffice()));
+  const lijst = vpbLijst();
+  for (const id of [...vpbVink]) if (!lijst.some(a => a.id === id)) vpbVink.delete(id);   // alleen wat je nu ziet
+  vpbBulkBalk(lijst);
   document.getElementById("vpb-kop").textContent = `${VPB_KOP[vpbStand]} (${lijst.length})`;
   // Zoeklijsten voor het rekeningveld, één per administratie
   document.getElementById("vpb-lijsten").innerHTML = [...vpbSchemas.entries()].map(([o, s]) =>
     `<datalist id="vpb-dl-${escapeHtml(o)}">${s.map(x => `<option value="${escapeHtml(x.code + " " + x.naam)}"></option>`).join("")}</datalist>`).join("");
   const tbody = document.querySelector("#tabel-vpb tbody");
   if (!lijst.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="vp-uitleg">${vpbStand === "goedgekeurd" ? "Geen goedgekeurde vraagposten die nog op Shai wachten." : "Niets in deze lijst."}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="vp-uitleg">${vpbStand === "goedgekeurd" ? "Geen goedgekeurde vraagposten die nog op Shai wachten." : "Niets in deze lijst."}</td></tr>`;
     return;
   }
   const bewerkbaar = vpbStand === "nieuw";
@@ -7459,7 +7476,7 @@ function vpbTeken(bewaren = true) {
     if (a.administratie !== vorige) {
       vorige = a.administratie;
       const b = a.task_deliverable_uploads;
-      html += `<tr class="vp-regels"><td colspan="7" style="padding-left:12px"><b>${escapeHtml(a.customers?.name || a.administratie)}</b> · ${escapeHtml(a.administratie)}` +
+      html += `<tr class="vp-regels"><td colspan="8" style="padding-left:12px"><b>${escapeHtml(a.customers?.name || a.administratie)}</b> · ${escapeHtml(a.administratie)}` +
         (b ? `<span class="vp-uitleg" style="margin-left:10px">${escapeHtml(b.bestandsnaam || "")} — teruggestuurd${b.door_naam ? ` door ${escapeHtml(b.door_naam)}` : ""} op ${escapeHtml(vwDatum(b.geupload_op))}</span>` : "") +
         `${bewerkbaar ? ` <button class="knop stil" data-vpb-actie="voorstellen" data-office="${escapeHtml(a.administratie)}" style="padding:2px 8px; font-size:12px; margin-left:8px"${vpbBezig ? " disabled" : ""}>✨ Shai opnieuw laten voorstellen</button>` : ""}</td></tr>`;
     }
@@ -7467,7 +7484,9 @@ function vpbTeken(bewaren = true) {
     const rekTekst = a._rekening ?? vpbRekTekst(a.administratie, a.keuze?.rekening ?? a.voorstel?.rekening ?? "");
     const rel = a._relatie ?? a.keuze?.relatie ?? a.voorstel?.relatie ?? "";
     const oms = a._omschrijving ?? a.keuze?.omschrijving ?? a.voorstel?.omschrijving ?? (a.antwoord || "").slice(0, 40);
+    const bezig = vpbRijBezig.has(a.id);
     html += `<tr>
+      <td class="fa-vink"><input type="checkbox" class="vpb-vink" ${d}${vpbVink.has(a.id) ? " checked" : ""}${bezig ? " disabled" : ""}></td>
       <td style="white-space:nowrap">${escapeHtml(vpDatum(a.datum))}</td>
       <td style="white-space:nowrap">${escapeHtml(a.dagboek)} ${escapeHtml(a.boekstuk || "")}</td>
       <td>${escapeHtml(a.omschrijving || "")}</td>
@@ -7479,7 +7498,7 @@ function vpbTeken(bewaren = true) {
            <input type="text" ${d} data-vpb-veld="omschrijving" value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px" autocomplete="off">
            ${a.voorstel ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">${a.voorstel.zeker ? "✨" : "❔"} ${escapeHtml(a.voorstel.toelichting || "")}</div>` : (vpbBezig ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">Shai denkt na…</div>` : "")}`
         : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
-      <td style="white-space:nowrap">${bewerkbaar
+      <td style="white-space:nowrap">${bezig ? `<span class="vp-uitleg">${VPB_DRAAI}Opslaan…</span>` : bewerkbaar
         ? `<button class="knop" data-vpb-actie="goedkeuren" ${d} style="padding:4px 10px">Goedkeuren</button> <button class="knop stil" data-vpb-actie="overslaan" ${d} style="padding:4px 10px">Overslaan</button>`
         : `<button class="knop stil" data-vpb-actie="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug naar te beoordelen</button>`}</td>
     </tr>`;
@@ -7516,30 +7535,74 @@ async function vpbVoorstellen(lijst) {
   } catch (e) { toonMelding("melding-vpb", "fout", "Voorstellen maken lukte niet: " + escapeHtml(e.message)); }
   vpbBezig = null; vpbTeken();
 }
-async function vpbActie(actie, id, office) {
-  const a = id ? vpbData.antwoorden.find(x => x.id === id) : null;
-  try {
-    if (actie === "goedkeuren") {
-      const veld = (n) => (document.querySelector(`[data-vpb-id="${id}"][data-vpb-veld="${n}"]`)?.value || "").trim();
-      const code = veld("rekening").split(/\s+/)[0] || "";
-      if (!(vpbSchemas.get(a.administratie) || []).some(s => s.code === code)) {
-        toonMelding("melding-vpb", "fout", `Kies bij ${escapeHtml(a.omschrijving || "deze post")} een rekening uit de lijst (typ een stukje van het nummer of de naam).`);
-        return;
-      }
-      const keuze = { rekening: code, relatie: veld("relatie") || null, omschrijving: (veld("omschrijving") || a.antwoord).slice(0, 40) };
-      await vpbOpslaan([{ id, keuze, status: "goedgekeurd" }]);
-      Object.assign(a, { keuze, status: "goedgekeurd" });
-    } else if (actie === "overslaan") {
-      await vpbOpslaan([{ id, status: "overgeslagen" }]); a.status = "overgeslagen";
-    } else if (actie === "terug") {
-      await vpbOpslaan([{ id, status: "nieuw" }]); a.status = "nieuw";
-    } else if (actie === "voorstellen") {
-      return vpbVoorstellen(vpbData.antwoorden.filter(x => x.administratie === office && x.status === "nieuw"));
-    }
-    document.getElementById("melding-vpb").innerHTML = "";
-    vernieuwBkFilters();   // tellingen in de tabjes (en via vpbModus de lijst) bijwerken
-  } catch (e) { toonMelding("melding-vpb", "fout", escapeHtml(e.message)); }
+const vpbLijst = () => (vpbData?.antwoorden || []).filter(a => a.status === vpbStand && (!bkOffice() || a.administratie === bkOffice()));
+/** De bulkbalk: alleen zichtbaar met vinkjes; in Te beoordelen goedkeuren/overslaan, elders terug. */
+function vpbBulkBalk(lijst) {
+  const n = vpbVink.size, balk = document.getElementById("vpb-bulk");
+  balk.style.display = n ? "" : "none";
+  const bezig = vpbRijBezig.size > 0;
+  document.getElementById("btn-vpb-goed").style.display = vpbStand === "nieuw" ? "" : "none";
+  document.getElementById("btn-vpb-over").style.display = vpbStand === "nieuw" ? "" : "none";
+  document.getElementById("btn-vpb-terug").style.display = vpbStand === "nieuw" ? "none" : "";
+  for (const id of ["btn-vpb-goed", "btn-vpb-over", "btn-vpb-terug"]) document.getElementById(id).disabled = bezig;
+  document.getElementById("vpb-bulk-tekst").innerHTML = bezig ? `${VPB_DRAAI}Bezig met ${vpbRijBezig.size} ${vpbRijBezig.size === 1 ? "regel" : "regels"}…` : `${n} aangevinkt`;
+  const alles = document.getElementById("vpb-alles");
+  alles.checked = lijst.length > 0 && lijst.every(a => vpbVink.has(a.id));
+  alles.indeterminate = n > 0 && !alles.checked;
 }
+/** De keuze uit de velden van één regel; null + melding als de rekening niet in het schema staat. */
+function vpbKeuzeUit(a) {
+  const veld = (n) => (document.querySelector(`[data-vpb-id="${a.id}"][data-vpb-veld="${n}"]`)?.value || "").trim();
+  const code = veld("rekening").split(/\s+/)[0] || "";
+  if (!(vpbSchemas.get(a.administratie) || []).some(s => s.code === code)) return null;
+  return { rekening: code, relatie: veld("relatie") || null, omschrijving: (veld("omschrijving") || a.antwoord).slice(0, 40) };
+}
+/** Goedkeuren / overslaan / terug voor één of meer regels; laadicoon zolang het opslaan duurt. */
+async function vpbVerwerk(actie, ids) {
+  const items = [], fout = [];
+  for (const id of ids) {
+    const a = vpbData.antwoorden.find(x => x.id === id);
+    if (!a || vpbRijBezig.has(id)) continue;
+    if (actie === "goedkeuren") {
+      const keuze = vpbKeuzeUit(a);
+      if (!keuze) { fout.push(a.omschrijving || a.antwoord); continue; }
+      items.push({ id, keuze, status: "goedgekeurd" });
+    } else items.push({ id, status: actie === "overslaan" ? "overgeslagen" : "nieuw" });
+  }
+  if (fout.length) toonMelding("melding-vpb", "fout", `Kies eerst een rekening uit de lijst bij: ${fout.map(escapeHtml).join(", ")} (typ een stukje van het nummer of de naam).`);
+  else document.getElementById("melding-vpb").innerHTML = "";
+  if (!items.length) return;
+  vpbBewaarInvoer();
+  for (const it of items) vpbRijBezig.add(it.id);
+  vpbTeken(false);
+  try {
+    await vpbOpslaan(items);
+    for (const it of items) {
+      const a = vpbData.antwoorden.find(x => x.id === it.id);
+      Object.assign(a, it.keuze ? { keuze: it.keuze, status: it.status } : { status: it.status });
+      vpbVink.delete(it.id);
+    }
+  } catch (e) { toonMelding("melding-vpb", "fout", escapeHtml(e.message)); }
+  for (const it of items) vpbRijBezig.delete(it.id);
+  vernieuwBkFilters();   // tellingen in de tabjes (en via vpbModus de lijst) bijwerken
+}
+async function vpbActie(actie, id, office) {
+  if (actie === "voorstellen") return vpbVoorstellen(vpbData.antwoorden.filter(x => x.administratie === office && x.status === "nieuw"));
+  return vpbVerwerk(actie, [id]);
+}
+document.querySelector("#tabel-vpb tbody").addEventListener("change", (e) => {
+  const v = e.target.closest(".vpb-vink");
+  if (!v) return;
+  v.checked ? vpbVink.add(v.dataset.vpbId) : vpbVink.delete(v.dataset.vpbId);
+  vpbBulkBalk(vpbLijst());
+});
+document.getElementById("vpb-alles").addEventListener("change", (e) => {
+  for (const a of vpbLijst()) e.target.checked ? vpbVink.add(a.id) : vpbVink.delete(a.id);
+  vpbTeken();
+});
+document.getElementById("btn-vpb-goed").addEventListener("click", () => vpbVerwerk("goedkeuren", [...vpbVink]));
+document.getElementById("btn-vpb-over").addEventListener("click", () => vpbVerwerk("overslaan", [...vpbVink]));
+document.getElementById("btn-vpb-terug").addEventListener("click", () => vpbVerwerk("terug", [...vpbVink]));
 document.querySelector("#tabel-vpb tbody").addEventListener("click", (e) => {
   const b = e.target.closest("[data-vpb-actie]");
   if (b) vpbActie(b.dataset.vpbActie, b.dataset.vpbId, b.dataset.office);

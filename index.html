@@ -197,6 +197,33 @@
   .fa-vergroting-vak img.echt { max-width: none; max-height: none; cursor: zoom-out; }
   .fa-scan iframe { width: 100%; height: 70vh; border: 1px solid var(--rand); border-radius: 6px; }
   .fa-form label { display: block; font-size: 12px; font-weight: 600; color: var(--tekst); margin: 8px 0 3px; }
+  /* Rustiger documentvenster (Shereen 15 okt): kop met status, strook bovenaan, blokjes, knoppenbalk onderaan. */
+  .fa-doc { display: flex; flex-direction: column; min-height: 100%; }
+  .fa-doc-kop { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .fa-doc-kop h2 { margin: 0; overflow-wrap: anywhere; }
+  #fa-opmerking .melding { margin: 0 0 10px; }
+  #fa-opmerking .fa-voorleg { margin: 0 0 10px; border: 1px solid #f0d58a; border-left: 4px solid var(--oranje); padding: 9px 12px; font-size: 13px; }
+  #fa-opmerking .fa-punten { margin: 4px 0 0; font-size: 13px; }
+  #fa-opmerking .fa-punten li { padding: 3px 0 3px 22px; border-bottom: 0; }
+  #fa-opmerking .fa-punten li::before { top: 3px; }
+  .fa-detail { grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.1fr); gap: 16px; align-items: start; }
+  @media (max-width: 1100px) { .fa-detail { grid-template-columns: 1fr; } }
+  .fa-scan-onder { font-size: 12px; color: var(--tekst); margin-top: -2px; }
+  .fa-blok { background: #fff; border: 1px solid var(--rand); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .fa-blok h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--tekst); }
+  .fa-blok .rij { display: flex; gap: 12px; flex-wrap: wrap; } .fa-blok .rij > div { flex: 1; min-width: 150px; }
+  .fa-kop-links { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .fa-kop-links label { white-space: nowrap; } .fa-kop-links span { font-size: 12px; white-space: nowrap; }
+  .fa-klein-knop { background: none; border: 0; color: var(--blauw); font-size: 12px; cursor: pointer; padding: 0 2px; text-decoration: underline; font-family: inherit; }
+  .fa-som { margin-top: 8px; padding: 7px 10px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .fa-som.goed { background: #eef8f1; border: 1px solid #b9dcc6; color: var(--groen); }
+  .fa-som.fout { background: #fbeaea; border: 1px solid #f3c4c0; color: var(--rood); }
+  .fa-waarom summary { cursor: pointer; font-size: 13px; }
+  #kaart-fa-detail .fa-ai { margin: 2px 0 10px; }
+  .fa-knoppen { position: sticky; bottom: -18px; z-index: 2; margin: auto -18px -18px; padding: 10px 18px; background: #fff; border-top: 1px solid var(--rand);
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .fa-duw { margin-left: auto; }
+  #kaart-fa-detail .fa-verwijder-vak { margin: 0 0 10px; }
   .fa-vinkjes { display: flex; gap: 18px; margin: 10px 0 2px; } .fa-vinkjes label { display: inline; font-weight: 400; font-size: 13px; }
   .fa-let { color: var(--oranje); font-weight: 600; } .fa-fout { color: var(--rood); font-weight: 600; }
   .fa-status.toegewezen, .fa-status.verwerkt { background: var(--groen); }
@@ -840,38 +867,20 @@
     <div class="fa-scheiding" id="fa-scheiding" title="Sleep om de breedte aan te passen (dubbelklik = terug naar standaard)"></div>
     <div class="kaart" id="kaart-fa-detail">
     <p class="fa-leeg" id="fa-leeg">Klik links op een document om het hier te openen.</p>
-    <div id="fa-inhoud" style="display:none">
-    <h2 id="fa-titel">Document</h2>
+    <!-- Rustiger documentvenster (Shereen 15 okt, voorbeeld docs/voorbeeld-rustig-basecone.html): zelfde velden, id's en
+         knoppen, alleen anders geordend — kop met status, strook "waarom Shai dit voorlegt" bovenaan, scan naast
+         blokjes 1 en 2, Boeken en Waarom over de hele breedte, knoppenbalk altijd zichtbaar onderaan. -->
+    <div id="fa-inhoud" class="fa-doc" style="display:none">
+    <div class="fa-doc-kop"><h2 id="fa-titel">Document</h2><span id="fa-status-pil"></span></div>
+    <div id="melding-fa-detail"></div>
+    <div id="fa-opmerking"></div>
+    <div class="fa-form">
     <div class="fa-detail">
-      <div class="fa-scan" id="fa-scan"></div>
-      <div class="fa-form">
-        <!-- Melding bovenaan (Shereen 14 okt: onder de knoppen was "Goedgekeurd … Dit is het volgende document" verwarrend). -->
-        <div id="melding-fa-detail"></div>
-        <p style="margin:0 0 4px"><span id="fa-som"></span></p>
-        <label style="margin-top:2px">Waarom verbeter je dit? (optioneel — wordt een regel voor de robot)</label>
-        <input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris">
-        <select id="fa-reden-voor" style="width:auto; margin-top:4px" title="Voor wie geldt je uitleg?">
-          <option value="leverancier">Alleen deze leverancier, alleen bij deze klant</option>
-          <option value="leverancier_alle">Deze leverancier, bij alle klanten</option>
-          <option value="klant">Alle leveranciers van deze klant</option>
-          <option value="alle">Alle leveranciers bij alle klanten</option>
-        </select>
-        <p style="margin:10px 0 4px">
-          <button class="knop" id="btn-fa-goedkeuren">✓ Goedkeuren</button>
-          <button class="knop stil" id="btn-fa-opnieuw">Opnieuw lezen</button>
-          <button class="knop stil" id="btn-fa-terug" style="display:none">Terug naar beoordelen</button>
-          <button class="knop stil" id="btn-fa-overslaan">Overslaan</button>
-          <button class="knop stil" id="btn-fa-verwijderen" title="Shai verwijdert dit document bij zijn volgende ronde uit Basecone. De scan blijft bewaard in het tabje DELETED.">Laten verwijderen door Shai</button>
-          <button class="knop stil" id="btn-fa-splitsen" style="display:none" title="Meer documenten in één upload: Shai wijst hem in zijn volgende ronde af in Validatie (dan staat hij weer bij Aangeleverd) en splitst hem daar per factuur.">Laten splitsen door Shai</button>
-        </p>
-        <div class="fa-verwijder-vak" id="fa-verwijder-vak" style="display:none">
-          <label for="fa-verwijder-reden">Waarom verwijderen? (komt in de mail aan de klant)</label>
-          <input type="text" id="fa-verwijder-reden" placeholder="bv. Dit is een rekeningoverzicht, geen factuur" maxlength="300">
-          <button class="knop" id="btn-fa-verwijder-ok">Verwijderen door Shai</button>
-          <button class="knop stil" id="btn-fa-verwijder-annuleer">Annuleren</button>
-        </div>
+      <div><div class="fa-scan" id="fa-scan"></div><div class="fa-scan-onder">Klik op de scan om te vergroten</div></div>
+      <div>
+        <div class="fa-blok"><h4>1 · Leverancier &amp; factuur</h4>
         <div class="rij">
-          <div><label>Crediteur * <button type="button" class="knop stil" id="btn-fa-crd-ververs" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Net een crediteur aangemaakt in Twinfield? Haal de lijst opnieuw op.">↻ Crediteuren uit Twinfield</button><button type="button" class="knop stil" id="btn-fa-crd-nieuw" style="padding:2px 8px; font-size:12px; margin-left:6px" title="Staat de leverancier er nog niet in? Shai maakt hem aan in Basecone.">＋ Nieuwe crediteur</button></label><div class="fa-crd-vak"><input type="text" id="fa-crediteur" placeholder="bv. C0197 of een naam" autocomplete="off"><span id="fa-crediteur-naam" class="fa-crd-naam"></span></div></div>
+          <div style="flex:2"><div class="fa-kop-links"><label>Crediteur *</label><span><button type="button" class="fa-klein-knop" id="btn-fa-crd-ververs" title="Net een crediteur aangemaakt in Twinfield? Haal de lijst opnieuw op.">↻ Crediteuren uit Twinfield</button> · <button type="button" class="fa-klein-knop" id="btn-fa-crd-nieuw" title="Staat de leverancier er nog niet in? Shai maakt hem aan in Basecone.">＋ Nieuwe crediteur</button></span></div><div class="fa-crd-vak"><input type="text" id="fa-crediteur" placeholder="bv. C0197 of een naam" autocomplete="off"><span id="fa-crediteur-naam" class="fa-crd-naam"></span></div></div>
           <div><label>Factuurnummer *</label><input type="text" id="fa-factuurnummer"></div>
         </div>
         <div id="fa-nieuw-crd" class="fa-nieuw-crd" style="display:none">
@@ -888,9 +897,11 @@
           </div>
         </div>
         <datalist id="fa-crediteuren"></datalist>
+        </div>
+        <div class="fa-blok"><h4>2 · Bedrag &amp; datum</h4>
         <div class="rij">
           <div><label>Bedrag (incl. alles) *</label><input type="text" id="fa-bedrag"></div>
-          <div><label>Valuta</label><select id="fa-valuta"><option>AWG</option><option>USD</option><option>EUR</option><option>XCG</option><option>ANG</option></select></div>
+          <div style="flex:0 0 110px; min-width:0"><label>Valuta</label><select id="fa-valuta"><option>AWG</option><option>USD</option><option>EUR</option><option>XCG</option><option>ANG</option></select></div>
         </div>
         <div class="rij">
           <div><label>Factuurdatum *</label><input type="date" id="fa-datum"><div class="fa-datum-tekst" id="fa-datum-tekst"></div></div>
@@ -900,22 +911,46 @@
           <label><input type="checkbox" id="fa-credit"> Creditfactuur</label>
           <label><input type="checkbox" id="fa-betaalbatch"> Niet in betaalbatch (al betaald)</label>
         </div>
-        <label>Omschrijving * <span id="fa-oms-teller"></span></label>
-        <input type="text" id="fa-omschrijving" maxlength="40">
-        <h3>Boekingsregels</h3>
-        <table id="tabel-fa-regels">
-          <thead><tr><th>Grootboekrekening</th><th class="num">Bedrag</th><th>Omschrijving regel</th><th>Wat de robot zag</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <datalist id="fa-rekeningen"></datalist>
-        <p style="margin:6px 0"><button class="knop stil" id="btn-fa-regel" style="padding:5px 10px; font-size:12px">+ Regel</button></p>
+        </div>
       </div>
     </div>
-    <!-- Over de volle breedte van het rechterdeel, onder scan en velden -->
-    <div class="fa-onder">
-      <h3 id="fa-opmerking-kop">Opmerkingen van Shai</h3>
-      <div id="fa-opmerking"></div>
-      <details class="fa-ai"><summary>Hoe de robot het las</summary><div id="fa-ai"></div></details>
+    <div class="fa-blok"><h4>3 · Boeken</h4>
+      <label>Omschrijving * <span id="fa-oms-teller" style="font-weight:400"></span></label>
+      <input type="text" id="fa-omschrijving" maxlength="40">
+      <table id="tabel-fa-regels" style="margin-top:10px">
+        <thead><tr><th>Grootboekrekening</th><th class="num">Bedrag</th><th>Omschrijving regel</th><th>Wat de robot zag</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <datalist id="fa-rekeningen"></datalist>
+      <p style="margin:6px 0 0"><button class="knop stil" id="btn-fa-regel" style="padding:5px 10px; font-size:12px">+ Regel</button></p>
+      <div id="fa-som" class="fa-som"></div>
+    </div>
+    <div class="fa-blok"><details class="fa-waarom"><summary><b>4 · Waarom verbeter je dit?</b> (optioneel — wordt een regel voor de robot)</summary>
+      <div class="rij" style="margin-top:8px">
+        <div style="flex:2"><input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris"></div>
+        <div><select id="fa-reden-voor" title="Voor wie geldt je uitleg?">
+          <option value="leverancier">Alleen deze leverancier, alleen bij deze klant</option>
+          <option value="leverancier_alle">Deze leverancier, bij alle klanten</option>
+          <option value="klant">Alle leveranciers van deze klant</option>
+          <option value="alle">Alle leveranciers bij alle klanten</option>
+        </select></div>
+      </div></details></div>
+    <details class="fa-ai"><summary>Hoe de robot het las</summary><div id="fa-ai"></div></details>
+    </div>
+    <div class="fa-verwijder-vak" id="fa-verwijder-vak" style="display:none">
+      <label for="fa-verwijder-reden">Waarom verwijderen? (komt in de mail aan de klant)</label>
+      <input type="text" id="fa-verwijder-reden" placeholder="bv. Dit is een rekeningoverzicht, geen factuur" maxlength="300">
+      <button class="knop" id="btn-fa-verwijder-ok">Verwijderen door Shai</button>
+      <button class="knop stil" id="btn-fa-verwijder-annuleer">Annuleren</button>
+    </div>
+    <div class="fa-knoppen">
+      <button class="knop stil" id="btn-fa-verwijderen" title="Shai verwijdert dit document bij zijn volgende ronde uit Basecone. De scan blijft bewaard in het tabje DELETED.">Laten verwijderen door Shai</button>
+      <button class="knop stil" id="btn-fa-splitsen" style="display:none" title="Meer documenten in één upload: Shai wijst hem in zijn volgende ronde af in Validatie (dan staat hij weer bij Aangeleverd) en splitst hem daar per factuur.">Laten splitsen door Shai</button>
+      <button class="knop stil" id="btn-fa-overslaan">Overslaan</button>
+      <button class="knop stil" id="btn-fa-terug" style="display:none">Terug naar beoordelen</button>
+      <span class="fa-duw"></span>
+      <button class="knop stil" id="btn-fa-opnieuw">Opnieuw lezen</button>
+      <button class="knop" id="btn-fa-goedkeuren">✓ Goedkeuren</button>
     </div>
     </div>
     </div>
@@ -4726,7 +4761,7 @@ function faNieuwCrdToon() {
     knoppen.appendChild(b);
   }
   const weg = document.createElement("button"); weg.className = "knop stil"; weg.textContent = "Aanvraag intrekken"; weg.style.marginLeft = "6px";
-  metTweedeKlik(weg, "Zeker? Klik nog eens", async () => {
+  weg.addEventListener("click", async () => {
     if (document.getElementById("fa-crediteur").value.trim().toUpperCase() === "NIEUW") document.getElementById("fa-crediteur").value = "";
     await faNieuwCrdOpslaan(null, "crediteur-aanvraag ingetrokken");
   });
@@ -4855,6 +4890,7 @@ async function openFactuur(id) {
   document.getElementById("fa-inhoud").style.display = "";
   kaart.scrollTop = 0;
   document.getElementById("fa-titel").textContent = `${d.bestandsnaam || d.id} · ${d.office}`;
+  document.getElementById("fa-status-pil").innerHTML = statusLabel(d.status, "shai");
   document.getElementById("melding-fa-detail").innerHTML = "";
   document.getElementById("fa-reden").value = "";
   const voorKeuze = document.getElementById("fa-reden-voor");
@@ -4903,10 +4939,9 @@ async function openFactuur(id) {
   // te leggen bovenaan, daaronder de overige punten als lijst — zonder herhalingen.
   const punten = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
   if (d.status === "fout" && d.opmerking) opm.push(`<div class="melding fout">${faMetNamen(d.opmerking)}</div>`);
-  if (punten.voorleg) opm.push(`<div class="fa-voorleg"><b>Waarom Shai dit voorlegt</b><br>${faMetNamen(punten.voorleg)}</div>`);
-  if (punten.lijst.length) opm.push(`<ul class="fa-punten">${punten.lijst.map(w => `<li>${faMetNamen(w)}</li>`).join("")}</ul>`);
+  // Eén strook bovenaan het venster: de reden plus de overige punten eronder (Shereen 15 okt).
+  if (punten.voorleg || punten.lijst.length) opm.push(`<div class="fa-voorleg">${punten.voorleg ? `<b>Waarom Shai dit voorlegt:</b> ${faMetNamen(punten.voorleg)}` : "<b>Let op</b>"}${punten.lijst.length ? `<ul class="fa-punten">${punten.lijst.map(w => `<li>${faMetNamen(w)}</li>`).join("")}</ul>` : ""}</div>`);
   document.getElementById("fa-opmerking").innerHTML = opm.join("");
-  document.getElementById("fa-opmerking-kop").style.display = opm.length ? "" : "none";
 
   // Wat de robot las
   const a = d.ai || {};
@@ -4982,10 +5017,10 @@ function faSom() {
   const som = Math.round(regels.reduce((s, r) => s + r.bedrag, 0) * 100);
   const totaal = Math.round(faGetal(document.getElementById("fa-bedrag").value) * 100);
   const onbekend = faStam.BAS.length ? regels.filter(r => r.grootboek && !faStam.BAS.some(x => x.code === r.grootboek)).map(r => r.grootboek) : [];
-  document.getElementById("fa-som").innerHTML = (som === totaal
-    ? `<span style="color:var(--groen); font-weight:600">Regels tellen op tot het totaal ✓</span>`
-    : `<span class="fa-fout">Regels ${faBedrag(som / 100)} ≠ totaal ${faBedrag(totaal / 100)}</span>`) +
-    (onbekend.length ? ` <span class="fa-fout">Onbekende rekening: ${escapeHtml(onbekend.join(", "))}</span>` : "");
+  const somVak = document.getElementById("fa-som");
+  somVak.className = "fa-som " + (som === totaal && !onbekend.length ? "goed" : "fout");
+  somVak.innerHTML = (som === totaal ? "Regels tellen op tot het totaal ✓" : `Regels ${faBedrag(som / 100)} ≠ totaal ${faBedrag(totaal / 100)}`) +
+    (onbekend.length ? ` · Onbekende rekening: ${escapeHtml(onbekend.join(", "))}` : "");
 }
 /* Datum voluit in tekst + de periode (Shereen 10 okt): het datumvak toont de volgorde van de browser
    (mm/dd/jjjj), daardoor kan iemand denken dat 10/04 april is. */
@@ -4996,7 +5031,8 @@ function faDatumVoluit(iso) {
 }
 function faDatumTekst() {
   const d = faDatumVoluit(document.getElementById("fa-datum").value);
-  document.getElementById("fa-datum-tekst").innerHTML = d ? `${escapeHtml(d.tekst)} · <b>periode ${escapeHtml(d.periode)}</b>` : "";
+  // Alleen de datum voluit (Shereen 15 okt: "periode oktober 2026 (2026/10)" mag weg).
+  document.getElementById("fa-datum-tekst").textContent = d ? d.tekst : "";
   const v = faDatumVoluit(document.getElementById("fa-vervaldatum").value);
   document.getElementById("fa-verval-tekst").textContent = v ? v.tekst : "";
 }
@@ -7250,7 +7286,7 @@ document.getElementById("btn-fa-nc-sluiten").addEventListener("click", faNieuwCr
 document.getElementById("fa-crediteur").addEventListener("input", faCrediteurNaam);
 faKeuzelijst(document.getElementById("fa-crediteur"), () => faStam.CRD);
 document.getElementById("btn-fa-opnieuw").addEventListener("click", faOpnieuwLezen);
-metTweedeKlik(document.getElementById("btn-fa-overslaan"), "Zeker? Klik nog eens", () => faZetStatus("overgeslagen", "overgeslagen"));
+document.getElementById("btn-fa-overslaan").addEventListener("click", () => faZetStatus("overgeslagen", "overgeslagen"));
 
 /* ===== Basecone → DELETED (Shereen 12 okt) =====
    Wat Shai op aanwijzing uit Basecone verwijderde: eerste pagina van de scan, uploaddatum, naam, reden.
@@ -7846,7 +7882,7 @@ document.getElementById("vw-vink-alles").addEventListener("change", (e) => {
 document.getElementById("vw-groot").addEventListener("click", (e) => { e.currentTarget.style.display = "none"; });
 document.getElementById("btn-fa-terug").addEventListener("click", () => faZetStatus("voorstel", "terug naar beoordelen"));
 document.getElementById("btn-fa-verwijderen").addEventListener("click", faVerwijderVragen);
-metTweedeKlik(document.getElementById("btn-fa-splitsen"), "Zeker? Klik nog eens — Shai wijst hem af en splitst hem", () => {
+document.getElementById("btn-fa-splitsen").addEventListener("click", () => {
   const d = faGekozen; if (!d) return;
   const wie = gebruiker ? gebruiker.email : null;
   return faZetStatus("splitsen", "splitsen gevraagd", { basecone: { ...(d.basecone || {}), besluit: "afwijzen_voor_splitsen" },

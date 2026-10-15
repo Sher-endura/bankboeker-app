@@ -241,6 +241,12 @@
   .kb-chips { margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px; }
   .kb-chips button { border: 1px solid #9cc3ea; background: #dcebf9; color: var(--blauw-d); border-radius: 12px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
   .kb-voorbeeld { font-size: 13px; margin: 4px 0 2px; }
+  /* Factuur van een andere klant (15 okt) */
+  .bk-andere { margin-top: 6px; }
+  .bk-andere-zoek { width: 100%; max-width: 560px; }
+  .bk-andere-lijst { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-width: 760px; }
+  .bk-andere-optie { text-align: left; border: 1px solid var(--rand); background: #fff; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .bk-andere-optie:hover { background: #dcebf9; }
   /* Tabjes waar je iets moet doen (Shereen 14 okt): fel, in de kleur van het Shai-logo. */
   .status-tabjes button.doen { background: var(--zalm); color: #fff; font-weight: 600; border-radius: 6px 6px 0 0; padding: 6px 10px; margin-right: 4px; }
   .status-tabjes button.doen:hover { color: #fff; filter: brightness(0.93); }
@@ -5864,6 +5870,11 @@ function bkDetailRij(r) {
     || ((v.soort === "klant" || v.soort === "relatie") && v.regels && v.regels[0] && v.regels[0].relatie)
     || (twVoorstel && ((v.regels || []).find(x => x.relatie && x.factuur) || {}).relatie) || (kandidaten[0] || {}).relatie || "";
   const startFacturen = new Set(g.soort === "klant" ? (g.regels || []).map(x => x.boekstuk) : (v.soort === "klant" && v.regels ? v.regels.map(x => x.boekstuk) : []));
+  // Facturen van een ándere klant/leverancier bij dezelfde betaling (Shereen 15 okt, "0348/0330": 0330 van The Wicket Fish
+  // D10155 en 0348 van Hurricane D10139). Plus: op welke factuur het restant van een deelbetaling open blijft.
+  const extraFacturen = new Set(), aanErbij = new Set();
+  let extraGezet = false;
+  let deelOp = ((g.regels || []).find(x => x.open && Math.abs(Number(x.bedrag)) < Number(x.open) - 0.004) || {}).boekstuk || null;
   // Twinfields voorstel op een klantfactuur (Shereen 12 okt: "altijd de open facturen zien, met het vinkje bij de
   // selectie"): die klant en die factuur (op factuurnummer — Twinfield geeft geen boekstuk) staan klaar in de lijst.
   const twKlant = g.soort !== "klant" && twVoorstel ? (v.regels || []).filter(x => x.relatie && x.factuur) : [];
@@ -5921,7 +5932,11 @@ function bkDetailRij(r) {
   // 1000 600 afletteren op de 1e inv en die 400 aanbetalen op de 2e").
   const deelVerdeling = (facturen) => {
     let over = absBedrag;   // zonder teken: ook voor betalingen aan een leverancier
-    return [...facturen].sort((a, b) => String(a.datum).localeCompare(String(b.datum)))
+    const volg = [...facturen].sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+    // Zelf gekozen "restant open laten op" (15 okt) gaat als laatste; die krijgt wat er over is.
+    const i = deelOp ? volg.findIndex(o => o.code + "|" + o.nummer === deelOp) : -1;
+    if (i >= 0) volg.push(volg.splice(i, 1)[0]);
+    return volg
       .map(o => { const b = Math.round(Math.max(0, Math.min(o.open, over)) * 100) / 100; over = Math.round((over - b) * 100) / 100; return { o, b }; });
   };
   let omsZelf = false;   // zelf getypt in het omschrijvingsvak? dan niet meer overschrijven
@@ -5971,6 +5986,7 @@ function bkDetailRij(r) {
     // Deelbetaling in gewone woorden (Shereen 14 okt: "geen onderbetaling en waar gaat verschil heen, it's confusing"):
     // "Betaling 1.000,00 op factuur Endura-2024-0322 · restant open op Endura-2024-0322 na boeken: 1.542,50".
     if (rest < -0.004 && db.checked && vak.style.display !== "none") {
+      setTimeout(() => { const sel = el.querySelector(".bk-deel-op"); if (sel) sel.addEventListener("change", () => { deelOp = sel.value; somTekst(); }); }, 0);
       const naam = (o) => escapeHtml(o.factuur || o.code + " " + o.nummer);
       const delen = deelVerdeling(gekozenFacturen());
       const leeg = delen.filter(({ b }) => b < 0.005), betaald = delen.filter(({ b }) => b >= 0.005);
@@ -5978,6 +5994,8 @@ function bkDetailRij(r) {
       el.innerHTML = `Betaling <b>${faBedrag(absBedrag)}</b> op ` + (betaald.length === 1 ? `factuur ${naam(betaald[0].o)}`
           : betaald.map(({ o, b }) => `${naam(o)} <b>${faBedrag(b)}</b>${o.open - b > 0.004 ? "" : " (helemaal betaald)"}`).join(" · ")) +
         open.map(({ o, b }) => `<br>Restant open op ${naam(o)} na boeken: <b>${faBedrag(Math.round((o.open - b) * 100) / 100)}</b>`).join("") +
+        (delen.length > 1 && beoordelen ? `<br><label style="display:inline">Restant open laten op: <select class="bk-deel-op">${delen.map(({ o }) =>
+          `<option value="${escapeHtml(o.code + "|" + o.nummer)}"${open.some(x => x.o === o) ? " selected" : ""}>${naam(o)}${o.relatienaam ? " · " + escapeHtml(o.relatienaam) : ""}</option>`).join("")}</select></label>` : "") +
         (leeg.length ? `<br>${leeg.map(({ o }) => naam(o)).join(", ")}: daar blijft niets voor over — haal het vinkje weg` : "");
     }
     verschilRek();
@@ -6017,14 +6035,37 @@ function bkDetailRij(r) {
     if (!rel) { vak.textContent = `Kies eerst de ${K.relatie}.`; somTekst(); return; }
     // Halverwege typen ("D1012", "island"): nog geen klant — niet doen alsof die geen open facturen heeft.
     if (!k && aflet.klanten.length) { vak.textContent = `Kies de ${K.relatie} uit de lijst (zoek op naam of nummer).`; somTekst(); return; }
-    const lijst = aflet.open.filter(o => o.relatie === rel).sort((a, b) => a.datum.localeCompare(b.datum));
+    // Bij het opnieuw tekenen de vinkjes bewaren (anders gingen ze terug naar het voorstel).
+    const nuAan = vak.querySelector(".bk-fvink") ? new Set([...vak.querySelectorAll(".bk-fvink:checked")].map(x => x.value)) : null;
+    const sleutel = (o) => o.code + "|" + o.nummer;
+    if (!extraGezet) { extraGezet = true; for (const o of aflet.open) if (o.relatie !== rel && startFacturen.has(sleutel(o))) extraFacturen.add(sleutel(o)); }
+    const aan = (o) => aanErbij.has(sleutel(o)) || (nuAan ? nuAan.has(sleutel(o)) : startFacturen.has(sleutel(o)) || startTwFacturen.has(o.relatie + "|" + o.factuur));
+    const lijst = aflet.open.filter(o => o.relatie === rel || extraFacturen.has(sleutel(o))).sort((a, b) => a.datum.localeCompare(b.datum));
+    const andereHtml = `<div class="bk-andere"><input type="search" class="bk-andere-zoek" placeholder="＋ Factuur van een andere ${K.relatie} toevoegen — zoek op factuurnummer of naam" autocomplete="off"${beoordelen ? "" : " disabled"}><div class="bk-andere-lijst"></div></div>`;
     // Veel open facturen (Shereen 12 okt, Miniño): in 5 kolommen over het scherm + zoeken op nummer, datum of bedrag.
     // Zoeken verbergt alleen; wat aangevinkt is telt mee, ook als het buiten de zoekopdracht valt.
     vak.innerHTML = lijst.length ? (lijst.length > 5 ? `<input type="search" class="bk-fzoek" placeholder="🔍 Zoek factuur: nummer, datum of bedrag (${lijst.length} open)" autocomplete="off">` : "") +
-      `<div class="bk-fgrid">` + lijst.map(o => `<label data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${startFacturen.has(o.code + "|" + o.nummer) || startTwFacturen.has(o.relatie + "|" + o.factuur) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("") + `</div>`
-      : `Deze ${K.relatie} heeft geen ${K.facturen} — het hele bedrag komt open op de ${kant}, zonder factuur.`;
+      `<div class="bk-fgrid">` + lijst.map(o => `<label data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${aan(o) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b>${o.relatie !== rel ? ` · <i>${escapeHtml(o.relatie)} ${escapeHtml(o.relatienaam || "")}</i>` : ""}</label>`).join("") + `</div>` + andereHtml
+      : `Deze ${K.relatie} heeft geen ${K.facturen} — het hele bedrag komt open op de ${kant}, zonder factuur.` + andereHtml;
+    aanErbij.clear();
     const zf = tr.querySelector("#bk-zonder-factuur");
     if (zf && !lijst.length) zf.checked = true;
+    // Factuur van een andere klant zoeken en toevoegen (aangevinkt).
+    const az = vak.querySelector(".bk-andere-zoek"), al = vak.querySelector(".bk-andere-lijst");
+    if (az) az.addEventListener("input", () => {
+      const w = az.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      if (!w.length) { al.innerHTML = ""; return; }
+      const hits = aflet.open.filter(o => o.relatie !== rel && !extraFacturen.has(sleutel(o)) &&
+        w.every(x => [o.factuur, o.code, o.nummer, o.relatie, o.relatienaam, faBedrag(o.open), o.open.toFixed(2)].join(" ").toLowerCase().includes(x))).slice(0, 8);
+      al.innerHTML = hits.length ? hits.map(o => `<button type="button" class="bk-andere-optie" data-k="${escapeHtml(sleutel(o))}">${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(o.relatie)} ${escapeHtml(o.relatienaam || "")} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></button>`).join("")
+        : `<span class="fa-uitleg">Geen open ${K.facturen} gevonden.</span>`;
+      al.querySelectorAll(".bk-andere-optie").forEach(b => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        extraFacturen.add(b.dataset.k); aanErbij.add(b.dataset.k);
+        const rk = tr.querySelector('input[name="bk-keuze"][value="klant"]'); if (rk) rk.checked = true;
+        toonFacturen();
+      }));
+    });
     const fzoek = vak.querySelector(".bk-fzoek");
     if (fzoek) fzoek.addEventListener("input", () => {
       const w = fzoek.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -6095,7 +6136,7 @@ function bkDetailRij(r) {
   let splits = keuzeSplits ? (g.toewijzingen || []).map(t => ({ soort: t.soort === "grootboek" ? "grootboek" : (t.kant || "debiteur"),
       code: t.soort === "grootboek" ? t.rekening : t.relatie, factuur: t.soort === "facturen" ? ((t.facturen || [])[0] || {}).boekstuk || "" : "",
       bedrag: Math.abs(Number(t.bedrag) || 0) }))
-    : [{ soort: "grootboek", code: eigen, factuur: "", bedrag: absBedrag }, { soort: "grootboek", code: "", factuur: "", bedrag: 0 }];
+    : [{ soort: "grootboek", code: eigen, factuur: "", bedrag: absBedrag }, { soort: kant, code: "", factuur: "", bedrag: 0 }];
   const splitsData = {};   // per kant: { klanten, open } zodra geladen
   const laadSplitsData = (kant) => { if (kant === "grootboek" || splitsData[kant]) return;
     splitsData[kant] = { klanten: [], open: [], laden: true };
@@ -6115,12 +6156,15 @@ function bkDetailRij(r) {
       const open = s.soort !== "grootboek" && d ? d.open.filter(o => o.relatie === s.code).sort((a, b) => a.datum.localeCompare(b.datum)) : [];
       const nm = s.soort === "grootboek" ? bkRekNamen[`${r.office}|${s.code}`] : d && (d.klanten.find(k => k.code === s.code) || {}).naam;
       const naamTekst = !s.code || /[a-z]/i.test(s.code) && !nm ? "" : nm || (d && d.laden ? "…" : "onbekend");
+      // 1100 Debiteuren / 1600 Crediteuren als grootboekrekening: dan hoort er een klant/leverancier bij (15 okt).
+      const opRelatie = s.soort === "grootboek" && /debiteur|crediteur|receivable|payable/i.test(nm || "");
       return `<div class="bk-splits-rij" data-i="${i}">
         <select class="bk-s-soort"${beoordelen ? "" : " disabled"}>${SPLITS_SOORT.map(([w, t]) => `<option value="${w}"${s.soort === w ? " selected" : ""}>${t}</option>`).join("")}</select>
         <span class="fa-crd-vak bk-s-codevak"><input type="text" class="bk-s-code" value="${escapeHtml(s.code)}" placeholder="${s.soort === "grootboek" ? "rekening: nummer of naam" : BK_KANT[s.soort].relatie + ": nummer of naam"}" autocomplete="off"${beoordelen ? "" : " disabled"}><span class="fa-crd-naam">${escapeHtml(naamTekst)}</span></span>
         ${s.soort !== "grootboek" ? `<select class="bk-s-factuur"${beoordelen ? "" : " disabled"}><option value="">zonder factuur</option>${open.map(o => `<option value="${escapeHtml(o.code + "|" + o.nummer)}"${s.factuur === o.code + "|" + o.nummer ? " selected" : ""}>${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open ${faBedrag(o.open)}</option>`).join("")}</select>` : ""}
         <input type="text" class="bk-s-bedrag" inputmode="decimal" value="${s.bedrag ? faBedrag(s.bedrag) : ""}" placeholder="bedrag"${s.factuur ? ' readonly title="Het openstaande bedrag van de factuur"' : ""}${beoordelen ? "" : " disabled"}>
         ${splits.length > 2 && beoordelen ? `<button type="button" class="knop stil bk-s-weg" title="Deze toewijzing weghalen">✕</button>` : ""}
+        ${opRelatie ? `<div class="fa-uitleg" style="flex-basis:100%; color:var(--oranje)">↑ ${escapeHtml(s.code)} is de ${/crediteur|payable/i.test(nm) ? "crediteuren" : "debiteuren"}rekening — kies links <b>${/crediteur|payable/i.test(nm) ? "Leverancier" : "Klant"}</b>, dan kun je de ${/crediteur|payable/i.test(nm) ? "leverancier" : "klant"} (nummer of naam) en de factuur kiezen.</div>` : ""}
       </div>`; }).join("") +
       `<div style="margin-top:4px; font-size:13px">${beoordelen ? `<button type="button" class="knop stil" id="bk-s-erbij">＋ toewijzing</button> ` : ""}<span id="bk-s-som"></span></div>
        <div class="fa-uitleg" style="margin-top:4px">Een factuur gaat altijd voor het hele openstaande bedrag. Zonder factuur kan één keer, en Shai zet die als laatste.</div>`;
@@ -6144,7 +6188,7 @@ function bkDetailRij(r) {
     const erbij = vak.querySelector("#bk-s-erbij");
     if (erbij) erbij.addEventListener("click", (e) => { e.stopPropagation(); kiesSplits();
       const rest = rond(absBedrag - splits.reduce((t, s) => t + (Number(s.bedrag) || 0), 0));
-      splits.push({ soort: (splits[splits.length - 1] || {}).soort || "grootboek", code: "", factuur: "", bedrag: rest > 0 ? rest : 0 }); tekenSplits(); });
+      splits.push({ soort: kant, code: "", factuur: "", bedrag: rest > 0 ? rest : 0 }); tekenSplits(); });   // nieuwe rij: Klant/Leverancier (15 okt)
   }
   tekenSplits();
   tr.querySelectorAll('input[name="bk-keuze"]').forEach(x => x.addEventListener("change", () => {

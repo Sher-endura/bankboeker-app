@@ -243,9 +243,10 @@
   .kb-voorbeeld { font-size: 13px; margin: 4px 0 2px; }
   /* Factuur van een andere klant (15 okt) */
   .bk-andere { margin-top: 6px; }
-  .bk-deel-bedragen { margin-top: 6px; font-size: 13px; }
-  .bk-deel-rij { margin: 3px 0; }
-  .bk-deel-bedrag { width: 110px; text-align: right; padding: 2px 6px; }
+  .bk-deel-bedragen { margin-top: 4px; font-size: 13px; border-collapse: collapse; width: auto; }
+  .bk-deel-bedragen td { padding: 2px 8px 2px 0; border: none; vertical-align: middle; }
+  input.bk-deel-bedrag { width: 110px !important; max-width: 110px; display: inline-block; text-align: right; padding: 2px 6px; }
+  .bk-fgrid label.bk-f-ander { font-style: italic; }
   .bk-deel-stand { margin-top: 4px; }
   .bk-andere-zoek { width: 100%; max-width: 560px; }
   .bk-andere-lijst { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; max-width: 760px; }
@@ -5939,7 +5940,10 @@ function bkDetailRij(r) {
   // 1000 600 afletteren op de 1e inv en die 400 aanbetalen op de 2e").
   const deelVerdeling = (facturen) => {
     let over = absBedrag;   // zonder teken: ook voor betalingen aan een leverancier
-    const volg = [...facturen].sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+    // Eén klant: oudste eerst (Shereen 13 okt). Facturen van meer klanten (15 okt, 0348/0330): kleinste eerst helemaal,
+    // het restant op de grootste.
+    const meer = new Set(facturen.map(o => o.relatie)).size > 1;
+    const volg = [...facturen].sort((a, b) => meer ? a.open - b.open : String(a.datum).localeCompare(String(b.datum)));
     // Zelf gekozen "restant open laten op" (15 okt) gaat als laatste; die krijgt wat er over is.
     const sl = (o) => o.code + "|" + o.nummer;
     // Zelf ingevulde bedragen: die gelden; de deelbetaling (bedrag < open) als laatste, zoals Shai het in Twinfield doet.
@@ -6008,16 +6012,21 @@ function bkDetailRij(r) {
       const delen = deelVerdeling(gekozenFacturen());
       const leeg = delen.filter(({ b }) => b < 0.005), betaald = delen.filter(({ b }) => b >= 0.005);
       const open = betaald.filter(({ o, b }) => o.open - b > 0.004);
-      el.innerHTML = `Betaling <b>${faBedrag(absBedrag)}</b> op ` + (betaald.length === 1 ? `factuur ${naam(betaald[0].o)}`
+      // Bedragvakken alleen bij facturen van meer klanten (Shereen 15 okt: anders stond alles er twee keer).
+      const meerKlanten = new Set(delen.map(x => x.o.relatie)).size > 1;
+      el.innerHTML = (meerKlanten && beoordelen ? `Betaling <b>${faBedrag(absBedrag)}</b> verdelen over de facturen:`
+        : `Betaling <b>${faBedrag(absBedrag)}</b> op ` + (betaald.length === 1 ? `factuur ${naam(betaald[0].o)}`
           : betaald.map(({ o, b }) => `${naam(o)} <b>${faBedrag(b)}</b>${o.open - b > 0.004 ? "" : " (helemaal betaald)"}`).join(" · ")) +
-        open.map(({ o, b }) => `<br>Restant open op ${naam(o)} na boeken: <b>${faBedrag(Math.round((o.open - b) * 100) / 100)}</b>`).join("") +
-        (beoordelen ? `<div class="bk-deel-bedragen">Bedrag per factuur (pas aan wat je afboekt):` + delen.map(({ o, b }) =>
-          `<div class="bk-deel-rij">${naam(o)}${o.relatienaam ? ` · <i>${escapeHtml(o.relatienaam)}</i>` : ""} · open ${faBedrag(o.open)} · afboeken <input type="text" class="bk-deel-bedrag" inputmode="decimal" data-k="${escapeHtml(o.code + "|" + o.nummer)}" value="${faBedrag(b)}"></div>`).join("") +
+        open.map(({ o, b }) => `<br>Restant open op ${naam(o)} na boeken: <b>${faBedrag(Math.round((o.open - b) * 100) / 100)}</b>`).join("")) +
+        (meerKlanten && beoordelen ? `<table class="bk-deel-bedragen">` + delen.map(({ o, b }) =>
+          `<tr><td><input type="text" class="bk-deel-bedrag" inputmode="decimal" data-k="${escapeHtml(o.code + "|" + o.nummer)}" value="${faBedrag(b)}"></td>` +
+          `<td>op ${naam(o)} · <i>${escapeHtml(o.relatie)} ${escapeHtml(o.relatienaam || "")}</i> · open ${faBedrag(o.open)}` +
+          (b > 0.004 && o.open - b > 0.004 ? ` → restant open na boeken <b>${faBedrag(Math.round((o.open - b) * 100) / 100)}</b>` : b > 0.004 ? " → helemaal betaald" : "") + `</td></tr>`).join("") + `</table>` +
           (() => { const som = Math.round(delen.reduce((t, x) => t + x.b, 0) * 100) / 100, verschilB = Math.round((absBedrag - som) * 100) / 100,
               deel = delen.filter(x => x.b < x.o.open - 0.004).length;
             return `<div class="bk-deel-stand">` + (Math.abs(verschilB) > 0.004 ? `<span style="color:var(--rood)">Verdeeld ${faBedrag(som)} van ${faBedrag(absBedrag)} — ${verschilB > 0 ? "nog " + faBedrag(verschilB) + " te verdelen (voeg een factuur toe of pas een bedrag aan)" : faBedrag(-verschilB) + " te veel"}</span>`
               : deel > 1 ? `<span style="color:var(--rood)">Maar één factuur kan een deelbetaling krijgen (Twinfield) — de andere helemaal afboeken.</span>`
-              : `<span style="color:var(--groen)">Verdeeld ${faBedrag(som)} van ${faBedrag(absBedrag)} — past precies ✓</span>`) + `</div>`; })() + `</div>` : "") +
+              : `<span style="color:var(--groen)">Verdeeld ${faBedrag(som)} van ${faBedrag(absBedrag)} — past precies ✓</span>`) + `</div>`; })() : "") +
         (leeg.length ? `<br>${leeg.map(({ o }) => naam(o)).join(", ")}: daar blijft niets voor over — haal het vinkje weg` : "");
     }
     verschilRek();
@@ -6067,7 +6076,7 @@ function bkDetailRij(r) {
     // Veel open facturen (Shereen 12 okt, Miniño): in 5 kolommen over het scherm + zoeken op nummer, datum of bedrag.
     // Zoeken verbergt alleen; wat aangevinkt is telt mee, ook als het buiten de zoekopdracht valt.
     vak.innerHTML = lijst.length ? (lijst.length > 5 ? `<input type="search" class="bk-fzoek" placeholder="🔍 Zoek factuur: nummer, datum of bedrag (${lijst.length} open)" autocomplete="off">` : "") +
-      `<div class="bk-fgrid">` + lijst.map(o => `<label data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${aan(o) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b>${o.relatie !== rel ? ` · <i>${escapeHtml(o.relatie)} ${escapeHtml(o.relatienaam || "")}</i>` : ""}</label>`).join("") + `</div>` + andereHtml
+      `<div class="bk-fgrid">` + lijst.map(o => `<label${o.relatie !== rel ? ` class="bk-f-ander" title="Factuur van ${escapeHtml(o.relatie)} ${escapeHtml(o.relatienaam || "")}"` : ""} data-zoek="${escapeHtml([o.factuur, o.code, o.nummer, datumNlKort(o.datum), o.datum, faBedrag(o.open), o.open.toFixed(2), o.open.toFixed(2).replace(".", ",")].join(" ").toLowerCase())}"><input type="checkbox" class="bk-fvink" value="${escapeHtml(o.code + "|" + o.nummer)}"${aan(o) ? " checked" : ""}${beoordelen ? "" : " disabled"}> ${escapeHtml(o.factuur || o.code + " " + o.nummer)} · ${escapeHtml(datumNlKort(o.datum))} · open <b>${faBedrag(o.open)}</b></label>`).join("") + `</div>` + andereHtml
       : `Deze ${K.relatie} heeft geen ${K.facturen} — het hele bedrag komt open op de ${kant}, zonder factuur.` + andereHtml;
     aanErbij.clear();
     const zf = tr.querySelector("#bk-zonder-factuur");

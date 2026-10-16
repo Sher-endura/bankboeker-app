@@ -89,6 +89,8 @@
   #tabel-vp tr.vp-regels table { font-size: 12px; background: #fff; border: 1px solid var(--rand); }
   .vp-stand { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
   .vp-stand.klaar { background: #e3eefa; color: var(--blauw-d); }
+  /* Goedgekeurd vraagposten (Shereen 16 okt): kolom "Boeken op" zacht blauw — dát is wat Shai echt boekt. */
+  .vpb-boeken { background: #e8f1fb; }
   .vp-stand.verstuurd { background: #e5f5ec; color: #14653a; }
   .vp-stand.geen { background: #eef0f2; color: var(--tekst); }
   .vp-stand.let-op { background: #fdf0dc; color: #7a4a00; }
@@ -1030,7 +1032,7 @@
       <div id="vpb-lijsten"></div>
       <div style="overflow-x:auto; margin-bottom:14px">
         <table id="tabel-vpb">
-          <thead><tr><th class="fa-vink"><input type="checkbox" id="vpb-alles" title="Alles in deze lijst aanvinken"></th><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th>Boeken op</th><th></th></tr></thead>
+          <thead><tr><th class="fa-vink"><input type="checkbox" id="vpb-alles" title="Alles in deze lijst aanvinken"></th><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th class="vpb-boeken">Boeken op</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -7629,7 +7631,7 @@ function vpbTeken(bewaren = true) {
       <td>${escapeHtml(a.omschrijving || "")}</td>
       <td class="num">${vpBedragHtml(a.bedrag)}</td>
       <td style="min-width:170px"><b>${escapeHtml(a.antwoord)}</b>${a.opmerking ? `<div class="vp-uitleg" style="margin:2px 0 0">Endura: ${escapeHtml(a.opmerking)}</div>` : ""}</td>
-      <td style="min-width:280px">${bewerkbaar
+      <td class="vpb-boeken" style="min-width:280px">${bewerkbaar
         ? `<input type="text" list="vpb-dl-${escapeHtml(a.administratie)}" ${d} data-vpb-veld="rekening" value="${escapeHtml(rekTekst)}" placeholder="rekening — typ nummer of naam" autocomplete="off">
            <input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie (alleen bij debiteur/crediteur)" style="margin-top:4px" autocomplete="off">
            <input type="text" ${d} data-vpb-veld="omschrijving" value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px" autocomplete="off">

@@ -96,7 +96,7 @@
   .vp-stand.let-op { background: #fdf0dc; color: #7a4a00; }
   .vp-bedrag-min { color: var(--rood); }
   #tab-bank:not(.vp-zichtbaar) #bk-vp { display: none; }
-  #tab-bank.vp-modus #bk-bulk, #tab-bank.vp-modus #melding-bank, #tab-bank.vp-modus #bk-scroll, #tab-bank.vp-modus #bk-substatus,
+  #tab-bank.vp-modus #bk-bulk, #tab-bank.vp-modus #melding-bank, #tab-bank.vp-modus #tabel-bank, #tab-bank.vp-modus #bk-woot, #tab-bank.vp-modus #bk-substatus,
   #tab-bank.vp-modus #bk-substatus-info, #tab-bank.vp-modus #bk-richting-filter, #tab-bank.vp-modus #bk-zekerheid { display: none !important; }
   #tab-bank.vp-werk #bk-woot { display: none !important; }
   .vpb-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent;
@@ -1015,28 +1015,6 @@
       <button class="knop stil" id="btn-bk-ververs" style="padding:6px 12px" title="Haalt de lijst opnieuw op: wat Shai of een collega intussen deed (goedgekeurd, toegewezen, geboekt). Nieuwe bankregels uit Twinfield ophalen doet ▶ Shai nu laten draaien.">↻ Verversen</button>
     </div>
     <div class="status-tabjes" id="bk-tabjes"></div>
-    <!-- Vraagposten (Shereen 15 okt laat): "alles in Te beoordelen; goedgekeurd gaat naar het tabje Goedgekeurd
-         vraagposten; Shai pakt het op uit die twee tabjes". Dit blok staat in Te beoordelen en Overgeslagen boven de
-         bankregels (als er vraagposten zijn) en vult het tabje Goedgekeurd vraagposten (dan maakt de banklijst plaats). -->
-    <div id="bk-vp">
-      <h3 id="vpb-kop" style="margin:6px 0 2px"></h3>
-      <div id="melding-vpb"></div>
-      <!-- Vinkjes + acties voor meer regels tegelijk (Shereen 15 okt: "je moet de regels kunnen selecteren om goed te keuren
-           of een andere actie te gebruiken") — zelfde opzet als de bulkbalk van de bankregels. -->
-      <div class="fa-bulk" id="vpb-bulk" style="display:none; margin:0 0 8px">
-        <button class="knop" id="btn-vpb-goed">✓ Aangevinkte goedkeuren</button>
-        <button class="knop stil" id="btn-vpb-over">Aangevinkte overslaan</button>
-        <button class="knop stil" id="btn-vpb-terug">↶ Aangevinkte terug naar te beoordelen</button>
-        <span id="vpb-bulk-tekst"></span>
-      </div>
-      <div id="vpb-lijsten"></div>
-      <div style="overflow-x:auto; margin-bottom:14px">
-        <table id="tabel-vpb">
-          <thead><tr><th class="fa-vink"><input type="checkbox" id="vpb-alles" title="Alles in deze lijst aanvinken"></th><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th class="vpb-boeken">Boeken op</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
       <button class="knop stil" id="btn-bk-vraagposten" title="Keurt de aangevinkte regels goed op de vraagpostenrekening van die klant (uit het klantprofiel, anders herkend aan de naam: Vraagposten / Ask the accountant / Uit te zoeken posten); Shai wijst ze daarna toe en boekt ze (concept).">→ Aangevinkte naar Vraagposten</button>
@@ -1045,6 +1023,28 @@
     <div id="melding-bank"></div>
     <!-- Alleen de regels scrollen; alles hierboven en de kolomkoppen blijven staan (Shereen 11 okt). -->
     <div class="bk-scroll" id="bk-scroll">
+      <!-- Vraagposten (Shereen 15 okt laat; 16 okt: in hetzelfde scrollvak als de bankregels, één lijst om door te scrollen): "alles in Te beoordelen; goedgekeurd gaat naar het tabje Goedgekeurd
+           vraagposten; Shai pakt het op uit die twee tabjes". Dit blok staat in Te beoordelen en Overgeslagen boven de
+           bankregels (als er vraagposten zijn) en vult het tabje Goedgekeurd vraagposten (dan maakt de banklijst plaats). -->
+      <div id="bk-vp">
+        <h3 id="vpb-kop" style="margin:6px 0 2px"></h3>
+        <div id="melding-vpb"></div>
+        <!-- Vinkjes + acties voor meer regels tegelijk (Shereen 15 okt: "je moet de regels kunnen selecteren om goed te keuren
+             of een andere actie te gebruiken") — zelfde opzet als de bulkbalk van de bankregels. -->
+        <div class="fa-bulk" id="vpb-bulk" style="display:none; margin:0 0 8px; position:sticky; top:0; z-index:6; background:#fff">
+          <button class="knop" id="btn-vpb-goed">✓ Aangevinkte goedkeuren</button>
+          <button class="knop stil" id="btn-vpb-over">Aangevinkte overslaan</button>
+          <button class="knop stil" id="btn-vpb-terug">↶ Aangevinkte terug naar te beoordelen</button>
+          <span id="vpb-bulk-tekst"></span>
+        </div>
+        <div id="vpb-lijsten"></div>
+        <div style="overflow-x:auto; margin-bottom:14px">
+          <table id="tabel-vpb">
+            <thead><tr><th class="fa-vink"><input type="checkbox" id="vpb-alles" title="Alles in deze lijst aanvinken"></th><th>Datum</th><th>Boekstuk</th><th>Bank</th><th class="num">Bedrag</th><th>Antwoord klant</th><th class="vpb-boeken">Boeken op</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
       <table id="tabel-bank">
         <thead><tr><th class="fa-vink"><input type="checkbox" id="bk-vink-alles" title="Alles in deze lijst aanvinken — voorstel én voorleggen. Kies een status in &quot;Alle statussen&quot; om alleen die aan te vinken."></th><th>Status</th><th>Klant</th><th>Datum</th><th title="De omschrijving zoals de bank hem aanlevert">RAW bankomschrijving</th><th title="De omschrijving zoals Shai hem in Twinfield zet — pas hem aan in het uitklapvak">REFINED bankomschrijving</th><th class="num">Bedrag</th><th>Voorstel</th><th id="bk-sorteer-zekerheid" class="fa-sorteer" title="Klik om te sorteren: hoog → laag, nog eens: laag → hoog, nog eens: gewone volgorde (per afschrift)">Zekerheid <span id="bk-sorteer-pijl">⇅</span></th><th class="bk-klap" id="bk-klap" colspan="2" title="Klik om Bron en Uitleg open of dicht te klappen"></th></tr></thead>
         <tbody></tbody>
@@ -7365,6 +7365,7 @@ const vwMailFunctie = (body) => vwRoep(`${CFG.SUPABASE_URL}/functions/v1/basecon
    JWT-controle daar aan blijft) en jouw Shai Booking-inlog in x-shai-token; die controleert hij zelf. */
 const EBOARD_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3c3d0YXJseXlnaWF5anJ6ZWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1MDk2MjUsImV4cCI6MjA5OTA4NTYyNX0.9y2PtOJFoJk2kfPSZvPu1Jr8FZ0wbbeWh1ajwwCJMTA";   // openbare sleutel (staat ook in de E-Board-app)
 let vpData = null, vpVink = new Set(), vpOpen = new Set(), vpBezig = false;
+const vpTerugVink = new Set();   // "lijst-id|regelnummer": regels die terug moeten naar Te beoordelen
 async function vpRoep(body) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) throw new Error("Niet ingelogd.");
@@ -7401,7 +7402,33 @@ async function laadVraagposten() {
   vpVulMaanden(vpData.perioden || [], vpData.periode);
   const klaar = new Set(vpData.klanten.filter(k => k.stand === "klaar").map(k => k.id));
   vpVink = new Set([...vpVink].filter(id => klaar.has(id)));
+  vpTerugVink.clear();   // regelnummers kunnen verschoven zijn
   vpTeken();
+}
+/** Aangevinkte regels van één lijst terug naar Te beoordelen (Shereen 16 okt: "alsof het bij bankboeken per ongeluk
+ *  naar vraagposten is gegaan"). E-Board haalt ze uit de lijst (Excel opnieuw) en zet ze als vraagpost zonder
+ *  klantantwoord in Te beoordelen — geboekt worden ze als vraagpost, nooit als bankregel. */
+async function vpTerugsturen(id) {
+  const r = vpData?.klanten.find(k => k.id === id);
+  if (!r || vpBezig) return;
+  const regels = r.regels.filter((x, i) => vpTerugVink.has(`${id}|${i}`)).map(x => ({ dagboek: x.dagboek, nummer: x.nummer, bedrag: x.bedrag }));
+  if (!regels.length) return;
+  const rest = r.regels.length - regels.length;
+  if (!confirm(`${regels.length === 1 ? "Deze regel" : `Deze ${regels.length} regels`} van ${r.klant} terug naar Te beoordelen?\n\n` +
+    (rest ? `Shai maakt de vraagpostenlijst opnieuw met de overige ${rest} ${rest === 1 ? "regel" : "regels"}.` : "Er blijft niets over: de lijst gaat van de kaart en het punt blijft NVT."))) return;
+  vpBezig = true; vpTeken();
+  let melding;
+  try {
+    const u = await vpRoep({ actie: "terugsturen", id, regels });
+    melding = ["ok", `${u.teruggestuurd} naar Te beoordelen gestuurd (Twinfield Bank).` +
+      (u.over ? ` De lijst is opnieuw gemaakt met ${u.over} ${u.over === 1 ? "regel" : "regels"}.` : " Er zijn geen vraagposten meer voor deze klant.") +
+      (u.vervallen ? ` ${u.vervallen} ${u.vervallen === 1 ? "regel stond" : "regels stonden"} niet meer open op 2999 en ${u.vervallen === 1 ? "is" : "zijn"} vervallen.` : "") +
+      (u.let_op ? ` Let op: ${escapeHtml(u.let_op)}.` : "")];
+  } catch (e) { melding = ["fout", "Terugsturen mislukt: " + escapeHtml(e.message)]; }
+  vpBezig = false;
+  await laadVraagposten();
+  toonMelding("melding-vp", melding[0], melding[1]);
+  laadVpBeoordelen();   // tellingen in Twinfield Bank bijwerken
 }
 const VP_STAND_KLASSE = { klaar: "klaar", verstuurd: "verstuurd", geen: "geen", nog_niet: "geen" };
 function vpTeken() {
@@ -7430,11 +7457,17 @@ function vpTeken() {
       <td>${stand}${vpAntwKnop(r)}</td>
       <td>${r.stand === "klaar" ? `<button class="knop vp-stuur" data-id="${r.id}" style="padding:5px 12px; white-space:nowrap">In aanleverlijst</button>` : ""}</td>
     </tr>`;
+    // Terug naar Te beoordelen (Shereen 16 okt): alleen zolang de lijst nog niet in de aanleverlijst staat.
+    const terug = r.stand === "klaar", nTerug = terug ? r.regels.filter((x, i) => vpTerugVink.has(`${r.id}|${i}`)).length : 0;
     const regels = open ? `<tr class="vp-regels"><td colspan="7">
       <div class="vp-uitleg" style="margin:0 0 6px">${escapeHtml(r.bestandsnaam || "")}</div>
-      <table><thead><tr><th>Boekdatum</th><th>Dagboek</th><th>Periode</th><th>Omschrijving</th><th class="num">Bedrag</th></tr></thead><tbody>
-      ${r.regels.map(x => `<tr><td>${escapeHtml(vpDatum(x.datum))}</td><td>${escapeHtml(x.dagboek || "")}</td><td>${escapeHtml(x.periode || "")}</td><td>${escapeHtml(x.omschrijving || "")}</td><td class="num">${vpBedragHtml(x.bedrag)}</td></tr>`).join("")}
-      </tbody></table></td></tr>` : "";
+      <table><thead><tr>${terug ? `<th class="fa-vink"></th>` : ""}<th>Boekdatum</th><th>Dagboek</th><th>Periode</th><th>Omschrijving</th><th class="num">Bedrag</th></tr></thead><tbody>
+      ${r.regels.map((x, i) => `<tr>${terug ? `<td class="fa-vink"><input type="checkbox" class="vp-terug-vink" data-sleutel="${r.id}|${i}"${vpTerugVink.has(`${r.id}|${i}`) ? " checked" : ""}${vpBezig ? " disabled" : ""}></td>` : ""}<td>${escapeHtml(vpDatum(x.datum))}</td><td>${escapeHtml(x.dagboek || "")} ${escapeHtml(x.nummer || "")}</td><td>${escapeHtml(x.periode || "")}</td><td>${escapeHtml(x.omschrijving || "")}</td><td class="num">${vpBedragHtml(x.bedrag)}</td></tr>`).join("")}
+      </tbody></table>
+      ${terug ? `<div style="margin-top:8px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+        <button class="knop stil vp-terug" data-id="${r.id}" style="padding:5px 12px"${nTerug && !vpBezig ? "" : " disabled"}>↩ Aangevinkte terug naar Te beoordelen${nTerug ? ` (${nTerug})` : ""}</button>
+        <span class="vp-uitleg" style="margin:0; font-size:12px">Weten we het zelf? Dan gaat de regel uit deze lijst en naar Twinfield Bank → Te beoordelen; daar kies je de rekening. Shai boekt hem daarna als vraagpost in de oorspronkelijke boeking.</span>
+      </div>` : ""}</td></tr>` : "";
     return rij + regels;
   }).join("");
   const klaar = k.filter(x => x.stand === "klaar");
@@ -7473,6 +7506,10 @@ document.getElementById("vp-alles").addEventListener("change", (e) => {
 document.querySelector("#tabel-vp tbody").addEventListener("click", async (e) => {
   const vink = e.target.closest(".vp-vinkje");
   if (vink) { vink.checked ? vpVink.add(vink.dataset.id) : vpVink.delete(vink.dataset.id); vpTeken(); return; }
+  const terugVink = e.target.closest(".vp-terug-vink");
+  if (terugVink) { terugVink.checked ? vpTerugVink.add(terugVink.dataset.sleutel) : vpTerugVink.delete(terugVink.dataset.sleutel); vpTeken(); return; }
+  const terug = e.target.closest(".vp-terug");
+  if (terug) { vpTerugsturen(terug.dataset.id); return; }
   const stuur = e.target.closest(".vp-stuur");
   if (stuur) { vpVersturen([stuur.dataset.id]); return; }
   const bekijk = e.target.closest(".vp-bekijk");
@@ -7630,7 +7667,8 @@ function vpbTeken(bewaren = true) {
       <td style="white-space:nowrap">${escapeHtml(a.dagboek)} ${escapeHtml(a.boekstuk || "")}</td>
       <td>${escapeHtml(a.omschrijving || "")}</td>
       <td class="num">${vpBedragHtml(a.bedrag)}</td>
-      <td style="min-width:170px"><b>${escapeHtml(a.antwoord)}</b>${a.opmerking ? `<div class="vp-uitleg" style="margin:2px 0 0">Endura: ${escapeHtml(a.opmerking)}</div>` : ""}</td>
+      <td style="min-width:170px">${a.antwoord ? `<b>${escapeHtml(a.antwoord)}</b>${a.opmerking ? `<div class="vp-uitleg" style="margin:2px 0 0">Endura: ${escapeHtml(a.opmerking)}</div>` : ""}`
+        : `<i>↩ Teruggestuurd door Endura</i><div class="vp-uitleg" style="margin:2px 0 0; font-size:12px" title="${escapeHtml(a.opmerking || "")}">geen klantantwoord — kies zelf de rekening</div>`}</td>
       <td class="vpb-boeken" style="min-width:280px">${bewerkbaar
         ? `<input type="text" list="vpb-dl-${escapeHtml(a.administratie)}" ${d} data-vpb-veld="rekening" value="${escapeHtml(rekTekst)}" placeholder="rekening — typ nummer of naam" autocomplete="off">
            <input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie (alleen bij debiteur/crediteur)" style="margin-top:4px" autocomplete="off">
@@ -7695,7 +7733,7 @@ function vpbKeuzeUit(a) {
   const veld = (n) => (document.querySelector(`[data-vpb-id="${a.id}"][data-vpb-veld="${n}"]`)?.value || "").trim();
   const code = veld("rekening").split(/\s+/)[0] || "";
   if (!(vpbSchemas.get(a.administratie) || []).some(s => s.code === code)) return null;
-  return { rekening: code, relatie: veld("relatie") || null, omschrijving: (veld("omschrijving") || a.antwoord).slice(0, 40) };
+  return { rekening: code, relatie: veld("relatie") || null, omschrijving: (veld("omschrijving") || a.antwoord || a.omschrijving || "").slice(0, 40) };
 }
 /** Goedkeuren / overslaan / terug voor één of meer regels; laadicoon zolang het opslaan duurt. */
 async function vpbVerwerk(actie, ids) {

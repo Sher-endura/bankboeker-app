@@ -151,6 +151,16 @@
   .vw-mail label.vw-ontvanger { display: block; font-weight: normal; margin: 2px 0; }
   #vw-groot { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: none; align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; }
   #vw-groot img { max-width: 92vw; max-height: 92vh; background: #fff; }
+  /* "Er is een nieuwe versie beschikbaar" (Shereen 16 okt, zoals in E-Board) — zie versieMelder(). */
+  #versie-melding { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 250; width: calc(100% - 32px); max-width: 460px;
+    display: flex; align-items: center; gap: 12px; background: var(--blauw-d); color: #fff; border-radius: 12px; padding: 12px 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.3); font-size: 14px; }
+  #versie-melding[hidden] { display: none; }
+  #versie-melding .vm-tekst { flex: 1; min-width: 0; }
+  #versie-melding .vm-tekst b { display: block; }
+  #versie-melding .vm-tekst span { display: block; font-size: 12px; margin-top: 2px; color: #f1f5f9; }
+  #versie-melding .vm-herlaad { flex-shrink: 0; border: 0; border-radius: 8px; padding: 7px 12px; background: var(--zalm); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; }
+  #versie-melding .vm-later { flex-shrink: 0; border: 0; background: none; color: #fff; font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 4px; }
   .fa-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
   /* Gesplitst scherm zoals in Basecone: lijst links, document rechts, scheiding versleepbaar */
   main.breed { max-width: none; }
@@ -1171,6 +1181,12 @@
     </form>
     <div id="melding-wachtwoord"></div>
   </div>
+</div>
+
+<div id="versie-melding" role="status" hidden>
+  <div class="vm-tekst"><b>Er is een nieuwe versie beschikbaar</b><span>Herlaad even, dan werk je met de laatste versie.</span></div>
+  <button class="vm-herlaad" type="button">Herladen</button>
+  <button class="vm-later" type="button" title="Later" aria-label="Later">×</button>
 </div>
 
 <script src="config.js"></script>
@@ -8130,6 +8146,39 @@ document.getElementById("wachtwoord-form").addEventListener("submit", async (e) 
   }
   location.reload();
 });
+
+/* "Er is een nieuwe versie beschikbaar" (Shereen 16 okt, zoals de VersieMelder van E-Board). Een tabblad dat de hele
+   dag openstaat houdt de oude app vast; alleen herladen haalt de nieuwe binnen. Elke 5 minuten, en zodra het tabblad
+   weer in beeld komt, kijken of index.html online veranderd is (GitHub Pages: ETag/Last-Modified; zonder die
+   kopregels, zoals op serve.js, de inhoud zelf). Nooit vanzelf herladen: wie midden in iets zit, kiest zelf. */
+(function versieMelder() {
+  const el = document.getElementById("versie-melding");
+  const adres = location.pathname.replace(/[^/]*$/, "") + "index.html";
+  let begin = null, nieuw = null, weggeklikt = null, laatste = 0;
+  async function vingerafdruk() {
+    const kop = await fetch(adres + "?v=" + Date.now(), { method: "HEAD", cache: "no-store" });
+    if (!kop.ok) return null;
+    const label = kop.headers.get("etag") || kop.headers.get("last-modified");
+    if (label) return label;
+    const res = await fetch(adres + "?v=" + Date.now(), { cache: "no-store" });
+    return res.ok ? await res.text() : null;
+  }
+  async function controleer() {
+    if (location.protocol === "file:" || Date.now() - laatste < 60 * 1000) return;   // hooguit eens per minuut
+    laatste = Date.now();
+    try {
+      const nu = await vingerafdruk();
+      if (!nu) return;
+      if (begin === null) { begin = nu; return; }
+      if (nu !== begin) { nieuw = nu; el.hidden = weggeklikt === nieuw; }
+    } catch (e) { /* geen net: volgende ronde opnieuw */ }
+  }
+  el.querySelector(".vm-herlaad").addEventListener("click", () => location.reload());
+  el.querySelector(".vm-later").addEventListener("click", () => { weggeklikt = nieuw; el.hidden = true; });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") controleer(); });
+  setInterval(controleer, 5 * 60 * 1000);
+  controleer();
+})();
 
 (async function init() {
   document.getElementById("voet-modus").textContent = CLOUD

@@ -863,6 +863,7 @@
     <div class="status-tabjes" id="fa-tabjes"></div>
     <div class="fa-bulk" id="fa-bulk" style="display:none">
       <button class="knop" id="btn-fa-bulk-goedkeuren">✓ Aangevinkte goedkeuren</button>
+      <button class="knop stil" id="btn-fa-bulk-overslaan">Aangevinkte overslaan</button>
       <span id="fa-bulk-tekst"></span>
     </div>
     <div id="melding-facturen"></div>
@@ -1028,6 +1029,7 @@
     <div class="fa-bulk" id="bk-bulk" style="display:none">
       <button class="knop" id="btn-bk-bulk">✓ Aangevinkte goedkeuren</button>
       <button class="knop stil" id="btn-bk-vraagposten" title="Keurt de aangevinkte regels goed op de vraagpostenrekening van die klant (uit het klantprofiel, anders herkend aan de naam: Vraagposten / Ask the accountant / Uit te zoeken posten); Shai wijst ze daarna toe en boekt ze (concept).">→ Aangevinkte naar Vraagposten</button>
+      <button class="knop stil" id="btn-bk-bulk-overslaan">Aangevinkte overslaan</button>
       <span id="bk-bulk-tekst"></span>
     </div>
     <div id="melding-bank"></div>
@@ -4495,7 +4497,7 @@ function vernieuwFaTabel() {
     const tr = document.createElement("tr");
     if (faGekozen && faGekozen.id === d.id) tr.classList.add("gekozen");
     tr.title = `${d.bestandsnaam || d.id} · ${d.office}`;
-    const kanVink = FA_BEOORDELEN.includes(d.status);
+    const kanVink = FA_VINK.includes(d.status);
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="fa-vink-rij"${faVink.has(d.id) ? " checked" : ""}>` : ""}</td><td>${statusLabel(d.status, "shai")}</td>
       <td style="font-size:13px"><b>${escapeHtml(v.crediteur || "")}</b> ${escapeHtml(faCrdNamen[`${d.office}|${v.crediteur}`] || (d.nieuwe_crediteur && (v.crediteur === "NIEUW" || v.crediteur === d.nieuwe_crediteur.code) ? d.nieuwe_crediteur.naam + " (nieuw)" : ""))}</td>
       <td style="font-size:13px">${[...new Set((v.regels || []).map(r => r.grootboek))]
@@ -4560,10 +4562,12 @@ function faSorteerZekerheid() {
   vernieuwFaTabel();
 }
 // Alles aanvinken pakt ook "voorleggen" (Shereen 13 okt, zelfde als Twinfield Bank).
-const faVinkbaar = () => faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status) && !faIsDicht(d.office));   // ingeklapt = niet mee aanvinken
+// Ook in Goedgekeurd aan te vinken, om in één keer over te slaan (Shereen 16 okt, zelfde als Twinfield Bank).
+const FA_VINK = [...FA_BEOORDELEN, "goedgekeurd", "ingevuld"];
+const faVinkbaar = () => faZichtbaar().filter(d => FA_VINK.includes(d.status) && !faIsDicht(d.office));   // ingeklapt = niet mee aanvinken
 function faBulkStand() {
   // Alleen wat je ziet blijft aangevinkt (12 okt, zelfde als Twinfield Bank).
-  const zicht = new Set(faZichtbaar().filter(d => FA_BEOORDELEN.includes(d.status)).map(d => d.id));
+  const zicht = new Set(faZichtbaar().filter(d => FA_VINK.includes(d.status)).map(d => d.id));
   for (const id of [...faVink]) if (!zicht.has(id)) faVink.delete(id);
   const voorstellen = faVinkbaar();
   const alles = document.getElementById("fa-vink-alles");
@@ -4572,7 +4576,11 @@ function faBulkStand() {
   alles.indeterminate = faVink.size > 0 && !alles.checked;
   document.getElementById("fa-bulk").style.display = faVink.size ? "" : "none";
   const voorleggen = faDocs.filter(d => faVink.has(d.id) && d.status === "voorleggen").length;
-  document.getElementById("fa-bulk-tekst").textContent = `${faVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Shai vult ze daarna in Basecone in en boekt ze door naar Twinfield.`;
+  const goedTabje = faTabje === "goedgekeurd";
+  document.getElementById("btn-fa-bulk-goedkeuren").style.display = goedTabje ? "none" : "";
+  document.getElementById("fa-bulk-tekst").textContent = goedTabje
+    ? `${faVink.size} aangevinkt. Overslaan: Shai vult ze niet in en boekt ze niet.`
+    : `${faVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Goedkeuren: Shai vult ze daarna in Basecone in en boekt ze door naar Twinfield. Overslaan: Shai doet er niets meer mee.`;
   requestAnimationFrame(faHoogte);
 }
 function faVinkAlles() {
@@ -4657,6 +4665,27 @@ async function faBulkGoedkeuren() {
     `${goed} goedgekeurd — Shai vult ze bij zijn volgende ronde in en boekt ze door.` +
     (overgeslagen.length ? `<br>Niet goedgekeurd (open ze en verbeter ze eerst):<br>${overgeslagen.map(escapeHtml).join("<br>")}` : ""));
 }
+/* Aangevinkte overslaan (Shereen 16 okt), vanuit Te beoordelen én Goedgekeurd — zoals Overslaan bij één document.
+   Alleen wat nog op die status staat: wat Shai intussen geboekt heeft, blijft geboekt. */
+async function faBulkOverslaan() {
+  const docs = faDocs.filter(d => faVink.has(d.id) && FA_VINK.includes(d.status));
+  if (!docs.length) return;
+  const knop = document.getElementById("btn-fa-bulk-overslaan"); knop.disabled = true;
+  const wie = gebruiker ? gebruiker.email : null;
+  const { data, error } = await sb.from("basecone_documenten").update({ status: "overgeslagen", updated_by: wie })
+    .in("id", docs.map(d => d.id)).in("status", FA_VINK).select("id, office");
+  knop.disabled = false;
+  if (error) return toonMelding("melding-facturen", "fout", "Overslaan lukte niet: " + escapeHtml(error.message));
+  const klaar = data || [];
+  if (klaar.length) await sb.from("basecone_log").insert(klaar.map(d => ({ document_id: d.id, office: d.office, actie: "overgeslagen", details: { in_een_keer: true }, door: wie })));
+  for (const d of docs) faVink.delete(d.id);
+  await laadFacturen();
+  if (faGekozen && klaar.some(d => d.id === faGekozen.id)) faSluitDetail();
+  const niet = docs.length - klaar.length;
+  toonMelding("melding-facturen", "ok", `${klaar.length} overgeslagen — Shai doet er niets meer mee (terugzetten kan in het tabje Overgeslagen).` +
+    (niet ? ` ${niet} niet: die had Shai intussen al verwerkt of iemand anders veranderd.` : ""));
+}
+document.getElementById("btn-fa-bulk-overslaan").addEventListener("click", faBulkOverslaan);
 async function laadFaStam(office) {
   const { data } = await sb.from("twinfield_stamdata").select("soort, data").eq("office", office);
   faStam = { BAS: [], CRD: [] };
@@ -5980,7 +6009,7 @@ function vernieuwBkTabel() {
     }
     const v = r.goedgekeurd && (r.goedgekeurd.regels || r.goedgekeurd.toewijzingen) ? { ...r.voorstel, ...r.goedgekeurd, regels: bkGoedRegels(r.goedgekeurd) } : r.voorstel || {};
     const z = Number((r.voorstel || {}).zekerheid || 0);
-    const kanVink = BK_BEOORDELEN.includes(r.status);   // ook zonder voorstel: kan naar Vraagposten (Shereen 12 okt)
+    const kanVink = BK_VINK.includes(r.status);   // ook zonder voorstel: kan naar Vraagposten (Shereen 12 okt); Goedgekeurd: overslaan (16 okt)
     const bron = bkHerkomst(r);   // herkomst: alleen in de ⓘ en in de kolom Bron (Shereen 11 okt)
     // "Klant/leverancier toewijzen doet Shai nog niet" stond in oudere voorstellen — klopt niet meer (Shereen 14 okt).
     const uitleg = ((r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "")).replace(/\s*Klant\/leverancier toewijzen doet Shai nog niet — graag zelf in Twinfield\.?/g, "");
@@ -6769,8 +6798,10 @@ async function bkZetStatus(r, status, actie) {
 // GEEN voorstel — dat gaat bij goedkeuren naar Vraagposten (Shereen 13 okt). Niet: een half voorstel (klant zonder
 // factuur, meer facturen) — die moet je openen; en niet wat in Twinfield al toegewezen is.
 const bkGeenVoorstel = (r) => { const v = r.voorstel || {}; return v.soort !== "twinfield" && !(v.regels || []).length; };
-const bkMagVinken = (r) => BK_BEOORDELEN.includes(r.status) && r.twinfield_bak !== "Assigned" && (!!bkStandaardGoedkeuring(r) || bkGeenVoorstel(r));
-const bkVinkbaar = () => bkZichtbaar().filter(bkMagVinken);
+// In Goedgekeurd: alles aan te vinken, om in één keer over te slaan (Shereen 16 okt).
+const BK_VINK = [...BK_BEOORDELEN, "goedgekeurd"];
+const bkMagVinken = (r) => r.status === "goedgekeurd" || (BK_BEOORDELEN.includes(r.status) && r.twinfield_bak !== "Assigned" && (!!bkStandaardGoedkeuring(r) || bkGeenVoorstel(r)));
+const bkVinkbaar = () => bkZichtbaar().filter(r => bkMagVinken(r) && !bkIsDicht(r.office));   // ingeklapt = niet mee aanvinken, zoals Basecone (16 okt)
 function bkBulkStand() {
   // Vinkje per afschrift bijwerken: aan als alles aangevinkt is, half als een deel (12 okt).
   const zichtbaarNu = bkZichtbaar();
@@ -6782,7 +6813,7 @@ function bkBulkStand() {
   });
   // Alleen wat je ziet blijft aangevinkt (Shereen 12 okt: 699 aangevinkt terwijl de zoekopdracht er een paar toonde —
   // goedkeuren zou dan ook de onzichtbare regels raken).
-  const zicht = new Set(bkZichtbaar().filter(r => BK_BEOORDELEN.includes(r.status)).map(r => r.id));
+  const zicht = new Set(bkZichtbaar().filter(r => BK_VINK.includes(r.status)).map(r => r.id));
   for (const id of [...bkVink]) if (!zicht.has(id)) bkVink.delete(id);
   const voorstellen = bkVinkbaar();
   const alles = document.getElementById("bk-vink-alles");
@@ -6792,8 +6823,38 @@ function bkBulkStand() {
   document.getElementById("bk-bulk").style.display = bkVink.size ? "" : "none";
   const voorleggen = bkRegels.filter(r => bkVink.has(r.id) && r.status === "voorleggen").length;
   const zonder = bkRegels.filter(r => bkVink.has(r.id) && !bkStandaardGoedkeuring(r)).length;
-  document.getElementById("bk-bulk-tekst").textContent = `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Goedkeuren: Shai wijst ze toe precies zoals voorgesteld${zonder ? ` (${zonder} zonder voorstel — die gaan naar Vraagposten)` : ""}. Naar Vraagposten: op de vraagpostenrekening van de klant.`;
+  const goedTabje = bkTabje === "goedgekeurd";
+  for (const id of ["btn-bk-bulk", "btn-bk-vraagposten"]) document.getElementById(id).style.display = goedTabje ? "none" : "";
+  document.getElementById("bk-bulk-tekst").textContent = goedTabje
+    ? `${bkVink.size} aangevinkt. Overslaan: Shai wijst ze niet toe in Twinfield.`
+    : `${bkVink.size} aangevinkt${voorleggen ? ` (waarvan ${voorleggen} op voorleggen)` : ""}. Goedkeuren: Shai wijst ze toe precies zoals voorgesteld${zonder ? ` (${zonder} zonder voorstel — die gaan naar Vraagposten)` : ""}. Naar Vraagposten: op de vraagpostenrekening van de klant. Overslaan: Shai doet er niets meer mee.`;
 }
+/* Aangevinkte overslaan (Shereen 16 okt), vanuit Te beoordelen én Goedgekeurd — zoals Overslaan bij één regel
+   (bkZetStatus). Alleen wat nog op die status staat: wat Shai intussen toewees, blijft toegewezen. */
+async function bkBulkOverslaan() {
+  const regels = bkRegels.filter(r => bkVink.has(r.id) && BK_VINK.includes(r.status));
+  if (!regels.length) return;
+  const knop = document.getElementById("btn-bk-bulk-overslaan"); knop.disabled = true;
+  const door = gebruiker ? gebruiker.email : null;
+  const klaar = [];
+  let fout = null;
+  for (let i = 0; i < regels.length; i += 200) {
+    const { data, error } = await sb.from("bank_regels")
+      .update({ status: "overgeslagen", goedgekeurd: null, goedgekeurd_door: null, goedgekeurd_op: null, updated_by: door })
+      .in("id", regels.slice(i, i + 200).map(r => r.id)).in("status", BK_VINK).select("id, office");
+    if (error) { fout = error.message; break; }
+    klaar.push(...(data || []));
+  }
+  knop.disabled = false;
+  if (klaar.length) await sb.from("bank_log").insert(klaar.map(r => ({ regel_id: r.id, office: r.office, actie: "overgeslagen", details: { in_een_keer: true }, door })));
+  for (const r of regels) bkVink.delete(r.id);
+  bkGekozen = null;
+  await laadBank();
+  const niet = regels.length - klaar.length;
+  toonMelding("melding-bank", fout ? "fout" : "ok", `${klaar.length} regel(s) overgeslagen — Shai doet er niets meer mee (terugzetten kan in het tabje Overgeslagen).` +
+    (fout ? " Daarna ging het mis: " + escapeHtml(fout) : niet ? ` ${niet} niet: die had Shai intussen al toegewezen of iemand anders veranderd.` : ""));
+}
+document.getElementById("btn-bk-bulk-overslaan").addEventListener("click", bkBulkOverslaan);
 document.getElementById("bk-vink-alles").addEventListener("change", (e) => {
   for (const r of bkVinkbaar()) e.target.checked ? bkVink.add(r.id) : bkVink.delete(r.id);
   vernieuwBkTabel();

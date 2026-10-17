@@ -231,6 +231,19 @@
   .fa-som.goed { background: #eef8f1; border: 1px solid #b9dcc6; color: var(--groen); }
   .fa-som.fout { background: #fbeaea; border: 1px solid #f3c4c0; color: var(--rood); }
   .fa-waarom summary { cursor: pointer; font-size: 13px; }
+  /* Boeken staat rechts naast de scan (17 okt): elke regel compact onder elkaar — rekening, dan bedrag + omschrijving,
+     dan wat de robot zag — in plaats van vijf kolommen naast elkaar. */
+  #tabel-fa-regels { margin-top: 10px; } #tabel-fa-regels thead { display: none; }
+  #tabel-fa-regels tbody tr { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; grid-template-areas: "gl gl weg" "rb ro ro" "zag zag zag";
+    gap: 4px 8px; padding: 8px 0; border-bottom: 1px solid var(--rand); }
+  #tabel-fa-regels tbody td { padding: 0; border: 0; min-width: 0; }
+  #tabel-fa-regels tbody td:nth-child(1) { grid-area: gl; } #tabel-fa-regels tbody td:nth-child(2) { grid-area: rb; text-align: left; }
+  #tabel-fa-regels tbody td:nth-child(3) { grid-area: ro; } #tabel-fa-regels tbody td:nth-child(4) { grid-area: zag; color: var(--tekst); }
+  #tabel-fa-regels tbody td:nth-child(5) { grid-area: weg; align-self: center; }
+  #tabel-fa-regels tbody td:nth-child(2)::before, #tabel-fa-regels tbody td:nth-child(3)::before { display: block; font-size: 11px; font-weight: 600; color: var(--tekst); margin-bottom: 2px; }
+  #tabel-fa-regels tbody td:nth-child(2)::before { content: "Bedrag"; } #tabel-fa-regels tbody td:nth-child(3)::before { content: "Omschrijving regel"; }
+  #tabel-fa-regels tbody td:nth-child(4):not(:empty)::before { content: "Wat de robot zag: "; font-weight: 600; }
+  #tabel-fa-regels .fa-crd-vak, #tabel-fa-regels .fa-ro, #tabel-fa-regels .fa-rb { min-width: 0 !important; width: 100% !important; }
   #kaart-fa-detail .fa-ai { margin: 2px 0 10px; }
   .fa-knoppen { position: sticky; bottom: -18px; z-index: 2; margin: auto -18px -18px; padding: 10px 18px; background: #fff; border-top: 1px solid var(--rand);
     display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -882,7 +895,7 @@
     <p class="fa-leeg" id="fa-leeg">Klik links op een document om het hier te openen.</p>
     <!-- Rustiger documentvenster (Shereen 15 okt, voorbeeld docs/voorbeeld-rustig-basecone.html): zelfde velden, id's en
          knoppen, alleen anders geordend — kop met status, strook "waarom Shai dit voorlegt" bovenaan, scan naast
-         blokjes 1 en 2, Boeken en Waarom over de hele breedte, knoppenbalk altijd zichtbaar onderaan. -->
+         blokjes 1 en 2 (17 okt: ook Boeken en Waarom rechts naast de scan), knoppenbalk altijd zichtbaar onderaan. -->
     <div id="fa-inhoud" class="fa-doc" style="display:none">
     <div class="fa-doc-kop"><h2 id="fa-titel">Document</h2><span id="fa-status-pil"></span></div>
     <div id="melding-fa-detail"></div>
@@ -925,29 +938,30 @@
           <label><input type="checkbox" id="fa-betaalbatch"> Niet in betaalbatch (al betaald)</label>
         </div>
         </div>
+        <!-- 3 en 4 rechts onder 2, naast de scan (Shereen 17 okt: "in de lege ruimte, dat werkt fijner") -->
+        <div class="fa-blok"><h4>3 · Boeken</h4>
+          <label>Omschrijving * <span id="fa-oms-teller" style="font-weight:400"></span></label>
+          <input type="text" id="fa-omschrijving" maxlength="40">
+          <table id="tabel-fa-regels" style="margin-top:10px">
+            <thead><tr><th>Grootboekrekening</th><th class="num">Bedrag</th><th>Omschrijving regel</th><th>Wat de robot zag</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <datalist id="fa-rekeningen"></datalist>
+          <p style="margin:6px 0 0"><button class="knop stil" id="btn-fa-regel" style="padding:5px 10px; font-size:12px">+ Regel</button></p>
+          <div id="fa-som" class="fa-som"></div>
+        </div>
+        <div class="fa-blok"><details class="fa-waarom"><summary><b>4 · Waarom verbeter je dit?</b> (optioneel — wordt een regel voor de robot)</summary>
+          <div class="rij" style="margin-top:8px">
+            <div style="flex:2"><input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris"></div>
+            <div><select id="fa-reden-voor" title="Voor wie geldt je uitleg?">
+              <option value="leverancier">Alleen deze leverancier, alleen bij deze klant</option>
+              <option value="leverancier_alle">Deze leverancier, bij alle klanten</option>
+              <option value="klant">Alle leveranciers van deze klant</option>
+              <option value="alle">Alle leveranciers bij alle klanten</option>
+            </select></div>
+          </div></details></div>
       </div>
     </div>
-    <div class="fa-blok"><h4>3 · Boeken</h4>
-      <label>Omschrijving * <span id="fa-oms-teller" style="font-weight:400"></span></label>
-      <input type="text" id="fa-omschrijving" maxlength="40">
-      <table id="tabel-fa-regels" style="margin-top:10px">
-        <thead><tr><th>Grootboekrekening</th><th class="num">Bedrag</th><th>Omschrijving regel</th><th>Wat de robot zag</th><th></th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <datalist id="fa-rekeningen"></datalist>
-      <p style="margin:6px 0 0"><button class="knop stil" id="btn-fa-regel" style="padding:5px 10px; font-size:12px">+ Regel</button></p>
-      <div id="fa-som" class="fa-som"></div>
-    </div>
-    <div class="fa-blok"><details class="fa-waarom"><summary><b>4 · Waarom verbeter je dit?</b> (optioneel — wordt een regel voor de robot)</summary>
-      <div class="rij" style="margin-top:8px">
-        <div style="flex:2"><input type="text" id="fa-reden" placeholder="bv. Kooyman-planken altijd op 4150 onderhoud inventaris"></div>
-        <div><select id="fa-reden-voor" title="Voor wie geldt je uitleg?">
-          <option value="leverancier">Alleen deze leverancier, alleen bij deze klant</option>
-          <option value="leverancier_alle">Deze leverancier, bij alle klanten</option>
-          <option value="klant">Alle leveranciers van deze klant</option>
-          <option value="alle">Alle leveranciers bij alle klanten</option>
-        </select></div>
-      </div></details></div>
     <details class="fa-ai"><summary>Hoe de robot het las</summary><div id="fa-ai"></div></details>
     </div>
     <div class="fa-verwijder-vak" id="fa-verwijder-vak" style="display:none">

@@ -235,6 +235,8 @@
   .fa-blok { background: #fff; border: 1px solid #c3cad2; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
   .fa-blok h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--tekst); }
   .fa-blok .rij { display: flex; gap: 12px; flex-wrap: wrap; } .fa-blok .rij > div { flex: 1; min-width: 150px; }
+  /* Bedrag + valuta en de twee datums dicht bij elkaar (Shereen 17 okt), niet over de hele breedte verspreid. */
+  .fa-blok .rij.fa-rij-dicht { gap: 14px 28px; } .fa-blok .rij.fa-rij-dicht > div { flex: 0 0 auto; min-width: 0; }
   .fa-kop-links { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .fa-kop-links label { white-space: nowrap; } .fa-kop-links span { font-size: 12px; white-space: nowrap; }
   .fa-klein-knop { background: none; border: 0; color: var(--blauw); font-size: 12px; cursor: pointer; padding: 0 2px; text-decoration: underline; font-family: inherit; }
@@ -939,11 +941,11 @@
         <datalist id="fa-crediteuren"></datalist>
         </div>
         <div class="fa-blok"><h4>2 · Bedrag &amp; datum</h4>
-        <div class="rij">
-          <div><label>Bedrag (incl. alles) *</label><input type="text" id="fa-bedrag"></div>
+        <div class="rij fa-rij-dicht">
+          <div><label>Bedrag (incl. alles) *</label><input type="text" id="fa-bedrag" style="width:170px"></div>
           <div style="flex:0 0 110px; min-width:0"><label>Valuta</label><select id="fa-valuta"><option>AWG</option><option>USD</option><option>EUR</option><option>XCG</option><option>ANG</option></select></div>
         </div>
-        <div class="rij">
+        <div class="rij fa-rij-dicht">
           <div><label>Factuurdatum *</label><input type="date" id="fa-datum"><div class="fa-datum-tekst" id="fa-datum-tekst"></div></div>
           <div><label>Vervaldatum (leeg = Basecone rekent)</label><input type="date" id="fa-vervaldatum"><div class="fa-datum-tekst" id="fa-verval-tekst"></div></div>
         </div>

@@ -7794,7 +7794,7 @@ function vpbLaadRelaties(office) {
     const lijst = { DEB: [], CRD: [], klaar: false };
     vpbRelaties.set(office, lijst);
     Promise.all(["DEB", "CRD"].map(t => liveDimensies(office, t).then(x => { lijst[t] = x; }, () => {})))
-      .then(() => { lijst.klaar = true; });
+      .then(() => { lijst.klaar = true; if (vpbStand) vpbTeken(); });   // namen in de relatievakken bijwerken
   }
   return vpbRelaties.get(office);
 }
@@ -7908,8 +7908,7 @@ function vpbTeken(bewaren = true) {
         : `<i>↩ Teruggestuurd door Endura</i><div class="vp-uitleg" style="margin:2px 0 0; font-size:12px" title="${escapeHtml(a.opmerking || "")}">geen klantantwoord — kies zelf de rekening</div>`}</td>
       <td class="vpb-boeken" style="min-width:280px">${bewerkbaar
         ? `<input type="text" list="vpb-dl-${escapeHtml(a.administratie)}" ${d} data-vpb-veld="rekening" value="${escapeHtml(rekTekst)}" placeholder="rekening — typ nummer of naam" autocomplete="off">
-           <input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie — typ naam of nummer (bij debiteur/crediteur)" style="margin-top:4px" autocomplete="off">
-           <div class="vp-uitleg" data-vpb-relnaam="${a.id}" style="margin:2px 0 0; font-size:12px">${escapeHtml(vpbRelNaam(a.administratie, rel))}</div>
+           <div class="fa-crd-vak" style="margin-top:4px"><input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie — typ naam of nummer (bij debiteur/crediteur)" autocomplete="off"><span class="fa-crd-naam" data-vpb-relnaam="${a.id}" style="font-size:13px">${escapeHtml(vpbRelNaam(a.administratie, rel))}</span></div>
            <input type="text" ${d} data-vpb-veld="omschrijving" value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px" autocomplete="off">
            ${a.voorstel ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">${a.voorstel.zeker ? "✨" : "❔"} ${escapeHtml(a.voorstel.toelichting || "")}</div>` : (vpbBezig ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">Shai denkt na…</div>` : "")}`
         : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)} ${escapeHtml(vpbRelNaam(a.administratie, a.keuze.relatie))}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
@@ -7925,7 +7924,8 @@ function vpbTeken(bewaren = true) {
     faKeuzelijst(veld, () => vpbRelLijst(a));
     veld.addEventListener("input", () => {
       const naam = tbody.querySelector(`[data-vpb-relnaam="${a.id}"]`);
-      if (naam) naam.textContent = vpbRelNaam(a.administratie, veld.value.trim());
+      // Naam ín het vak achter het nummer (zoals de crediteur in Basecone); niet over getypte zoektekst heen.
+      if (naam) naam.textContent = /[a-z]/i.test(veld.value) && !vpbRelNaam(a.administratie, veld.value.trim()) ? "" : vpbRelNaam(a.administratie, veld.value.trim());
     });
   }
 }

@@ -116,8 +116,8 @@
   .fa-balk { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   .fa-filter { border: 1px solid var(--rand); background: #fff; color: var(--tekst); border-radius: 14px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
   .fa-filter.actief { background: var(--blauw); border-color: var(--blauw); color: #fff; }
-  #tabel-facturen tbody tr { cursor: pointer; } #tabel-facturen tbody tr:hover { background: #eef5fb; }
-  #tabel-facturen tbody tr.gekozen { background: #dcebf8; }
+  #tabel-facturen > tbody > tr { cursor: pointer; } #tabel-facturen > tbody > tr:hover { background: #eef5fb; }
+  #tabel-facturen > tbody > tr.gekozen { background: #dcebf8; }
   #tabel-facturen .fa-vink { width: 34px; text-align: center; cursor: default; }
   #tabel-facturen th.fa-sorteer, #tabel-bank th.fa-sorteer { cursor: pointer; user-select: none; white-space: nowrap; }
   #tabel-facturen th.fa-sorteer:hover, #tabel-bank th.fa-sorteer:hover { color: var(--blauw); }
@@ -164,12 +164,19 @@
   .fa-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
   /* Gesplitst scherm zoals in Basecone: lijst links, document rechts, scheiding versleepbaar */
   main.breed { max-width: none; }
-  .fa-split { display: grid; grid-template-columns: var(--fa-links, 42%) 10px minmax(0, 1fr); height: calc(100vh - 110px); min-height: 480px; margin-bottom: 16px; }
+  .fa-split { display: grid; grid-template-columns: minmax(0, 1fr); height: calc(100vh - 110px); min-height: 480px; margin-bottom: 16px; }
+  /* Geen rechterpaneel meer (Shereen 17 okt): het document klapt open onder de regel, over de hele breedte. */
+  .fa-scheiding { display: none; }
+  #tabel-facturen > tbody > tr.fa-open-rij { cursor: default; background: #f4f8fc; } #tabel-facturen > tbody > tr.fa-open-rij:hover { background: #f4f8fc; }
+  #tabel-facturen > tbody > tr.fa-open-rij > td { padding: 4px 6px 14px; border-bottom: 2px solid var(--blauw); }
+  #tabel-facturen #kaart-fa-detail { margin: 0; border: 1px solid #9cc3ea; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+  #tabel-facturen #kaart-fa-detail .fa-knoppen { bottom: 0; }
+  #tabel-facturen .fa-scan img { max-height: calc(100vh - 200px); width: auto; max-width: 100%; display: block; margin-left: auto; margin-right: auto; }
   .fa-split > .kaart { margin: 0; overflow: auto; min-width: 0; }
   .fa-scheiding { cursor: col-resize; position: relative; touch-action: none; }
   .fa-scheiding::after { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: var(--rand); }
   .fa-scheiding:hover::after, .fa-scheiding.sleept::after { background: var(--blauw); left: 3px; width: 4px; }
-  #tabel-facturen thead th { position: sticky; top: -18px; background: #fff; z-index: 1; }
+  #tabel-facturen > thead th { position: sticky; top: -18px; background: #fff; z-index: 3; }
   .fa-leeg { color: var(--tekst); font-size: 14px; padding: 30px 6px; }
   #tabel-fa-regels input.fa-leeg-vak:placeholder-shown { outline: 2px solid var(--oranje); background: #fff7ed; }
   @media (max-width: 900px) {
@@ -218,7 +225,7 @@
   #fa-opmerking .fa-punten { margin: 4px 0 0; font-size: 13px; }
   #fa-opmerking .fa-punten li { padding: 3px 0 3px 22px; border-bottom: 0; }
   #fa-opmerking .fa-punten li::before { top: 3px; }
-  .fa-detail { grid-template-columns: minmax(260px, 0.9fr) minmax(320px, 1.1fr); gap: 16px; align-items: start; }
+  .fa-detail { grid-template-columns: minmax(280px, 2fr) minmax(380px, 3fr); gap: 16px; align-items: start; }
   @media (max-width: 1100px) { .fa-detail { grid-template-columns: 1fr; } }
   .fa-scan-onder { font-size: 12px; color: var(--tekst); margin-top: -2px; }
   .fa-blok { background: #fff; border: 1px solid var(--rand); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
@@ -891,8 +898,11 @@
       <div class="woot" id="fa-woot" hidden><img data-src="woot-woot-fuchsia-street-art.png" alt="WOOT WOOT! Niets meer te beoordelen."><p>Alles beoordeeld. Shai doet de rest in Basecone.</p></div>
     </div>
     <div class="fa-scheiding" id="fa-scheiding" title="Sleep om de breedte aan te passen (dubbelklik = terug naar standaard)"></div>
+    <!-- Openklappen onder de regel (Shereen 17 okt): dit documentvenster wacht hier verborgen en gaat bij openen in een
+         extra regel direct onder het aangeklikte document in de lijst (vernieuwFaTabel). Geen rechterpaneel meer. -->
+    <div id="fa-detail-thuis" hidden>
     <div class="kaart" id="kaart-fa-detail">
-    <p class="fa-leeg" id="fa-leeg">Klik links op een document om het hier te openen.</p>
+    <p class="fa-leeg" id="fa-leeg">Klik op een document in de lijst om het te openen.</p>
     <!-- Rustiger documentvenster (Shereen 15 okt, voorbeeld docs/voorbeeld-rustig-basecone.html): zelfde velden, id's en
          knoppen, alleen anders geordend — kop met status, strook "waarom Shai dit voorlegt" bovenaan, scan naast
          blokjes 1 en 2 (17 okt: ook Boeken en Waarom rechts naast de scan), knoppenbalk altijd zichtbaar onderaan. -->
@@ -976,8 +986,11 @@
       <button class="knop stil" id="btn-fa-overslaan">Overslaan</button>
       <button class="knop stil" id="btn-fa-terug" style="display:none">Terug naar beoordelen</button>
       <span class="fa-duw"></span>
+      <button class="knop stil" id="btn-fa-vorige" title="Vorig document in de lijst (Ctrl+←). Dit document blijft staan zoals het is.">← Vorige</button>
+      <button class="knop stil" id="btn-fa-volgende" title="Laat dit document staan voor later en open het volgende (Ctrl+→). Wat je al invulde, onthoudt Shai.">Volgende →</button>
       <button class="knop stil" id="btn-fa-opnieuw">Opnieuw lezen</button>
-      <button class="knop" id="btn-fa-goedkeuren">✓ Goedkeuren</button>
+      <button class="knop" id="btn-fa-goedkeuren" title="Goedkeuren (Ctrl+Enter)">✓ Goedkeuren</button>
+    </div>
     </div>
     </div>
     </div>
@@ -4253,6 +4266,11 @@ function toonMelding(id, soort, tekst) {
    Zie docs/BASECONE-ROBOT-START.md. */
 let faRekNamen = {}, faCrdNamen = {};   // "BINGO|7103" → "Kostprijs food", "BINGO|C0175" → "Compra", voor de lijst
 let faDocs = [], faGekozen = null, faStam = { BAS: [], CRD: [] };
+// Openklappen onder de regel (17 okt): volgorde van de lijst zoals getekend, en waar je zat toen je een document opende.
+let faVolgorde = [], faPlek = null;
+// Wat je al invulde bij een document dat je met Volgende/Vorige liet staan (tot de pagina ververst). Alleen terugzetten
+// als Shai het document intussen niet opnieuw las (zelfde voorstel).
+const faConcept = new Map();
 /* Statuskolom — één werkwijze voor Twinfield Bank én Basecone (Shereen 12 okt: "een verandering bij de
    één moet same zijn bij de ander"). Zelfde woorden en (via de CSS .fa-status) zelfde kleuren. Bij voorstel
    en voorleggen staat erbij wie voorstelt: "TF" (Twinfields eigen herkenning) of "Shai". */
@@ -4485,7 +4503,15 @@ function vernieuwFaTabel() {
   const lijst = faZichtbaar();
   document.getElementById("fa-sorteer-pijl").textContent = faSorteer === "af" ? "▼ hoog→laag" : faSorteer === "op" ? "▲ laag→hoog" : "⇅";
   const zoekt = document.getElementById("fa-zoek").value.trim();
-  tbody.innerHTML = lijst.length ? "" : `<tr><td colspan="9" class="fa-uitleg">${document.getElementById("fa-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`;
+  // Het open document (regel tr.fa-open-rij) blijft op zijn plek: de andere regels worden eromheen opnieuw gezet. Zo
+  // komt het vanzelf direct onder het gekozen document en laadt een PDF-scan niet steeds opnieuw (Shereen 17 okt).
+  const faOpenRij = tbody.querySelector(":scope > tr.fa-open-rij");
+  for (const rij of [...tbody.children]) if (rij !== faOpenRij) rij.remove();
+  let faVoorOpen = !!faOpenRij;
+  const faZet = (el) => { if (faVoorOpen) tbody.insertBefore(el, faOpenRij); else tbody.appendChild(el); };
+  const faZetHtml = (html) => { const t = document.createElement("tbody"); t.innerHTML = html; for (const el of [...t.children]) faZet(el); };
+  faVolgorde = [];
+  if (!lijst.length) faZetHtml(`<tr><td colspan="9" class="fa-uitleg">${document.getElementById("fa-office").value === GEEN_ADMIN ? "<b>Niet gevonden</b> — geen administratie met deze naam of code." : zoekt ? "Niets gevonden." : "Niets in deze lijst."}</td></tr>`);
   { const o = document.getElementById("fa-office").value, open = FA_TABJES[0][2];
     const klaar = faTabje === "beoordelen" && !zoekt && !faDocs.some(d => (!o || d.office === o) && open.includes(d.status));
     toonWoot("fa-woot", o, klaar);
@@ -4501,7 +4527,7 @@ function vernieuwFaTabel() {
       faVorigeKlant = d.office;
       const naam = (profielen.find(p => p.code === d.office) || {}).naam || "";
       const n = lijst.filter(x => x.office === d.office).length, dicht = faIsDicht(d.office);
-      tbody.insertAdjacentHTML("beforeend", `<tr class="fa-klant" data-office="${escapeHtml(d.office)}" title="Klik om ${dicht ? "uit" : "in"} te klappen"><td colspan="9"><span class="bk-klap-pijl">${dicht ? "▸" : "▾"}</span> ${escapeHtml(d.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${n} document${n === 1 ? "" : "en"}</span></td></tr>`);
+      faZetHtml(`<tr class="fa-klant" data-office="${escapeHtml(d.office)}" title="Klik om ${dicht ? "uit" : "in"} te klappen"><td colspan="9"><span class="bk-klap-pijl">${dicht ? "▸" : "▾"}</span> ${escapeHtml(d.office)}${naam ? " · " + escapeHtml(naam.trim()) : ""} <span style="font-weight:600">— ${n} document${n === 1 ? "" : "en"}</span></td></tr>`);
     }
     if (faIsDicht(d.office)) continue;
     const v = d.goedgekeurd || d.voorstel || {};
@@ -4521,12 +4547,34 @@ function vernieuwFaTabel() {
       <td class="num">${v.credit ? "−" : ""}${faBedrag(v.bedrag)}</td>
       <td>${escapeHtml(v.zekerheid || "")}</td>
       <td>${let_ ? `<span class="fa-let" title="${escapeHtml(alle.map(w => "• " + w).join("\n"))}">${let_}</span>` : ""}${d.status === "fout" ? `<span class="fa-fout">${escapeHtml((d.opmerking || "").slice(0, 60))}</span>` : ""}</td>`;
-    tr.addEventListener("click", (e) => { if (!e.target.closest(".fa-vink")) openFactuur(d.id); });
+    // Klik = openklappen onder de regel; nog eens klikken op het open document = dichtklappen.
+    tr.addEventListener("click", (e) => { if (e.target.closest(".fa-vink")) return; if (faGekozen && faGekozen.id === d.id) faSluitDetail(); else faDocOpen(d.id); });
     const vink = tr.querySelector(".fa-vink-rij");
     if (vink) vink.addEventListener("change", () => { vink.checked ? faVink.add(d.id) : faVink.delete(d.id); faBulkStand(); });
-    tbody.appendChild(tr);
+    faZet(tr);
+    faVolgorde.push(d.id);
+    if (faGekozen && faGekozen.id === d.id) faVoorOpen = false;   // wat hierna komt, gaat ná het open document
   }
+  faPlaatsDetail(faOpenRij);
   faBulkStand();
+}
+/* Het documentvenster in een extra regel direct onder het gekozen document zetten, of terug naar zijn wachtplek als
+   er niets open is of het document niet in de lijst staat (ingeklapte klant, ander filter). */
+function faPlaatsDetail(openRij) {
+  const tbody = document.querySelector("#tabel-facturen tbody"), kaart = document.getElementById("kaart-fa-detail");
+  const gekozenTr = faGekozen && tbody.querySelector(":scope > tr.gekozen");
+  if (!gekozenTr) {
+    document.getElementById("fa-detail-thuis").appendChild(kaart);
+    if (openRij) openRij.remove();
+    return;
+  }
+  if (!openRij) {
+    openRij = document.createElement("tr");
+    openRij.className = "fa-open-rij";
+    openRij.innerHTML = `<td colspan="9"></td>`;
+  }
+  if (gekozenTr.nextSibling !== openRij) gekozenTr.after(openRij);
+  if (kaart.parentElement !== openRij.firstElementChild) openRij.firstElementChild.appendChild(kaart);
 }
 /* Vinkjes + "alles selecteren" + in één keer goedkeuren (Shereen 10 okt). Alles aanvinken pakt alleen
    de voorstellen in de huidige lijst; een document op "voorleggen" vink je bewust los aan. */
@@ -4973,6 +5021,7 @@ async function openFactuur(id) {
   if (error || !d) { toonMelding("melding-facturen", "fout", "Document niet gevonden."); return; }
   faGekozen = d;
   vernieuwFaTabel();
+  faPlek = { id: d.id, volgorde: [...faVolgorde] };
   await laadFaStam(d.office);
   const kaart = document.getElementById("kaart-fa-detail");
   document.getElementById("fa-leeg").style.display = "none";
@@ -5019,6 +5068,7 @@ async function openFactuur(id) {
   document.getElementById("fa-betaalbatch").checked = !!v.niet_in_betaalbatch;
   const aiRegels = (d.ai && d.ai.regels) || [];
   vernieuwFaRegels((v.regels || []).map((r, i) => ({ ...r, inhoud: aiRegels[i] ? aiRegels[i].inhoud : "" })));
+  faZetConcept(d);
   faOmsTeller();
 
   const opm = [];
@@ -5210,8 +5260,10 @@ async function faOpnieuwLezen() {
     });
     const r = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(r.fout || `HTTP ${resp.status}`);
-    await laadFacturen(); await openFactuur(d.id);
-    toonMelding("melding-fa-detail", "ok", `Opnieuw gelezen: ${escapeHtml(r.status)}.`);
+    faConcept.delete(d.id);
+    await laadFacturen();
+    // 17 okt: na Opnieuw lezen meteen door naar het volgende document (dit staat met het nieuwe voorstel in de lijst).
+    faVolgendeOfSluiten(d.office, `${d.bestandsnaam || "Document"} opnieuw gelezen: ${r.status}.`);
   } catch (e) { toonMelding("melding-fa-detail", "fout", "Lezen mislukt: " + escapeHtml(e.message)); }
   knop.disabled = false;
 }
@@ -5248,20 +5300,78 @@ async function faVerwijderBevestigen() {
    (Shereen 10 okt: het laatst goedgekeurde document bleef open staan). */
 function faVolgendeOfSluiten(office, melding) {
   const open = faZichtbaar().filter(x => FA_BEOORDELEN.includes(x.status));
-  const volgende = open.find(x => x.office === office) || open[0];
+  const hier = faPlek ? faPlek.id : null;
+  if (hier) faConcept.delete(hier);
+  // 17 okt: verder ONDER het document waar je zat (wat je met Volgende liet staan, blijft voor later), na de laatste
+  // weer bovenaan. Lukt dat niet: het eerste open document van dezelfde klant, zoals voorheen.
+  let volgende = null;
+  if (faPlek) {
+    const ids = faPlek.volgorde, i = ids.indexOf(hier);
+    for (let k = 1; k <= ids.length && !volgende; k++) volgende = open.find(x => x.id === ids[(i + k) % ids.length] && x.id !== hier) || null;
+  }
+  volgende = volgende || open.find(x => x.office === office && x.id !== hier) || open.find(x => x.id !== hier) || open[0];
   if (volgende) {
-    openFactuur(volgende.id).then(() => toonMelding("melding-fa-detail", "ok", `${escapeHtml(melding)} Dit is het volgende document.`));
+    faGekozen = null;   // het afgehandelde document hoeft niet onthouden te worden
+    faDocOpen(volgende.id).then(() => toonMelding("melding-fa-detail", "ok", `${escapeHtml(melding)} Dit is het volgende document.`));
     return;
   }
   faSluitDetail(`${melding} Alles is beoordeeld — Shai vult de goedgekeurde documenten in Basecone in en boekt ze door.`);
 }
 function faSluitDetail(tekst) {
+  faBewaarConcept();
   faGekozen = null;
   document.getElementById("fa-inhoud").style.display = "none";
   const leeg = document.getElementById("fa-leeg");
   leeg.style.display = "";
-  leeg.textContent = tekst || "Klik links op een document om het hier te openen.";
+  leeg.textContent = "Klik op een document in de lijst om het te openen.";
+  if (tekst) toonMelding("melding-facturen", "ok", escapeHtml(tekst));
   vernieuwFaTabel();
+}
+/* Een document openen vanuit de lijst of met Volgende/Vorige: eerst onthouden wat je bij het vorige invulde, daarna
+   de lijst zo scrollen dat het geopende document bovenaan staat (onder de kolomkoppen). */
+async function faDocOpen(id) {
+  faBewaarConcept();
+  await openFactuur(id);
+  faNaarBoven();
+}
+function faNaarBoven() {
+  const tr = document.querySelector("#tabel-facturen > tbody > tr.gekozen");
+  const vak = tr && tr.closest(".kaart");
+  if (!vak) return;
+  if (vak.scrollHeight <= vak.clientHeight + 2) { tr.scrollIntoView({ block: "start" }); return; }   // smal scherm: de pagina scrolt
+  const kop = document.querySelector("#tabel-facturen > thead");
+  vak.scrollTop += tr.getBoundingClientRect().top - vak.getBoundingClientRect().top - (kop ? kop.offsetHeight : 0) + 2;
+}
+const faVersie = (d) => JSON.stringify(d.goedgekeurd || d.voorstel || {});
+function faBewaarConcept() {
+  const d = faGekozen;
+  if (!d || document.getElementById("fa-inhoud").style.display === "none" || document.getElementById("btn-fa-goedkeuren").style.display === "none") return;
+  const w = (id) => document.getElementById(id).value;
+  faConcept.set(d.id, { versie: faVersie(d), crediteur: w("fa-crediteur"), factuurnummer: w("fa-factuurnummer"), bedrag: w("fa-bedrag"),
+    valuta: w("fa-valuta"), datum: w("fa-datum"), vervaldatum: w("fa-vervaldatum"), omschrijving: w("fa-omschrijving"),
+    credit: document.getElementById("fa-credit").checked, betaalbatch: document.getElementById("fa-betaalbatch").checked,
+    reden: w("fa-reden"), redenVoor: w("fa-reden-voor"), regels: leesFaRegels() });
+}
+function faZetConcept(d) {
+  const c = faConcept.get(d.id);
+  if (!c) return;
+  if (c.versie !== faVersie(d)) { faConcept.delete(d.id); return; }   // intussen opnieuw gelezen: het nieuwe voorstel telt
+  const zet = (id, w) => { document.getElementById(id).value = w ?? ""; };
+  zet("fa-crediteur", c.crediteur); zet("fa-factuurnummer", c.factuurnummer); zet("fa-bedrag", c.bedrag); zet("fa-valuta", c.valuta);
+  zet("fa-datum", c.datum); zet("fa-vervaldatum", c.vervaldatum); zet("fa-omschrijving", c.omschrijving);
+  zet("fa-reden", c.reden); zet("fa-reden-voor", c.redenVoor || "leverancier");
+  document.getElementById("fa-credit").checked = c.credit; document.getElementById("fa-betaalbatch").checked = c.betaalbatch;
+  vernieuwFaRegels(c.regels);
+  faCrediteurNaam(); faDatumTekst();
+  if (c.reden) document.querySelector("#kaart-fa-detail .fa-waarom").open = true;
+}
+/* Volgende / Vorige (Shereen 17 okt: "zodat je 1 even kan laten staan voor later"): het document eronder of erboven in
+   de lijst, zonder iets te veranderen. Na de laatste weer bovenaan. */
+function faNaast(richting) {
+  if (!faGekozen) return;
+  const ids = faVolgorde, i = ids.indexOf(faGekozen.id);
+  if (ids.length < 2 || i < 0) { toonMelding("melding-fa-detail", "ok", "Er is geen ander document in deze lijst."); return; }
+  faDocOpen(ids[(i + richting + ids.length) % ids.length]);
 }
 async function laadFaRegels() {
   const office = document.getElementById("kb-office").value;
@@ -7427,6 +7537,20 @@ document.getElementById("btn-fa-nc-sluiten").addEventListener("click", faNieuwCr
 document.getElementById("fa-crediteur").addEventListener("input", faCrediteurNaam);
 faKeuzelijst(document.getElementById("fa-crediteur"), () => faStam.CRD);
 document.getElementById("btn-fa-opnieuw").addEventListener("click", faOpnieuwLezen);
+document.getElementById("btn-fa-volgende").addEventListener("click", () => faNaast(1));
+document.getElementById("btn-fa-vorige").addEventListener("click", () => faNaast(-1));
+/* Sneltoetsen in Basecone (17 okt): Ctrl+Enter = Goedkeuren; Ctrl+→ / Ctrl+← = Volgende / Vorige, maar niet in een
+   tekstvak: daar springt Ctrl+pijl gewoon een woord verder. */
+document.addEventListener("keydown", (e) => {
+  if (!e.ctrlKey || e.altKey || e.metaKey || !faGekozen || !document.getElementById("kaart-fa-detail").closest("#tabel-facturen")) return;
+  if (!document.getElementById("tab-facturen").offsetParent) return;
+  const knop = (id) => { const b = document.getElementById(id); return b.style.display !== "none" && !b.disabled ? b : null; };
+  if (e.key === "Enter") { const b = knop("btn-fa-goedkeuren"); if (b) { e.preventDefault(); b.click(); } return; }
+  if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+  if (e.target.closest("input, textarea, select, [contenteditable]")) return;
+  e.preventDefault();
+  faNaast(e.key === "ArrowRight" ? 1 : -1);
+});
 document.getElementById("btn-fa-overslaan").addEventListener("click", () => faZetStatus("overgeslagen", "overgeslagen"));
 
 /* ===== Basecone → DELETED (Shereen 12 okt) =====

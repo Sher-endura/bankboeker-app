@@ -104,7 +104,8 @@
   @keyframes vpb-draai { to { transform: rotate(360deg); } }
   #tabel-vpb .fa-vink { width: 34px; text-align: center; }
   #tabel-vpb tr.vpb-klant { cursor: pointer; user-select: none; }
-  #tabel-vpb tr.vpb-klant td { background: var(--zalm); color: #1f2937; font-weight: 700; font-size: 15px; padding-top: 10px; padding-bottom: 10px; }
+  /* Vraagposten-klanten paars (Shereen 17 okt): duidelijk anders dan de roze bank-klanten, toch in één lijst. */
+  #tabel-vpb tr.vpb-klant td { background: #b69cf0; color: #1f2937; font-weight: 700; font-size: 15px; padding-top: 10px; padding-bottom: 10px; }
   #tabel-vpb .bk-klap-pijl { display: inline-block; width: 16px; }
   #tabel-vpb tr.vpb-kop td { background: var(--grijs); color: var(--tekst); font-size: 13px; }
   #tabel-vpb .fa-vink input { width: 17px; height: 17px; cursor: pointer; }
@@ -229,7 +230,9 @@
   .fa-detail { grid-template-columns: minmax(280px, 2fr) minmax(380px, 3fr); gap: 16px; align-items: start; }
   @media (max-width: 1100px) { .fa-detail { grid-template-columns: 1fr; } }
   .fa-scan-onder { font-size: 12px; color: var(--tekst); margin-top: -2px; }
-  .fa-blok { background: #fff; border: 1px solid var(--rand); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  /* Iets donkerdere lijnen (Shereen 17 okt): de blokken en hun velden staan zichtbaar op één lijn. */
+  #kaart-fa-detail .fa-blok input[type=text], #kaart-fa-detail .fa-blok input[type=date], #kaart-fa-detail .fa-blok select { border-color: #c3cad2; }
+  .fa-blok { background: #fff; border: 1px solid #c3cad2; border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
   .fa-blok h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--tekst); }
   .fa-blok .rij { display: flex; gap: 12px; flex-wrap: wrap; } .fa-blok .rij > div { flex: 1; min-width: 150px; }
   .fa-kop-links { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }

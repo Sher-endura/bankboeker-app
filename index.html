@@ -7805,6 +7805,76 @@ function vpbRelLijst(a) {
   if (/debiteur/.test(rek)) return l.DEB;
   return Number(a.bedrag) < 0 ? [...l.DEB, ...l.CRD] : [...l.CRD, ...l.DEB];
 }
+/* Afletteren bij een vraagpost (Shereen 17 okt): onder de gekozen relatie de openstaande facturen (zelfde lijst als
+   Twinfield Bank, bkAfletGegevens), met vinkje en bedrag per factuur. Staat een factuurnummer in de banktekst, dan
+   staat die al aangevinkt. Niets aangevinkt = op de debiteur/crediteur zonder factuur. De robot kiest ze daarna in het
+   factuurvenster van Twinfield (vraagposten.mjs, kiesFacturen). Facturen samen = precies het bedrag. */
+const vpbOpenCache = {};   // "office|kant" → { open, laadt, fout }
+const vpbKant = (rekTekst) => (/crediteur/i.test(rekTekst || "") ? "crediteur" : "debiteur");
+function vpbOpenVoor(office, kant) {
+  const k = office + "|" + kant;
+  if (!vpbOpenCache[k]) {
+    vpbOpenCache[k] = { laadt: true, open: [] };
+    bkAfletGegevens(office, kant).then(d => { vpbOpenCache[k] = { open: d.open || [] }; if (vpbStand) vpbTeken(); },
+      e => { vpbOpenCache[k] = { open: [], fout: e.message || String(e) }; if (vpbStand) vpbTeken(); });
+  }
+  return vpbOpenCache[k];
+}
+const vpbCijfers = (t) => String(t || "").replace(/\D/g, "");
+/** Al gekozen bij een andere goedgekeurde vraagpost (niet dubbel afletteren). */
+function vpbGeclaimd(a) {
+  const c = {};
+  for (const x of vpbData?.antwoorden || []) if (x.id !== a.id && x.status === "goedgekeurd" && x.administratie === a.administratie)
+    for (const f of x.keuze?.facturen || []) c[f.factuur] = (c[f.factuur] || 0) + Number(f.bedrag || 0);
+  return c;
+}
+function vpbFactLijst(a, rel, kant) {
+  const c = vpbOpenVoor(a.administratie, kant), claim = vpbGeclaimd(a);
+  const lijst = (c.open || []).filter(o => o.relatie === rel && o.factuur)
+    .map(o => ({ ...o, open: Math.round((Math.abs(o.open) - (claim[o.factuur] || 0)) * 100) / 100 })).filter(o => o.open > 0.004)
+    .sort((x, y) => String(x.datum).localeCompare(String(y.datum)));
+  return { c, lijst };
+}
+function vpbFactStaat(a, rel, lijst) {
+  if (a._fact && a._fact.relatie === rel) return a._fact;
+  const keuze = {};
+  if (a.keuze?.relatie === rel && Array.isArray(a.keuze.facturen)) for (const f of a.keuze.facturen) keuze[f.factuur] = faBedrag(f.bedrag);
+  else {
+    // Factuurnummer in de banktekst → alvast aangevinkt (oudste eerst, tot het bedrag op is).
+    const tekst = vpbCijfers(a.omschrijving);
+    let rest = Math.abs(Number(a.bedrag));
+    for (const o of lijst) {
+      const c = vpbCijfers(o.factuur);
+      if (c.length >= 5 && tekst.includes(c) && rest > 0.004) { const b = Math.min(o.open, rest); keuze[o.factuur] = faBedrag(b); rest = Math.round((rest - b) * 100) / 100; }
+    }
+  }
+  return (a._fact = { relatie: rel, keuze });
+}
+function vpbFactSom(a) {
+  const st = a._fact, gekozen = st ? Object.values(st.keuze) : [];
+  if (!gekozen.length) return `<span class="vp-uitleg" style="margin:0">Niets aangevinkt: Shai boekt op de relatie zonder factuur (afletteren kan later in Twinfield).</span>`;
+  const som = Math.round(gekozen.reduce((t, b) => t + faGetal(b), 0) * 100) / 100, totaal = Math.abs(Number(a.bedrag)), rest = Math.round((totaal - som) * 100) / 100;
+  return Math.abs(rest) < 0.005 ? `<span style="color:var(--groen)">Verdeeld ${faBedrag(som)} van ${faBedrag(totaal)} — past precies ✓</span>`
+    : `<span style="color:var(--rood)">Verdeeld ${faBedrag(som)} van ${faBedrag(totaal)} — ${rest > 0 ? "nog " + faBedrag(rest) + " te verdelen" : faBedrag(-rest) + " te veel"}</span>`;
+}
+function vpbFactHtml(a, rel, rekTekst) {
+  if (!rel || !/debiteur|crediteur/i.test(rekTekst || "")) return "";
+  const kant = vpbKant(rekTekst), { c, lijst } = vpbFactLijst(a, rel, kant);
+  const vak = (inhoud) => `<div data-vpb-factvak="${a.id}" style="margin-top:6px">${inhoud}</div>`;
+  if (c.laadt) return vak(`<span class="vp-uitleg" style="margin:0">${VPB_DRAAI}Openstaande facturen ophalen uit Twinfield…</span>`);
+  if (c.fout) return vak(`<span class="vp-uitleg" style="margin:0">Openstaande facturen ophalen lukte niet (${escapeHtml(c.fout)}) — Shai boekt dan op de relatie zonder factuur.</span>`);
+  if (!lijst.length) return vak(`<span class="vp-uitleg" style="margin:0">Geen openstaande facturen bij deze relatie — Shai boekt erop zonder factuur.</span>`);
+  const st = vpbFactStaat(a, rel, lijst);
+  return vak(`<div style="font-size:12px; font-weight:600; margin-bottom:2px">Openstaande facturen (${lijst.length}) — vink aan om af te letteren</div>
+    <div style="max-height:170px; overflow:auto; border:1px solid var(--rand); border-radius:5px; padding:4px 6px; background:#fff">${lijst.map(o => {
+      const aan = o.factuur in st.keuze;
+      return `<div style="display:flex; gap:8px; align-items:center; font-size:12px; padding:2px 0">
+        <input type="checkbox" data-vpb-fact="${a.id}" data-factuur="${escapeHtml(o.factuur)}" data-open="${o.open}"${aan ? " checked" : ""} style="width:auto">
+        <span style="flex:1"><b>${escapeHtml(o.factuur)}</b> · ${escapeHtml(vpDatum(o.datum))} · open ${faBedrag(o.open)}</span>
+        <input type="text" data-vpb-factbedrag="${a.id}" data-factuur="${escapeHtml(o.factuur)}" value="${aan ? escapeHtml(st.keuze[o.factuur]) : ""}" placeholder="${faBedrag(o.open)}" style="width:90px; padding:3px 6px; text-align:right">
+      </div>`; }).join("")}</div>
+    <div data-vpb-factsom="${a.id}" style="font-size:12px; margin-top:3px">${vpbFactSom(a)}</div>`);
+}
 const vpbRelNaam = (office, code) => { const l = vpbRelaties.get(office); return code && l ? ([...l.DEB, ...l.CRD].find(x => x.code === code) || {}).naam || "" : ""; };
 const vpbRekTekst = (office, code) => { const s = (vpbSchemas.get(office) || []).find(x => x.code === code); return code ? (s ? `${s.code} ${s.naam}` : code) : ""; };
 /** Alle open werk van de vraagposten ophalen (te beoordelen, goedgekeurd, overgeslagen) — bij elke laadBank(). */
@@ -7909,9 +7979,10 @@ function vpbTeken(bewaren = true) {
       <td class="vpb-boeken" style="min-width:280px">${bewerkbaar
         ? `<input type="text" list="vpb-dl-${escapeHtml(a.administratie)}" ${d} data-vpb-veld="rekening" value="${escapeHtml(rekTekst)}" placeholder="rekening — typ nummer of naam" autocomplete="off">
            <div class="fa-crd-vak" style="margin-top:4px"><input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie — typ naam of nummer (bij debiteur/crediteur)" autocomplete="off"><span class="fa-crd-naam" data-vpb-relnaam="${a.id}" style="font-size:13px">${escapeHtml(vpbRelNaam(a.administratie, rel))}</span></div>
+           ${vpbFactHtml(a, rel, rekTekst)}
            <input type="text" ${d} data-vpb-veld="omschrijving" value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px" autocomplete="off">
            ${a.voorstel ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">${a.voorstel.zeker ? "✨" : "❔"} ${escapeHtml(a.voorstel.toelichting || "")}</div>` : (vpbBezig ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">Shai denkt na…</div>` : "")}`
-        : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)} ${escapeHtml(vpbRelNaam(a.administratie, a.keuze.relatie))}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
+        : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)} ${escapeHtml(vpbRelNaam(a.administratie, a.keuze.relatie))}` : ""}${(a.keuze.facturen || []).length ? `<div style="font-size:12px">Afletteren: ${a.keuze.facturen.map(f => `${escapeHtml(f.factuur)} ${faBedrag(f.bedrag)}`).join(", ")}</div>` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
       <td style="white-space:nowrap">${bezig ? `<span class="vp-uitleg">${VPB_DRAAI}Opslaan…</span>` : bewerkbaar
         ? `<button class="knop" data-vpb-actie="goedkeuren" ${d} style="padding:4px 10px">Goedkeuren</button> <button class="knop stil" data-vpb-actie="overslaan" ${d} style="padding:4px 10px">Overslaan</button>`
         : `<button class="knop stil" data-vpb-actie="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug naar te beoordelen</button>`}</td>
@@ -7926,6 +7997,8 @@ function vpbTeken(bewaren = true) {
       const naam = tbody.querySelector(`[data-vpb-relnaam="${a.id}"]`);
       // Naam ín het vak achter het nummer (zoals de crediteur in Basecone); niet over getypte zoektekst heen.
       if (naam) naam.textContent = /[a-z]/i.test(veld.value) && !vpbRelNaam(a.administratie, veld.value.trim()) ? "" : vpbRelNaam(a.administratie, veld.value.trim());
+      const code = veld.value.trim();
+      if (vpbRelNaam(a.administratie, code) && (!a._fact || a._fact.relatie !== code)) setTimeout(() => { if (vpbStand) vpbTeken(); }, 0);
     });
   }
 }
@@ -7984,8 +8057,14 @@ function vpbKeuzeUit(a) {
   const relatie = veld("relatie"), rekNaam = veld("rekening").toLowerCase(), rl = vpbRelaties.get(a.administratie);
   if (/debiteur|crediteur/.test(rekNaam) && !relatie) { a._relFout = "kies bij deze rekening een klant of leverancier (relatie)"; return null; }
   if (relatie && rl && rl.klaar && ![...rl.DEB, ...rl.CRD].some(x => x.code === relatie)) { a._relFout = `relatie ${relatie} bestaat niet in Twinfield`; return null; }
+  let facturen = [];
+  if (relatie && a._fact && a._fact.relatie === relatie) {
+    facturen = Object.entries(a._fact.keuze).map(([factuur, b]) => ({ factuur, bedrag: Math.round(faGetal(b) * 100) / 100 })).filter(f => f.bedrag > 0);
+    const som = Math.round(facturen.reduce((t, f) => t + f.bedrag, 0) * 100) / 100;
+    if (facturen.length && Math.abs(som - Math.abs(Number(a.bedrag))) > 0.004) { a._relFout = `facturen: verdeeld ${faBedrag(som)} van ${faBedrag(Math.abs(Number(a.bedrag)))}`; return null; }
+  }
   delete a._relFout;
-  return { rekening: code, relatie: relatie || null, omschrijving: (veld("omschrijving") || a.antwoord || a.omschrijving || "").slice(0, 40) };
+  return { rekening: code, relatie: relatie || null, ...(facturen.length ? { facturen } : {}), omschrijving: (veld("omschrijving") || a.antwoord || a.omschrijving || "").slice(0, 40) };
 }
 /** Goedkeuren / overslaan / terug voor één of meer regels; laadicoon zolang het opslaan duurt. */
 async function vpbVerwerk(actie, ids) {
@@ -8041,10 +8120,32 @@ async function vpbActie(actie, id, office) {
   return vpbVerwerk(actie, [id]);
 }
 document.querySelector("#tabel-vpb tbody").addEventListener("change", (e) => {
+  const fv = e.target.closest("[data-vpb-fact]");
+  if (fv) {
+    const a = vpbData.antwoorden.find(x => x.id === fv.dataset.vpbFact);
+    if (!a || !a._fact) return;
+    const f = fv.dataset.factuur;
+    if (fv.checked) {
+      const som = Object.values(a._fact.keuze).reduce((t, b) => t + faGetal(b), 0), rest = Math.abs(Number(a.bedrag)) - som;
+      a._fact.keuze[f] = faBedrag(Math.max(0, Math.min(Number(fv.dataset.open), Math.round(rest * 100) / 100)) || Number(fv.dataset.open));
+    } else delete a._fact.keuze[f];
+    vpbTeken();
+    return;
+  }
   const v = e.target.closest(".vpb-vink");
   if (!v) return;
   v.checked ? vpbVink.add(v.dataset.vpbId) : vpbVink.delete(v.dataset.vpbId);
   vpbBulkBalk(vpbLijst());
+});
+document.querySelector("#tabel-vpb tbody").addEventListener("input", (e) => {
+  const fb = e.target.closest("[data-vpb-factbedrag]");
+  if (!fb) return;
+  const a = vpbData.antwoorden.find(x => x.id === fb.dataset.vpbFactbedrag);
+  if (!a || !a._fact) return;
+  const f = fb.dataset.factuur, vink = fb.parentElement.querySelector("[data-vpb-fact]");
+  if (fb.value.trim()) { a._fact.keuze[f] = fb.value.trim(); if (vink) vink.checked = true; } else { delete a._fact.keuze[f]; if (vink) vink.checked = false; }
+  const som = document.querySelector(`[data-vpb-factsom="${a.id}"]`);
+  if (som) som.innerHTML = vpbFactSom(a);
 });
 document.getElementById("vpb-alles").addEventListener("change", (e) => {
   for (const a of vpbLijst().filter(x => !vpbIsDicht(x.administratie))) e.target.checked ? vpbVink.add(a.id) : vpbVink.delete(a.id);

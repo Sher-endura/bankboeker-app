@@ -164,7 +164,7 @@
   .fa-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
   /* Gesplitst scherm zoals in Basecone: lijst links, document rechts, scheiding versleepbaar */
   main.breed { max-width: none; }
-  .fa-split { display: grid; grid-template-columns: minmax(0, 1fr); height: calc(100vh - 110px); min-height: 480px; margin-bottom: 16px; }
+  .fa-split { display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: 16px; }
   /* Geen rechterpaneel meer (Shereen 17 okt): het document klapt open onder de regel, over de hele breedte. */
   .fa-scheiding { display: none; }
   #tabel-facturen > tbody > tr.fa-open-rij { cursor: default; background: #f4f8fc; } #tabel-facturen > tbody > tr.fa-open-rij:hover { background: #f4f8fc; }
@@ -172,11 +172,12 @@
   #tabel-facturen #kaart-fa-detail { margin: 0; border: 1px solid #9cc3ea; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
   #tabel-facturen #kaart-fa-detail .fa-knoppen { bottom: 0; }
   #tabel-facturen .fa-scan img { max-height: calc(100vh - 200px); width: auto; max-width: 100%; display: block; margin-left: auto; margin-right: auto; }
-  .fa-split > .kaart { margin: 0; overflow: auto; min-width: 0; }
+  /* De pagina zelf scrolt (17 okt): zoekbalk en filters schuiven weg, het open document krijgt het hele scherm. */
+  .fa-split > .kaart { margin: 0; overflow: visible; min-width: 0; }
   .fa-scheiding { cursor: col-resize; position: relative; touch-action: none; }
   .fa-scheiding::after { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: var(--rand); }
   .fa-scheiding:hover::after, .fa-scheiding.sleept::after { background: var(--blauw); left: 3px; width: 4px; }
-  #tabel-facturen > thead th { position: sticky; top: -18px; background: #fff; z-index: 3; }
+  #tabel-facturen > thead th { position: sticky; top: 0; background: #fff; z-index: 3; }
   .fa-leeg { color: var(--tekst); font-size: 14px; padding: 30px 6px; }
   #tabel-fa-regels input.fa-leeg-vak:placeholder-shown { outline: 2px solid var(--oranje); background: #fff7ed; }
   @media (max-width: 900px) {
@@ -5336,11 +5337,9 @@ async function faDocOpen(id) {
 }
 function faNaarBoven() {
   const tr = document.querySelector("#tabel-facturen > tbody > tr.gekozen");
-  const vak = tr && tr.closest(".kaart");
-  if (!vak) return;
-  if (vak.scrollHeight <= vak.clientHeight + 2) { tr.scrollIntoView({ block: "start" }); return; }   // smal scherm: de pagina scrolt
+  if (!tr) return;
   const kop = document.querySelector("#tabel-facturen > thead");
-  vak.scrollTop += tr.getBoundingClientRect().top - vak.getBoundingClientRect().top - (kop ? kop.offsetHeight : 0) + 2;
+  window.scrollTo({ top: tr.getBoundingClientRect().top + window.scrollY - (kop ? kop.offsetHeight : 0) - 2 });
 }
 const faVersie = (d) => JSON.stringify(d.goedgekeurd || d.voorstel || {});
 function faBewaarConcept() {
@@ -7489,11 +7488,9 @@ document.getElementById("btn-fa-ververs").addEventListener("click", faVerversen)
 })();
 /* Lijst en document lopen precies tot de onderkant van het scherm (geen pagina-schuiven). */
 function faHoogte() {
+  // 17 okt: geen vaste hoogte meer — de pagina scrolt, zodat een opengeklapt document het hele scherm kan gebruiken.
   const sp = document.getElementById("fa-split");
-  if (!sp.offsetParent) return;
-  if (innerWidth <= 900) { sp.style.height = ""; return; }
-  const boven = sp.getBoundingClientRect().top + window.scrollY;
-  sp.style.height = Math.max(480, innerHeight - boven - 12) + "px";
+  if (sp) sp.style.height = "";
 }
 addEventListener("resize", faHoogte);
 /* Scheiding tussen lijst en document verslepen; de breedte onthoudt deze browser. */

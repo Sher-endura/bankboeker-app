@@ -8099,15 +8099,17 @@ async function vpbVerwerk(actie, ids) {
 /* Geheugen van de bank-Shai (Shereen 15 okt): een goedgekeurd antwoord = banktekst → gekozen rekening, met het antwoord
    van de klant als reden (tabel bank_vraagpost_kennis, update 13). Bij deze klant een gewoon voorstel; bij andere
    klanten voorleggen via de rekening met dezelfde naam. Terug of Overslaan haalt het weer weg. Een keuze op een
-   debiteur/crediteur leert niets (net als bij de bank). */
+   debiteur/crediteur onthoudt ook die relatie (Shereen 17 okt: "laat zien op welk klantnummer, 0063 Wacky Wahoo";
+   database-update 15) — dan stelt de bank-Shai "Op klant boeken" voor mét die klant. */
 async function vpbGeheugen(items) {
   const weg = [], erbij = [];
   for (const it of items) {
     const a = vpbData.antwoorden.find(x => x.id === it.id);
     const k = it.status === "goedgekeurd" && it.keuze;
-    if (!a || !k || k.relatie || k.rekening === vraagpostenRekening(a.administratie) || !a.omschrijving) { weg.push(it.id); continue; }
+    if (!a || !k || k.rekening === vraagpostenRekening(a.administratie) || !a.omschrijving) { weg.push(it.id); continue; }
     const s = (vpbSchemas.get(a.administratie) || []).find(x => x.code === k.rekening);
     erbij.push({ vraagpost_id: it.id, office: a.administratie, omschrijving: a.omschrijving, rekening: k.rekening, rekening_naam: s ? s.naam : null,
+      relatie: k.relatie || null, relatie_naam: k.relatie ? (vpbRelNaam(a.administratie, k.relatie) || null) : null,
       antwoord: a.antwoord || null, datum: a.datum || null, goedgekeurd_door: gebruiker ? gebruiker.email : null, goedgekeurd_op: new Date().toISOString() });
   }
   const fouten = [];

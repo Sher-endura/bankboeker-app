@@ -7782,6 +7782,27 @@ async function vpSchema(office) {
   if (!s.length) s = ((profielen.find(p => p.code === office) || {}).schema || []).map(x => ({ code: String(x.gl), naam: String(x.naam || "") }));
   return s.filter(x => x.code !== "2999" && x.code !== "2998");
 }
+/* Relatieveld zoals in Twinfield Bank (Shereen 17 okt): zoeken op naam of nummer in de klanten (DEB) of leveranciers
+   (CRD) van die administratie, live uit Twinfield. Welke lijst: volgt de rekening (debiteuren/crediteuren), anders het
+   bedrag (ontvangst = eerst klanten). */
+const vpbRelaties = new Map();   // office → { DEB: [...], CRD: [...] }
+function vpbLaadRelaties(office) {
+  if (!vpbRelaties.has(office)) {
+    const lijst = { DEB: [], CRD: [], klaar: false };
+    vpbRelaties.set(office, lijst);
+    Promise.all(["DEB", "CRD"].map(t => liveDimensies(office, t).then(x => { lijst[t] = x; }, () => {})))
+      .then(() => { lijst.klaar = true; });
+  }
+  return vpbRelaties.get(office);
+}
+function vpbRelLijst(a) {
+  const l = vpbLaadRelaties(a.administratie);
+  const rek = (document.querySelector(`[data-vpb-id="${a.id}"][data-vpb-veld="rekening"]`)?.value || "").toLowerCase();
+  if (/crediteur/.test(rek)) return l.CRD;
+  if (/debiteur/.test(rek)) return l.DEB;
+  return Number(a.bedrag) < 0 ? [...l.DEB, ...l.CRD] : [...l.CRD, ...l.DEB];
+}
+const vpbRelNaam = (office, code) => { const l = vpbRelaties.get(office); return code && l ? ([...l.DEB, ...l.CRD].find(x => x.code === code) || {}).naam || "" : ""; };
 const vpbRekTekst = (office, code) => { const s = (vpbSchemas.get(office) || []).find(x => x.code === code); return code ? (s ? `${s.code} ${s.naam}` : code) : ""; };
 /** Alle open werk van de vraagposten ophalen (te beoordelen, goedgekeurd, overgeslagen) — bij elke laadBank(). */
 async function laadVpBeoordelen() {
@@ -7793,6 +7814,7 @@ async function laadVpBeoordelen() {
   } catch (e) { toonMelding("melding-vpb", "fout", "Kon de vraagposten niet ophalen: " + escapeHtml(e.message)); return; }
   const offices = [...new Set(vpbData.antwoorden.map(a => a.administratie))];
   await Promise.all(offices.filter(o => !vpbSchemas.has(o)).map(async o => vpbSchemas.set(o, await vpSchema(o))));
+  for (const o of offices) vpbLaadRelaties(o);
   document.getElementById("melding-vpb").innerHTML = "";
   vpbModus();
   // Nieuwe antwoorden zonder voorstel: Shai stelt meteen voor.
@@ -7883,16 +7905,26 @@ function vpbTeken(bewaren = true) {
         : `<i>↩ Teruggestuurd door Endura</i><div class="vp-uitleg" style="margin:2px 0 0; font-size:12px" title="${escapeHtml(a.opmerking || "")}">geen klantantwoord — kies zelf de rekening</div>`}</td>
       <td class="vpb-boeken" style="min-width:280px">${bewerkbaar
         ? `<input type="text" list="vpb-dl-${escapeHtml(a.administratie)}" ${d} data-vpb-veld="rekening" value="${escapeHtml(rekTekst)}" placeholder="rekening — typ nummer of naam" autocomplete="off">
-           <input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie (alleen bij debiteur/crediteur)" style="margin-top:4px" autocomplete="off">
+           <input type="text" ${d} data-vpb-veld="relatie" value="${escapeHtml(rel)}" placeholder="relatie — typ naam of nummer (bij debiteur/crediteur)" style="margin-top:4px" autocomplete="off">
+           <div class="vp-uitleg" data-vpb-relnaam="${a.id}" style="margin:2px 0 0; font-size:12px">${escapeHtml(vpbRelNaam(a.administratie, rel))}</div>
            <input type="text" ${d} data-vpb-veld="omschrijving" value="${escapeHtml(oms)}" maxlength="40" style="margin-top:4px" autocomplete="off">
            ${a.voorstel ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">${a.voorstel.zeker ? "✨" : "❔"} ${escapeHtml(a.voorstel.toelichting || "")}</div>` : (vpbBezig ? `<div class="vp-uitleg" style="margin:3px 0 0; font-size:12px">Shai denkt na…</div>` : "")}`
-        : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
+        : a.keuze ? `${escapeHtml(vpbRekTekst(a.administratie, a.keuze.rekening))}${a.keuze.relatie ? ` · ${escapeHtml(a.keuze.relatie)} ${escapeHtml(vpbRelNaam(a.administratie, a.keuze.relatie))}` : ""}<div>${escapeHtml(a.keuze.omschrijving || "")}</div>` : ""}</td>
       <td style="white-space:nowrap">${bezig ? `<span class="vp-uitleg">${VPB_DRAAI}Opslaan…</span>` : bewerkbaar
         ? `<button class="knop" data-vpb-actie="goedkeuren" ${d} style="padding:4px 10px">Goedkeuren</button> <button class="knop stil" data-vpb-actie="overslaan" ${d} style="padding:4px 10px">Overslaan</button>`
         : `<button class="knop stil" data-vpb-actie="terug" ${d} style="padding:3px 8px; font-size:12px">↶ Terug naar te beoordelen</button>`}</td>
     </tr>`;
   }
   tbody.innerHTML = html;
+  for (const veld of tbody.querySelectorAll('[data-vpb-veld="relatie"]')) {
+    const a = vpbData.antwoorden.find(x => x.id === veld.dataset.vpbId);
+    if (!a) continue;
+    faKeuzelijst(veld, () => vpbRelLijst(a));
+    veld.addEventListener("input", () => {
+      const naam = tbody.querySelector(`[data-vpb-relnaam="${a.id}"]`);
+      if (naam) naam.textContent = vpbRelNaam(a.administratie, veld.value.trim());
+    });
+  }
 }
 async function vpbOpslaan(items) {
   const r = await vpRoep({ actie: "antwoorden_opslaan", items });
@@ -7910,7 +7942,8 @@ async function vpbVoorstellen(lijst) {
       for (let i = 0; i < eigen.length; i += 40) {
         const deel = eigen.slice(i, i + 40);
         const { data, error } = await sb.functions.invoke("vraagpost-voorstel", { body: { office,
-          regels: deel.map(x => ({ id: x.id, datum: x.datum, bedrag: Number(x.bedrag), omschrijving: x.omschrijving, antwoord: x.antwoord })) } });
+          regels: deel.map(x => ({ id: x.id, datum: x.datum, bedrag: Number(x.bedrag), omschrijving: x.omschrijving, antwoord: x.antwoord })),
+          relaties: (() => { const l = vpbRelaties.get(office); return l ? [...l.DEB.map(x => ({ ...x, soort: "klant" })), ...l.CRD.map(x => ({ ...x, soort: "leverancier" }))] : []; })() } });
         if (error) { let t = error.message; try { t = (await error.context.json()).fout || t; } catch (_) {} throw new Error(t); }
         const items = (data.voorstellen || []).map(v => ({ id: v.id, voorstel: { rekening: v.rekening, rekeningnaam: v.rekeningnaam, relatie: v.relatie, omschrijving: v.omschrijving, toelichting: v.toelichting, zeker: v.zeker } }));
         if (items.length) await vpbOpslaan(items);
@@ -7945,7 +7978,11 @@ function vpbKeuzeUit(a) {
   const veld = (n) => (document.querySelector(`[data-vpb-id="${a.id}"][data-vpb-veld="${n}"]`)?.value || "").trim();
   const code = veld("rekening").split(/\s+/)[0] || "";
   if (!(vpbSchemas.get(a.administratie) || []).some(s => s.code === code)) return null;
-  return { rekening: code, relatie: veld("relatie") || null, omschrijving: (veld("omschrijving") || a.antwoord || a.omschrijving || "").slice(0, 40) };
+  const relatie = veld("relatie"), rekNaam = veld("rekening").toLowerCase(), rl = vpbRelaties.get(a.administratie);
+  if (/debiteur|crediteur/.test(rekNaam) && !relatie) { a._relFout = "kies bij deze rekening een klant of leverancier (relatie)"; return null; }
+  if (relatie && rl && rl.klaar && ![...rl.DEB, ...rl.CRD].some(x => x.code === relatie)) { a._relFout = `relatie ${relatie} bestaat niet in Twinfield`; return null; }
+  delete a._relFout;
+  return { rekening: code, relatie: relatie || null, omschrijving: (veld("omschrijving") || a.antwoord || a.omschrijving || "").slice(0, 40) };
 }
 /** Goedkeuren / overslaan / terug voor één of meer regels; laadicoon zolang het opslaan duurt. */
 async function vpbVerwerk(actie, ids) {
@@ -7955,7 +7992,7 @@ async function vpbVerwerk(actie, ids) {
     if (!a || vpbRijBezig.has(id)) continue;
     if (actie === "goedkeuren") {
       const keuze = vpbKeuzeUit(a);
-      if (!keuze) { fout.push(a.omschrijving || a.antwoord); continue; }
+      if (!keuze) { fout.push((a.omschrijving || a.antwoord) + (a._relFout ? ` (${a._relFout})` : "")); continue; }
       items.push({ id, keuze, status: "goedgekeurd" });
     } else items.push({ id, status: actie === "overslaan" ? "overgeslagen" : "nieuw" });
   }

@@ -5950,7 +5950,8 @@ function bkZichtbaar() {
    Shai neemt die regels gewoon mee bij Goedgekeurd. */
 const BK_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen"]], ["fout", "Fout", ["fout"]],
   ["overgeslagen", "Overgeslagen", ["overgeslagen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd"]],
-  ["toegewezen", "Toegewezen", ["toegewezen"]], ["verwerkt", "Verwerkt (concept)", ["verwerkt"]]];
+  // Namen van Shereen (19 okt): wat er in Twinfield gebeurd is, niet hoe Shai het intern noemt.
+  ["toegewezen", "Ingevuld in TF", ["toegewezen"]], ["verwerkt", "Bankafschrift geboekt in TF", ["verwerkt"]]];
 const BK_TABJES_DOEN = ["beoordelen", "fout", "overgeslagen"];
 let bkTabje = leesTabje("bankboeker.bank.tabje", BK_TABJES);
 let bkStatusSel = new Set(BK_TABJES.find(t => t[0] === bkTabje)[2]);

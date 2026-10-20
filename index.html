@@ -223,6 +223,8 @@
   .fa-doc-kop { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   .fa-doc-kop h2 { margin: 0; overflow-wrap: anywhere; }
   #fa-opmerking .melding { margin: 0 0 10px; }
+  #fa-opmerking .fa-controle { margin: 0 0 10px; background: #fdecec; border: 1px solid #f1b8b8; border-left: 4px solid var(--rood); border-radius: 6px; padding: 9px 12px; font-size: 13px; }
+  #fa-opmerking .fa-controle .fa-punten { margin: 4px 0 8px; }
   #fa-opmerking .fa-voorleg { margin: 0 0 10px; border: 1px solid #f0d58a; border-left: 4px solid var(--oranje); padding: 9px 12px; font-size: 13px; }
   #fa-opmerking .fa-punten { margin: 4px 0 0; font-size: 13px; }
   #fa-opmerking .fa-punten li { padding: 3px 0 3px 22px; border-bottom: 0; }
@@ -4538,7 +4540,7 @@ function vernieuwFaTabel() {
     if (faIsDicht(d.office)) continue;
     const v = d.goedgekeurd || d.voorstel || {};
     const pnt = faOpmerkingen(d.status === "fout" ? null : d.opmerking, (d.voorstel && d.voorstel.waarschuwingen) || v.waarschuwingen || []);
-    const alle = [...(pnt.voorleg ? [pnt.voorleg] : []), ...pnt.lijst];
+    const alle = [...faOpenControles(d).map(c => "⚠ " + c.tekst), ...(pnt.voorleg ? [pnt.voorleg] : []), ...pnt.lijst];
     const let_ = alle.length;
     const tr = document.createElement("tr");
     if (faGekozen && faGekozen.id === d.id) tr.classList.add("gekozen");
@@ -4552,7 +4554,7 @@ function vernieuwFaTabel() {
       <td style="white-space:nowrap">${escapeHtml(datumNlKort(v.datum))}</td>
       <td class="num">${v.credit ? "−" : ""}${faBedrag(v.bedrag)}</td>
       <td>${escapeHtml(v.zekerheid || "")}</td>
-      <td>${let_ ? `<span class="fa-let" title="${escapeHtml(alle.map(w => "• " + w).join("\n"))}">${let_}</span>` : ""}${d.status === "fout" ? `<span class="fa-fout">${escapeHtml((d.opmerking || "").slice(0, 60))}</span>` : ""}</td>`;
+      <td>${d.nieuwe_crediteur && d.nieuwe_crediteur.status === "fout" ? `<span class="fa-fout" title="${escapeHtml(d.nieuwe_crediteur.fout || "")}">Wacht op nieuwe crediteur — aanmaken mislukt (open en klik Opnieuw proberen)</span> ` : ""}${let_ ? `<span class="fa-let" title="${escapeHtml(alle.map(w => "• " + w).join("\n"))}">${let_}</span>` : ""}${d.status === "fout" ? `<span class="fa-fout">${escapeHtml((d.opmerking || "").slice(0, 60))}</span>` : ""}</td>`;
     // Klik = openklappen onder de regel; nog eens klikken op het open document = dichtklappen.
     tr.addEventListener("click", (e) => { if (e.target.closest(".fa-vink")) return; if (faGekozen && faGekozen.id === d.id) faSluitDetail(); else faDocOpen(d.id); });
     const vink = tr.querySelector(".fa-vink-rij");
@@ -4896,13 +4898,17 @@ function faNieuwCrdToon() {
   stand.innerHTML = nc.status === "fout"
     ? `<span class="fa-fout">Aanmaken van nieuwe crediteur ${wat} mislukt: ${escapeHtml(nc.fout || "onbekende fout")}</span>`
     : `Nieuwe crediteur ${wat} aangevraagd${nc.aangevraagd_door ? " door " + escapeHtml(nc.aangevraagd_door) : ""}. Shai maakt hem aan bij zijn volgende ronde. In het crediteurveld staat zolang <b>NIEUW</b>; je kunt het document gewoon goedkeuren.`;
-  if (!beoordelen) return;
+  // Ook bij Goedgekeurd opnieuw kunnen proberen (Shereen 20 okt, COSMED CreativeNM/Lorena Soto: aanmaken mislukte op 13 okt
+  // en het document bleef een week stil op Goedgekeurd liggen — Shai boekt pas als de crediteur er is).
+  const nogTeBoeken = ["goedgekeurd", "ingevuld"].includes(d.status);
+  if (!beoordelen && !(nogTeBoeken && nc.status === "fout")) return;
   const knoppen = document.createElement("p"); knoppen.style.margin = "8px 0 0";
   if (nc.status === "fout") {
     const b = document.createElement("button"); b.className = "knop"; b.textContent = "Opnieuw proberen";
     b.addEventListener("click", () => faNieuwCrdOpslaan({ ...nc, status: "aangevraagd", fout: null }, "crediteur opnieuw aangevraagd"));
     knoppen.appendChild(b);
   }
+  if (!beoordelen) { stand.appendChild(knoppen); return; }   // intrekken zou een goedgekeurd document met NIEUW laten vastzitten
   const weg = document.createElement("button"); weg.className = "knop stil"; weg.textContent = "Aanvraag intrekken"; weg.style.marginLeft = "6px";
   weg.addEventListener("click", async () => {
     if (document.getElementById("fa-crediteur").value.trim().toUpperCase() === "NIEUW") document.getElementById("fa-crediteur").value = "";
@@ -5086,7 +5092,13 @@ async function openFactuur(id) {
   if (d.status === "fout" && d.opmerking) opm.push(`<div class="melding fout">${faMetNamen(d.opmerking)}</div>`);
   // Eén strook bovenaan het venster: de reden plus de overige punten eronder (Shereen 15 okt).
   if (punten.voorleg || punten.lijst.length) opm.push(`<div class="fa-voorleg">${punten.voorleg ? `<b>Waarom Shai dit voorlegt:</b> ${faMetNamen(punten.voorleg)}` : "<b>Let op</b>"}${punten.lijst.length ? `<ul class="fa-punten">${punten.lijst.map(w => `<li>${faMetNamen(w)}</li>`).join("")}</ul>` : ""}</div>`);
+  // Controles met keuze (Shereen 19 okt): hoort bij een andere klant / al geboekt in Twinfield — Shai beslist niet zelf.
+  const ctl = faOpenControles(d);
+  if (ctl.length && FA_BEOORDELEN.includes(d.status)) opm.unshift(`<div class="fa-controle"><b>⚠ Shai waarschuwt</b><ul class="fa-punten">${ctl.map(c => `<li>${faMetNamen(c.tekst)}</li>`).join("")}</ul>` +
+    `<button class="knop klein" type="button" data-fa-controle="door" title="De waarschuwing klopt niet of het mag toch: gewoon beoordelen en goedkeuren">Toch doorgaan</button> ` +
+    `<button class="knop klein stil" type="button" data-fa-controle="weg" title="Shai verwijdert dit document bij zijn volgende ronde uit Basecone">Laten verwijderen door Shai</button></div>`);
   document.getElementById("fa-opmerking").innerHTML = opm.join("");
+  document.querySelectorAll("#fa-opmerking [data-fa-controle]").forEach(b => b.addEventListener("click", () => b.dataset.faControle === "door" ? faControleDoorgaan() : faControleVerwijderen()));
 
   // Wat de robot las
   const a = d.ai || {};
@@ -5224,6 +5236,9 @@ async function faGoedkeuren() {
     return;
   }
 
+  const ctlOpen = faOpenControles(d);
+  if (ctlOpen.length && !confirm(`Shai waarschuwt:\n\n${ctlOpen.map(c => "• " + c.tekst).join("\n")}\n\nToch goedkeuren?`)) return;
+
   // Leveranciers, artikelen en aantekeningen leert de database zelf bij het goedkeuren
   // (trigger basecone_leer, database-update 3). Alleen een uitleg in gewone taal wordt een regel.
   const leverancier = (d.ai && d.ai.leverancier_naam) || d.bestandsnaam || "";
@@ -5284,6 +5299,26 @@ async function faZetStatus(status, logActie, extra = {}) {
   else if (status === "verwijderen") faVolgendeOfSluiten(d.office, "Shai verwijdert dit document bij zijn volgende ronde uit Basecone (daarna te vinden onder DELETED).");
   else if (status === "splitsen") faVolgendeOfSluiten(d.office, "Shai wijst dit document in zijn volgende ronde af in Validatie en splitst het bij Aangeleverd; de delen komen daarna als nieuwe documenten terug.");
   else await openFactuur(d.id);
+}
+/* Controles van Shai die nog niet beantwoord zijn (voorstel.controles, factuur-lezen 19 okt). */
+const faOpenControles = (d) => (d && d.voorstel && !d.voorstel.controles_akkoord && Array.isArray(d.voorstel.controles)) ? d.voorstel.controles : [];
+async function faControleDoorgaan() {
+  const d = faGekozen; if (!d) return;
+  const wie = gebruiker ? gebruiker.email : null;
+  const voorstel = { ...d.voorstel, controles_akkoord: { door: wie, op: new Date().toISOString() } };
+  // De voorleg-reden die alleen om de waarschuwing stond, mag dan weg (zelfde tekst als CONTROLE_OPMERKING in factuur-lezen).
+  const opmerking = /^Shai waarschuwt — zie het rode blok/.test(d.opmerking || "") ? null : d.opmerking;
+  const { error } = await sb.from("basecone_documenten").update({ voorstel, opmerking, updated_by: wie }).eq("id", d.id);
+  if (error) { toonMelding("melding-fa-detail", "fout", escapeHtml(error.message)); return; }
+  await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "waarschuwing genegeerd", door: wie, details: { controles: (d.voorstel.controles || []).map(c => c.tekst) } });
+  await laadFacturen();
+  await openFactuur(d.id);
+}
+function faControleVerwijderen() {
+  const d = faGekozen; if (!d) return;
+  faVerwijderVragen();
+  const c = faOpenControles(d)[0], veld = document.getElementById("fa-verwijder-reden");
+  if (c && !veld.value.trim()) veld.value = c.verwijder_reden || "";
 }
 /* Laten verwijderen door Shai (Shereen 12 okt): eerst de reden vragen — die komt in de mail aan de klant. */
 function faVerwijderVragen() {

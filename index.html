@@ -5145,8 +5145,9 @@ function vernieuwFaRegels(regels) {
       <td style="font-size:12px">${escapeHtml(r.inhoud || "")}</td>
       <td><button class="knop stil fa-weg" style="padding:3px 8px; font-size:12px">✕</button></td>`;
     tr.dataset.inhoud = r.inhoud || "";
-    tr.querySelector(".fa-weg").addEventListener("click", () => { tr.remove(); faSom(); });
+    tr.querySelector(".fa-weg").addEventListener("click", () => { tr.remove(); faSom(); faKopGelijk(); });
     tr.querySelector(".fa-rb").addEventListener("input", faSom);
+    tr.querySelector(".fa-ro").addEventListener("input", faKopGelijk);
     const gl = tr.querySelector(".fa-gl");
     const glNaam = () => {
       const c = faStam.BAS.find(x => x.code === gl.value.trim());
@@ -5162,6 +5163,16 @@ function vernieuwFaRegels(regels) {
     tbody.appendChild(tr);
   }
   faSom();
+  faKopGelijk();
+}
+/* Eén boekingsregel: bovenaan staat dezelfde omschrijving als op de regel — zo boekt Shai het ook in Basecone (kopVan in
+   robot.mjs, 17 okt). Shereen 20 okt: "dan moet het scherm dat ook laten zien". Bij meer regels blijft de kop zoals hij is. */
+function faKopGelijk() {
+  const ro = document.querySelectorAll("#tabel-fa-regels tbody .fa-ro");
+  const kop = document.getElementById("fa-omschrijving");
+  if (ro.length !== 1 || !ro[0].value.trim() || kop.value === ro[0].value) return;
+  kop.value = ro[0].value;
+  faOmsTeller();
 }
 function leesFaRegels() {
   return [...document.querySelectorAll("#tabel-fa-regels tbody tr")].map(tr => ({
@@ -8401,7 +8412,12 @@ document.getElementById("btn-fa-verwijder-ok").addEventListener("click", faVerwi
 document.getElementById("btn-fa-verwijder-annuleer").addEventListener("click", () => { document.getElementById("fa-verwijder-vak").style.display = "none"; });
 document.getElementById("fa-verwijder-reden").addEventListener("keydown", (e) => { if (e.key === "Enter") faVerwijderBevestigen(); });
 document.getElementById("btn-fa-regel").addEventListener("click", () => vernieuwFaRegels([...leesFaRegels(), { grootboek: "", bedrag: 0, inhoud: "", omschrijving: document.getElementById("fa-omschrijving").value }]));
-document.getElementById("fa-omschrijving").addEventListener("input", faOmsTeller);
+document.getElementById("fa-omschrijving").addEventListener("input", () => {
+  faOmsTeller();
+  // Andersom ook: bij één regel loopt de regelomschrijving mee met de kop.
+  const ro = document.querySelectorAll("#tabel-fa-regels tbody .fa-ro");
+  if (ro.length === 1) ro[0].value = document.getElementById("fa-omschrijving").value;
+});
 document.getElementById("fa-datum").addEventListener("input", faDatumTekst);
 document.getElementById("fa-vervaldatum").addEventListener("input", faDatumTekst);
 /* Totaal aanpassen (Shereen 12 okt): zonder boekingsregels komt er vanzelf één regel met dat bedrag (dan

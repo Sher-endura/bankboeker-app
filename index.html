@@ -7056,7 +7056,15 @@ function bkNaarVraagposten(regels, meldingId = "melding-bank", reden) {
   if (zonder.length) return toonMelding(meldingId, "fout", bkGeenVp(zonder) + " Er is niets goedgekeurd.");
   return bkGoedkeuren(regels, (r) => bkVraagpostGoedkeuring(r, reden), meldingId, BK_BEWERK_STATUS);   // ook vanuit Fout (13 okt) en Overgeslagen (15 okt)
 }
-document.getElementById("btn-bk-vraagposten").addEventListener("click", () => bkNaarVraagposten(bkRegels.filter(r => bkVink.has(r.id))));
+// Eerst bevestigen (Shereen 20 okt: per ongeluk 139 regels naar Vraagposten i.p.v. Goedkeuren — Shai's ronde liep al).
+document.getElementById("btn-bk-vraagposten").addEventListener("click", () => {
+  const regels = bkRegels.filter(r => bkVink.has(r.id));
+  if (!regels.length) return;
+  const per = {}; for (const r of regels) per[r.office] = (per[r.office] || 0) + 1;
+  const klanten = Object.entries(per).map(([o, n]) => `${o} ${n}`).join(", ");
+  if (!confirm(`${regels.length} regel${regels.length === 1 ? "" : "s"} naar Vraagposten sturen?\n\n${klanten}\n\nShai wijst ze in zijn volgende ronde toe op de vraagpostenrekening (bv. 2999) — niet op het voorstel van Twinfield.\nWilde je goedkeuren zoals voorgesteld? Klik dan Annuleren en kies ✓ Aangevinkte goedkeuren.`)) return;
+  bkNaarVraagposten(regels);
+});
 document.getElementById("btn-bk-nu").addEventListener("click", bkNuDraaien);
 document.getElementById("btn-bk-ververs").addEventListener("click", async (e) => {
   // Laten zien dát hij ververst (Shereen 12 okt: "ik denk dat deze knop niet werkt").

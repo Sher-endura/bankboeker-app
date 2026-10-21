@@ -1277,7 +1277,8 @@ async function initAuth() {
     document.getElementById("wachtwoord-overlay").style.display = "flex";
     return false;
   }
-  document.getElementById("kop-gebruiker").textContent = gebruiker.email;
+  document.getElementById("kop-gebruiker").textContent = naamVan(gebruiker.email);
+  document.getElementById("kop-gebruiker").title = gebruiker.email || "";
   document.getElementById("kop-gebruiker").style.display = "";
   setTimeout(laadAiStand, 1500);
   setInterval(laadAiStand, 10 * 60 * 1000);
@@ -4278,8 +4279,11 @@ let faDocs = [], faGekozen = null, faStam = { BAS: [], CRD: [] };
 /* Wie en wanneer (Shereen 21 okt): bij goedgekeurd, fout en overgeslagen in de ⓘ / de tekst van Shai, voor Basecone én
    Twinfield. Goedgekeurd: uit de goedkeuring zelf; Fout en Overgeslagen: uit het logboek (updated_by verandert later
    ook door Shai's leesronde). */
-// "Shai" (bank-Shai) en robot@ (Basecone-Shai) zijn de robots; shai@endura-aruba.com is een gewone inlog van een medewerker.
-const wieTekst = (w) => !w ? "?" : /^(shai|robot@endura-aruba\.com)$/i.test(String(w).trim()) ? "Shai (robot)" : String(w);
+// Alleen de naam, geen mailadres (Shereen 21 okt): shereen@… → Shereen. "Shai" (bank-Shai), robot@ en shai@ (de inlog van
+// Basecone-Shai, ook in gebruik bij medewerkers) → Shai.
+function naamVan(w) { const t = String(w || "").trim(); if (!t) return "?"; if (/^(shai|robot)(@|$)/i.test(t)) return "Shai";
+  if (!t.includes("@")) return t; const n = t.split("@")[0]; return n.charAt(0).toUpperCase() + n.slice(1); }
+const wieTekst = naamVan;
 const wanneerTekst = (t) => t ? new Date(t).toLocaleString("nl-NL", { timeZone: "America/Aruba", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "?";
 /* Laatste logregel per id (bank_log.regel_id / basecone_log.document_id) met een van deze acties. */
 async function laatsteKeuzes(tabel, kolom, ids, acties) {
@@ -8560,7 +8564,7 @@ async function startOnline() {
 function onlineWaarBijwerken() { if (onlineKanaal) onlineKanaal.track({ email: onlineIk(), waar: onlineWaar(), sinds: onlineSinds }).catch(() => {}); }
 function toonOnline() {
   const online = Object.keys(onlineNu);
-  const wie = (e) => e.split("@")[0];
+  const wie = naamVan;
   const alle = [...new Set([...online, ...onlineBekend, onlineIk()].filter(Boolean))]
     .sort((x, y) => (online.includes(y) - online.includes(x)) || x.localeCompare(y));
   document.getElementById("online-tal").textContent = `${Math.max(online.length, 1)} online`;

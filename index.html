@@ -322,6 +322,9 @@
   .status-tabjes { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--rand); margin: 0 0 10px; }
   .status-tabjes button { background: none; border: none; border-bottom: 3px solid transparent; padding: 6px 6px; font-size: 14px; color: var(--tekst); cursor: pointer; white-space: nowrap; }
   .status-tabjes button:hover { color: var(--blauw); }
+  .status-tabjes button.vw-tab { background: var(--rood); color: #fff; font-weight: 600; border-radius: 6px 6px 0 0; padding: 6px 10px; margin-left: 4px; }
+  .status-tabjes button.vw-tab:hover { color: #fff; filter: brightness(0.92); }
+  .status-tabjes button.vw-tab.actief { color: #fff; border-bottom-color: var(--tekst); }
   #tabel-verwijderd td.vw-reden { cursor: text; } #tabel-verwijderd .vw-pen { color: var(--blauw); font-size: 12px; opacity: .6; }
   .status-tabjes button.actief { color: var(--blauw); font-weight: 600; border-bottom-color: #FB7974; }
   /* Harde regel toevoegen (Knowledgebase, 14 okt) */
@@ -1013,13 +1016,13 @@
   <div class="kaart">
     <div class="status-tabjes" id="vw-tabjes" style="margin-bottom:10px"></div>
     <h2>Basecone — verwijderd door Shai</h2>
-    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Hier staat elk document dat Shai op jouw aanwijzing uit Basecone heeft verwijderd (knop <b>Laten verwijderen door Shai</b> bij een document), met de eerste pagina van de scan, de uploaddatum en de reden. De scan blijft hier bewaard. Vink documenten van één klant aan en kies <b>✉ Klant mailen</b> om de klant te laten weten welke documenten we hebben weggehaald en waarom. Hoeft de klant het niet te weten (bv. een tijdlijn-pagina of een dubbele upload), kies dan <b>Definitief verwijderen (zonder mail)</b>: dan verdwijnt het uit deze lijst. Klik op een reden om hem aan te passen. De mail gaat naar de contactpersonen die in E-Board de aanleverherinneringen krijgen, vanaf het Endura-mailadres; de eerste pagina van elk document zit als bijlage bij de mail. Klik op een afbeelding om hem groot te zien.</details>
+    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Hier staat elk document dat Shai op jouw aanwijzing uit Basecone heeft verwijderd (knop <b>Laten verwijderen door Shai</b> bij een document), met de eerste pagina van de scan, de uploaddatum en de reden. De scan blijft hier bewaard tot je hem definitief verwijdert. Vink documenten van één klant aan en kies <b>✉ Klant mailen</b> om de klant te laten weten welke documenten we hebben weggehaald en waarom. Hoeft de klant het niet te weten (bv. een tijdlijn-pagina of een dubbele upload), kies dan <b>Definitief verwijderen (zonder mail)</b>: de scan wordt gewist en het document verdwijnt uit deze lijst. Klik op een reden om hem aan te passen. De mail gaat naar de contactpersonen die in E-Board de aanleverherinneringen krijgen, vanaf het Endura-mailadres; de eerste pagina van elk document zit als bijlage bij de mail. Klik op een afbeelding om hem groot te zien.</details>
     <div class="fa-balk">
       <select id="vw-office" style="width:auto"></select>
       <label style="font-weight:normal; display:flex; align-items:center; gap:6px; margin:0"><input type="checkbox" id="vw-ook-gemaild"> Ook al gemailde tonen</label>
       <button class="knop stil" id="btn-vw-ververs" style="padding:6px 12px">↻ Verversen</button>
       <button class="knop" id="btn-vw-mail" disabled>✉ Klant mailen</button>
-      <button class="knop stil gevaar" id="btn-vw-definitief" disabled title="Uit deze lijst halen zonder de klant te mailen. Het document is al uit Basecone verwijderd; Shai onthoudt het, zodat hij het nooit opnieuw tagt.">Definitief verwijderen (zonder mail)</button>
+      <button class="knop stil gevaar" id="btn-vw-definitief" disabled title="Scan wissen en uit deze lijst halen, zonder de klant te mailen. Het document is al uit Basecone verwijderd; Shai onthoudt het, zodat hij het nooit opnieuw tagt.">Definitief verwijderen (zonder mail)</button>
       <span id="vw-tal" style="font-size:13px"></span>
     </div>
     <div id="melding-verwijderd"></div>
@@ -4547,7 +4550,7 @@ function faTabjesRij(vakId, opDeleted) {
     vernieuwFaFilters(); vernieuwFaTabel();
   }, FA_TABJES_DOEN);
   const knop = document.createElement("button");
-  knop.type = "button"; knop.dataset.tab = "deleted"; if (opDeleted) knop.className = "actief";
+  knop.type = "button"; knop.dataset.tab = "deleted"; knop.className = "vw-tab" + (opDeleted ? " actief" : "");   // rood (Shereen 21 okt)
   knop.textContent = `DELETED${vwTeller === null ? "" : ` (${vwTeller})`}`;
   knop.addEventListener("click", () => kiesTab("verwijderd"));
   document.getElementById(vakId).appendChild(knop);
@@ -8399,25 +8402,48 @@ function vwRedenBewerken(td, d) {
   veld.addEventListener("keydown", (e) => { if (e.key === "Enter") bewaar(true); if (e.key === "Escape") bewaar(false); });
   veld.addEventListener("blur", () => bewaar(true));
 }
-/* Definitief verwijderen zonder mail (Shereen 21 okt). Alleen wat Shai al uit Basecone verwijderde. De rij blijft in de
-   database (basecone.definitief_verwijderd), zodat Shai het document herkent als het ooit terugkomt; de scan blijft in
-   de opslag (medewerkers mogen daar niets wissen), maar is nergens meer te zien. */
+/* De scans van één document echt wissen (database-update 18, Shereen 21 okt): de pagina's in scan_paden plus wat Shai in de
+   eigen map van het document bewaarde (ingevuld.png, boeken-mislukt.png). Gesplitste delen delen hun pagina's met het
+   origineel: een bestand dat een ander document nog gebruikt, blijft staan. Geeft het aantal gewiste bestanden. */
+async function vwScansWissen(d) {
+  const paden = new Set(d.scan_paden || []);
+  const map = `${d.office}/${d.id}`;
+  const { data: inMap } = await sb.storage.from("basecone-scans").list(map, { limit: 1000 });
+  for (const f of inMap || []) if (f.name && f.id) paden.add(`${map}/${f.name}`);
+  if (!paden.size) return 0;
+  const { data: anderen, error: e1 } = await sb.from("basecone_documenten").select("id, status, opmerking, scan_paden").overlaps("scan_paden", [...paden]).neq("id", d.id);
+  if (e1) throw new Error(e1.message);
+  // Het origineel van een splitsing telt niet mee: dat bestaat in Basecone niet meer, de delen zijn de documenten.
+  const echt = (anderen || []).filter(x => !(x.status === "overgeslagen" && /^Door Shai gesplitst/.test(x.opmerking || "")));
+  const inGebruik = new Set(echt.flatMap(x => x.scan_paden || []));
+  const weg = [...paden].filter(x => !inGebruik.has(x));
+  if (!weg.length) return 0;
+  const { data, error } = await sb.storage.from("basecone-scans").remove(weg);
+  if (error) throw new Error(error.message);
+  return (data || []).length;
+}
+/* Definitief verwijderen zonder mail (Shereen 21 okt). Alleen wat Shai al uit Basecone verwijderde. De scans worden gewist;
+   de rij blijft in de database (basecone.definitief_verwijderd), zodat Shai het document herkent als het ooit terugkomt. */
 async function vwDefinitief() {
   const gekozen = vwDocs.filter(d => vwVink.has(d.id) && d.status === "verwijderd");
   if (!gekozen.length) return;
-  if (!confirm(`${gekozen.length} document${gekozen.length === 1 ? "" : "en"} definitief verwijderen, zonder de klant te mailen?\n\nZe verdwijnen uit DELETED. Dit kun je hier niet terugdraaien.`)) return;
+  if (!confirm(`${gekozen.length} document${gekozen.length === 1 ? "" : "en"} definitief verwijderen, zonder de klant te mailen?\n\nDe scans worden gewist en ze verdwijnen uit DELETED. Dit kan niet worden teruggedraaid.`)) return;
   const wie = gebruiker ? gebruiker.email : null, op = new Date().toISOString();
-  let fout = null, klaar = 0;
+  let fout = null, klaar = 0, bestanden = 0;
   for (const d of gekozen) {
+    let gewist;
+    try { gewist = await vwScansWissen(d); } catch (e) { fout = `scans van ${d.bestandsnaam || d.id} wissen lukte niet: ${e.message}`; break; }
+    bestanden += gewist;
     const { data: rij } = await sb.from("basecone_documenten").select("basecone").eq("id", d.id).maybeSingle();
-    const { error } = await sb.from("basecone_documenten").update({ basecone: { ...((rij && rij.basecone) || {}), definitief_verwijderd: { door: wie, op } }, updated_by: wie })
+    const { error } = await sb.from("basecone_documenten").update({ scan_paden: [],
+      basecone: { ...((rij && rij.basecone) || {}), definitief_verwijderd: { door: wie, op, scans_gewist: gewist } }, updated_by: wie })
       .eq("id", d.id).eq("status", "verwijderd");
     if (error) { fout = error.message; break; }
-    await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "definitief verwijderd", door: wie, details: { zonder_mail: true, reden: d.verwijder_reden || null } });
+    await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "definitief verwijderd", door: wie, details: { zonder_mail: true, reden: d.verwijder_reden || null, scans_gewist: gewist } });
     vwVink.delete(d.id); klaar++;
   }
   await laadVerwijderd();
-  toonMelding("melding-verwijderd", fout ? "fout" : "ok", `${klaar} document${klaar === 1 ? "" : "en"} definitief verwijderd (zonder mail).` + (fout ? " Daarna ging het mis: " + escapeHtml(fout) : ""));
+  toonMelding("melding-verwijderd", fout ? "fout" : "ok", `${klaar} document${klaar === 1 ? "" : "en"} definitief verwijderd (zonder mail), ${bestanden} scanbestand${bestanden === 1 ? "" : "en"} gewist.` + (fout ? " Daarna ging het mis: " + escapeHtml(fout) : ""));
 }
 
 /* Het mailvenster: E-Board-klant (eenmalig koppelen), ontvangers, taal, toelichting, voorbeeld, proef, versturen. */

@@ -6044,8 +6044,12 @@ async function bkNuDraaien() {
   // Eén klant of iedereen: volgt de keuze in "Alle administraties" (Shereen 11 okt).
   const office = document.getElementById("bk-office").value || null;
   if (office === GEEN_ADMIN) { m.textContent = "Kies eerst een bestaande administratie (of maak het zoekvak leeg voor alle klanten)."; bkNuGevraagd = false; knop.disabled = false; return; }
-  const { error } = await sb.from("bank_log").insert({ actie: "nu draaien", office, door: gebruiker ? gebruiker.email : null });
-  m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"} (als zijn Twinfield-venster open en ingelogd is).`;
+  // Vanuit het tabje Goedgekeurd vraagposten (Shereen 21 okt): na de bankronde ook meteen de goedgekeurde vraagposten boeken
+  // (anders alleen na de vaste ronde van 18:00).
+  const metVp = bkVp && vpbStand === "goedgekeurd";
+  if (metVp && !confirm(`Shai nu laten draaien voor ${office || "alle klanten"} — en daarna meteen de goedgekeurde vraagposten${office ? " van " + office : ""} boeken in de oorspronkelijke boeking (concept)?`)) { bkNuGevraagd = false; knop.disabled = false; return; }
+  const { error } = await sb.from("bank_log").insert({ actie: "nu draaien", office, door: gebruiker ? gebruiker.email : null, ...(metVp ? { details: { vraagposten: true } } : {}) });
+  m.textContent = error ? "Lukte niet: " + error.message : `Gevraagd — Shai begint binnen een halve minuut met ${office || "alle klanten"}${metVp ? ", daarna de goedgekeurde vraagposten" : ""} (als zijn Twinfield-venster open en ingelogd is).`;
   setTimeout(() => { bkNuGevraagd = false; laadBankStatus(); }, 30000);
 }
 /* Tabje Verwerkt (Shereen 12 okt: "anders wordt het een megalijst"): per dag inklapbaar, nieuwste dag open, en
@@ -6208,7 +6212,7 @@ function vernieuwBkTabel() {
   // Keuzelijst: weer per tabje (Shereen 13 okt: "ik klikte OUTSTANDING_HOME bij te beoordelen omdat dat getal in de zoekbox
   // stond, en alles was al goedgekeurd") — alleen administraties met regels in dit tabje, het getal = regels in dit tabje.
   const bkSub = document.getElementById("bk-substatus").value;
-  vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
+  if (!bkVp) vulAdminKeuze("bk-office", bkRegels.filter(r => bkStatusSel.has(r.status) && bkRecentVerwerkt(r) && bkRichtingPast(r) && bkZekerPast(r) &&
     pastSubstatus(bkSub, r.status, r.voorstel && r.voorstel.bron)).map(r => r.office));
   const tbody = document.querySelector("#tabel-bank tbody");
   const lijst = bkZichtbaar();
@@ -8071,6 +8075,8 @@ function vpbBewaarInvoer() {
 function vpbTeken(bewaren = true) {
   if (bewaren) vpbBewaarInvoer();
   if (!vpbData || !vpbStand) return;
+  // De keuzelijst volgt hier de vraagposten (niet de bankregels): Code 19 heeft alleen vraagposten (21 okt).
+  vulAdminKeuze("bk-office", (vpbData.antwoorden || []).filter(a => a.status === vpbStand).map(a => a.administratie));
   const lijst = vpbLijst();
   for (const id of [...vpbVink]) if (!lijst.some(a => a.id === id && !vpbIsDicht(a.administratie))) vpbVink.delete(id);   // alleen wat je nu ziet
   vpbBulkBalk(lijst);

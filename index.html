@@ -224,6 +224,8 @@
   .fa-doc-kop h2 { margin: 0; overflow-wrap: anywhere; }
   #fa-opmerking .melding { margin: 0 0 10px; }
   #fa-opmerking .fa-wie { margin: 0 0 8px; font-size: 12px; color: var(--grijs, #6b7280); }
+  #fa-opmerking .fa-samen { margin: 0 0 10px; background: #eef4ff; border: 1px solid #c7d7f5; border-left: 4px solid var(--blauw); border-radius: 6px; padding: 9px 12px; font-size: 13px; }
+  #fa-opmerking .fa-samen ol { margin: 4px 0 8px 18px; padding: 0; } #fa-opmerking .fa-samen select { max-width: 100%; }
   #fa-opmerking .fa-controle { margin: 0 0 10px; background: #fdecec; border: 1px solid #f1b8b8; border-left: 4px solid var(--rood); border-radius: 6px; padding: 9px 12px; font-size: 13px; }
   #fa-opmerking .fa-controle .fa-punten { margin: 4px 0 8px; }
   #fa-opmerking .fa-voorleg { margin: 0 0 10px; border: 1px solid #f0d58a; border-left: 4px solid var(--oranje); padding: 9px 12px; font-size: 13px; }
@@ -5176,7 +5178,9 @@ async function openFactuur(id) {
   if (ctl.length && FA_BEOORDELEN.includes(d.status)) opm.unshift(`<div class="fa-controle"><b>⚠ Shai waarschuwt</b><ul class="fa-punten">${ctl.map(c => `<li>${faMetNamen(c.tekst)}</li>`).join("")}</ul>` +
     `<button class="knop klein" type="button" data-fa-controle="door" title="De waarschuwing klopt niet of het mag toch: gewoon beoordelen en goedkeuren">Toch doorgaan</button> ` +
     `<button class="knop klein stil" type="button" data-fa-controle="weg" title="Shai verwijdert dit document bij zijn volgende ronde uit Basecone">Laten verwijderen door Shai</button></div>`);
+  if (FA_BEOORDELEN.includes(d.status) || d.status === "fout") opm.push(faSamenBlok(d));
   document.getElementById("fa-opmerking").innerHTML = opm.join("");
+  faSamenKoppel(d);
   document.querySelectorAll("#fa-opmerking [data-fa-controle]").forEach(b => b.addEventListener("click", () => b.dataset.faControle === "door" ? faControleDoorgaan() : faControleVerwijderen()));
 
   // Wat de robot las
@@ -5389,6 +5393,88 @@ async function faZetStatus(status, logActie, extra = {}) {
   else if (status === "verwijderen") faVolgendeOfSluiten(d.office, "Shai verwijdert dit document bij zijn volgende ronde uit Basecone (daarna te vinden onder DELETED).");
   else if (status === "splitsen") faVolgendeOfSluiten(d.office, "Shai wijst dit document in zijn volgende ronde af in Validatie en splitst het bij Aangeleverd; de delen komen daarna als nieuwe documenten terug.");
   else await openFactuur(d.id);
+}
+/* Samenvoegen (Shereen 21 okt): pagina's of delen van één factuur die als losse documenten binnenkwamen (BINGO Compra
+   26877619: pagina 1 "carry forward", pagina 2 met het totaal; Super Food 20-10: boven- en onderkant van één lange bon,
+   alleen de bovenkant heeft een bonnummer). Shai stelt het voor bij een sterke aanwijzing; met "Samenvoegen met…" kies je zelf.
+   De robot wijst ze af in Validatie en voegt ze bij Aangeleverd samen (Basecone merge), in de volgorde hieronder. */
+const FA_SAMEN_STATUS = ["voorstel", "voorleggen", "fout", "nieuw", "gelezen"];
+const FA_DEEL = /pagina\s*[12]|carry\s*forward|afgesneden|onvolledig|bovenkant|onderkant|bovenste deel|onderste deel|ander(e)? deel|deel van de (bon|factuur)|tweede pagina|ontbreekt|apart is ge(ü|u)pload/i;
+const faTekstVan = (x) => [x.opmerking, ...((x.voorstel || {}).waarschuwingen || [])].filter(Boolean).join(" ");
+function faSamenKandidaten(d) {
+  const v = d.voorstel || {}, nr = (t) => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return faDocs.filter(x => x.id !== d.id && x.office === d.office && FA_SAMEN_STATUS.includes(x.status)).map(x => {
+    const w = x.voorstel || {}, zelfdeCrd = !!v.crediteur && v.crediteur === w.crediteur;
+    const zelfdeNr = zelfdeCrd && /\d{3,}/.test(v.factuurnummer || "") && nr(v.factuurnummer) === nr(w.factuurnummer);
+    const zelfdeDag = zelfdeCrd && !!v.datum && v.datum === w.datum;
+    // Beide documenten noemen een ontbrekend deel, en geen twee verschillende echte factuurnummers (dan zijn het twee facturen).
+    const deel = FA_DEEL.test(faTekstVan(d)) && FA_DEEL.test(faTekstVan(x));
+    const anderNr = /\d{3,}/.test(v.factuurnummer || "") && /\d{3,}/.test(w.factuurnummer || "") && nr(v.factuurnummer) !== nr(w.factuurnummer);
+    const score = zelfdeNr ? 3 : anderNr ? (zelfdeCrd ? 0.5 : 0) : zelfdeDag && deel ? 2 : zelfdeDag ? 1 : zelfdeCrd ? 0.5 : 0;
+    const waarom = zelfdeNr ? `zelfde factuurnummer ${v.factuurnummer}` : zelfdeDag && deel ? "zelfde leverancier en datum, en Shai zag dat er een deel ontbreekt" : zelfdeDag ? "zelfde leverancier en datum" : zelfdeCrd ? "zelfde leverancier" : "";
+    return { x, score, waarom };
+  }).sort((a, b) => b.score - a.score || String(a.x.geupload_op).localeCompare(String(b.x.geupload_op)));
+}
+/* Welke eerst? Het deel dat "onderste deel / alleen pagina 2 / bovenkant ontbreekt" heet, gaat achteraan; "carry forward /
+   onderaan afgesneden" vooraan; anders op uploadtijd. */
+function faSamenVolgorde(a, b) {
+  // Eerst kijken of het het LAATSTE deel is (onderkant / pagina 2), dan pas of het het eerste is.
+  const laat = (x) => /alleen (het )?onderste deel|alleen (de )?onderkant|alleen pagina 2|pagina 2 van|bovenkant[^.]*ontbreekt|bovenste deel[^.]*(ontbreekt|apart)/i.test(faTekstVan(x)) ? 1
+    : /carry\s*forward|onderaan afgesneden|onderste deel[^.]*ontbreekt|totaal[^.]*ontbreekt|tweede pagina|onderste deel apart|pagina 1 van/i.test(faTekstVan(x)) ? -1 : 0;
+  return laat(a) - laat(b) || String(a.geupload_op).localeCompare(String(b.geupload_op));
+}
+let faSamenKeuze = null;   // { voor: doc-id, ander: doc-id, omgedraaid: bool }
+function faSamenBlok(d) {
+  const k = faSamenKandidaten(d);
+  const sterk = k.filter(c => c.score >= 2);
+  if (!faSamenKeuze || faSamenKeuze.voor !== d.id) faSamenKeuze = { voor: d.id, ander: sterk.length ? sterk[0].x.id : null, omgedraaid: false, open: sterk.length > 0 };
+  if (!faSamenKeuze.open) return `<div class="fa-samen" style="background:none; border:none; padding:0"><button type="button" class="fa-klein-knop" data-fa-samen="open">⊕ Samenvoegen met…</button> <span style="font-size:12px; color:var(--grijs,#6b7280)">(pagina's of delen van één factuur die apart zijn aangeleverd)</span></div>`;
+  const ander = faDocs.find(x => x.id === faSamenKeuze.ander);
+  const opties = k.map(c => `<option value="${escapeHtml(c.x.id)}"${c.x.id === faSamenKeuze.ander ? " selected" : ""}>${escapeHtml(c.x.bestandsnaam || c.x.id)} · ${escapeHtml(faCrdNamen[`${c.x.office}|${(c.x.voorstel || {}).crediteur}`] || (c.x.voorstel || {}).crediteur || "?")} · ${faBedrag((c.x.voorstel || {}).bedrag)}${c.waarom ? " — " + escapeHtml(c.waarom) : ""}</option>`).join("");
+  let volgorde = ander ? [d, ander].sort(faSamenVolgorde) : [d];
+  if (faSamenKeuze.omgedraaid) volgorde = volgorde.reverse();
+  const tekst = (x) => `<b>${escapeHtml(x.bestandsnaam || x.id)}</b> — ${faBedrag((x.voorstel || {}).bedrag)}${x.id === d.id ? " (dit document)" : ""}`;
+  const sterkTekst = sterk.length && ander && sterk.some(c => c.x.id === ander.id) ? `<b>Pagina's van één factuur?</b> ${escapeHtml(sterk.find(c => c.x.id === ander.id).waarom)}.` : "<b>Samenvoegen met een ander document</b>";
+  return `<div class="fa-samen">${sterkTekst}
+    <div style="margin-top:6px">Met: <select data-fa-samen="kies"><option value="">— kies het andere deel —</option>${opties}</select></div>
+    ${ander ? `<div style="margin-top:6px">Volgorde in het samengevoegde document:</div><ol>${volgorde.map(x => `<li>${tekst(x)}</li>`).join("")}</ol>
+    <button type="button" class="knop klein" data-fa-samen="doen">Laten samenvoegen door Shai</button> <button type="button" class="knop klein stil" data-fa-samen="draai">⇅ Volgorde omdraaien</button> ` : ""}
+    <button type="button" class="knop klein stil" data-fa-samen="dicht">Niet samenvoegen</button></div>`;
+}
+function faSamenKoppel(d) {
+  const vak = document.querySelector("#fa-opmerking .fa-samen");
+  if (!vak) return;
+  const opnieuw = () => openFactuur(d.id);
+  vak.querySelectorAll("[data-fa-samen]").forEach(el => {
+    const wat = el.dataset.faSamen;
+    if (wat === "kies") el.addEventListener("change", () => { faSamenKeuze.ander = el.value || null; faSamenKeuze.omgedraaid = false; opnieuw(); });
+    else el.addEventListener("click", () => {
+      if (wat === "open") { faSamenKeuze.open = true; opnieuw(); }
+      else if (wat === "dicht") { faSamenKeuze.open = false; faSamenKeuze.ander = null; opnieuw(); }
+      else if (wat === "draai") { faSamenKeuze.omgedraaid = !faSamenKeuze.omgedraaid; opnieuw(); }
+      else if (wat === "doen") faSamenVoegen(d);
+    });
+  });
+}
+async function faSamenVoegen(d) {
+  const ander = faDocs.find(x => x.id === (faSamenKeuze && faSamenKeuze.ander));
+  if (!ander) return;
+  let volgorde = [d, ander].sort(faSamenVolgorde);
+  if (faSamenKeuze.omgedraaid) volgorde = volgorde.reverse();
+  if (!confirm(`Deze ${volgorde.length} documenten laten samenvoegen tot één document?\n\n${volgorde.map((x, i) => `${i + 1}. ${x.bestandsnaam || x.id} (${faBedrag((x.voorstel || {}).bedrag)})`).join("\n")}\n\nShai wijst ze in zijn volgende Basecone-ronde af in Validatie, voegt ze bij Aangeleverd samen in deze volgorde en leest het samengevoegde document als één factuur.`)) return;
+  const wie = gebruiker ? gebruiker.email : null, op = new Date().toISOString();
+  const groep = volgorde.map(x => x.id);
+  for (const x of volgorde) {
+    const { data: rij } = await sb.from("basecone_documenten").select("basecone").eq("id", x.id).maybeSingle();
+    const { error } = await sb.from("basecone_documenten").update({ status: "splitsen", goedgekeurd: null, goedgekeurd_door: null, goedgekeurd_op: null,
+      basecone: { ...((rij && rij.basecone) || {}), besluit: "afwijzen_voor_samenvoegen", tag_toegestaan: false, samenvoegen: { groep, door: wie, op } },
+      opmerking: `Shai voegt samen (${groep.indexOf(x.id) + 1} van ${groep.length}): ${volgorde.map(y => y.bestandsnaam || y.id).join(" + ")}.`, updated_by: wie }).eq("id", x.id);
+    if (error) { toonMelding("melding-fa-detail", "fout", "Samenvoegen vragen lukte niet: " + escapeHtml(error.message)); return; }
+    await sb.from("basecone_log").insert({ document_id: x.id, office: x.office, actie: "samenvoegen gevraagd", door: wie, details: { groep, plek: groep.indexOf(x.id) + 1 } });
+  }
+  faSamenKeuze = null;
+  await laadFacturen();
+  faVolgendeOfSluiten(d.office, "Shai voegt deze documenten in zijn volgende Basecone-ronde samen; het samengevoegde document komt daarna als nieuw document terug in Te beoordelen.");
 }
 /* Controles van Shai die nog niet beantwoord zijn (voorstel.controles, factuur-lezen 19 okt). */
 const faOpenControles = (d) => (d && d.voorstel && !d.voorstel.controles_akkoord && Array.isArray(d.voorstel.controles)) ? d.voorstel.controles : [];

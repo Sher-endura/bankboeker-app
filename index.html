@@ -223,6 +223,7 @@
   .fa-doc-kop { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
   .fa-doc-kop h2 { margin: 0; overflow-wrap: anywhere; }
   #fa-opmerking .melding { margin: 0 0 10px; }
+  #fa-opmerking .fa-wie { margin: 0 0 8px; font-size: 12px; color: var(--grijs, #6b7280); }
   #fa-opmerking .fa-controle { margin: 0 0 10px; background: #fdecec; border: 1px solid #f1b8b8; border-left: 4px solid var(--rood); border-radius: 6px; padding: 9px 12px; font-size: 13px; }
   #fa-opmerking .fa-controle .fa-punten { margin: 4px 0 8px; }
   #fa-opmerking .fa-voorleg { margin: 0 0 10px; border: 1px solid #f0d58a; border-left: 4px solid var(--oranje); padding: 9px 12px; font-size: 13px; }
@@ -361,7 +362,7 @@
   #tabel-bank tr.bk-rij { cursor: pointer; } #tabel-bank tr.bk-rij:hover td { background: #f3f6fa; }
   #tabel-bank tr.gekozen td { background: #eaf1fb; }
   #tabel-bank .bk-oms { max-width: 360px; }
-  #tabel-bank .bk-uitleg { max-width: 380px; line-height: 1.4; }
+  #tabel-bank .bk-uitleg { max-width: 380px; line-height: 1.4; white-space: pre-line; }
   #tabel-bank .bk-refined { max-width: 260px; font-weight: 600; }
   #tabel-bank th.bk-klap { cursor: pointer; white-space: nowrap; color: var(--blauw); user-select: none; }
   #tabel-bank th.bk-klap:hover { text-decoration: underline; }
@@ -4274,6 +4275,43 @@ function toonMelding(id, soort, tekst) {
    Zie docs/BASECONE-ROBOT-START.md. */
 let faRekNamen = {}, faCrdNamen = {};   // "BINGO|7103" → "Kostprijs food", "BINGO|C0175" → "Compra", voor de lijst
 let faDocs = [], faGekozen = null, faStam = { BAS: [], CRD: [] };
+/* Wie en wanneer (Shereen 21 okt): bij goedgekeurd, fout en overgeslagen in de ⓘ / de tekst van Shai, voor Basecone én
+   Twinfield. Goedgekeurd: uit de goedkeuring zelf; Fout en Overgeslagen: uit het logboek (updated_by verandert later
+   ook door Shai's leesronde). */
+// "Shai" (bank-Shai) en robot@ (Basecone-Shai) zijn de robots; shai@endura-aruba.com is een gewone inlog van een medewerker.
+const wieTekst = (w) => !w ? "?" : /^(shai|robot@endura-aruba\.com)$/i.test(String(w).trim()) ? "Shai (robot)" : String(w);
+const wanneerTekst = (t) => t ? new Date(t).toLocaleString("nl-NL", { timeZone: "America/Aruba", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "?";
+/* Laatste logregel per id (bank_log.regel_id / basecone_log.document_id) met een van deze acties. */
+async function laatsteKeuzes(tabel, kolom, ids, acties) {
+  const uit = new Map();
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data } = await sb.from(tabel).select(`${kolom}, actie, door, at`).in(kolom, ids.slice(i, i + 150)).in("actie", acties).order("at", { ascending: false });
+    for (const l of data || []) if (!uit.has(l[kolom])) uit.set(l[kolom], l);
+  }
+  return uit;
+}
+let faKeuzeLog = new Map(), bkKeuzeLog = new Map();
+const FA_KEUZE_ACTIES = ["fout", "overgeslagen", "overgeslagen (dubbel)", "opgeruimd"];
+const BK_KEUZE_ACTIES = ["fout", "overgeslagen"];
+function faWieWanneer(d) {
+  const st = d.status, l = faKeuzeLog.get(d.id);
+  const goed = d.goedgekeurd_door ? `Goedgekeurd door ${wieTekst(d.goedgekeurd_door)} op ${wanneerTekst(d.goedgekeurd_op)}` : "";
+  if (["goedgekeurd", "ingevuld", "geboekt"].includes(st)) return goed;
+  if (st === "overgeslagen") return `Overgeslagen door ${wieTekst(l ? l.door : d.updated_by)} op ${wanneerTekst(l ? l.at : d.updated_at)}`;
+  if (st === "fout") return [`Op Fout gezet door ${wieTekst(l ? l.door : d.updated_by)} op ${wanneerTekst(l ? l.at : d.updated_at)}`, goed].filter(Boolean).join(" · ");
+  if (st === "verwijderd" || st === "verwijderen") return `Verwijderen gevraagd door ${wieTekst(d.verwijderd_door || d.updated_by)}${d.verwijderd_op ? " · verwijderd op " + wanneerTekst(d.verwijderd_op) : ""}`;
+  return "";
+}
+function bkWieWanneer(r) {
+  const st = r.status, l = bkKeuzeLog.get(r.id);
+  const goed = r.goedgekeurd_door ? `Goedgekeurd door ${wieTekst(r.goedgekeurd_door)} op ${wanneerTekst(r.goedgekeurd_op)}` : "";
+  if (st === "goedgekeurd") return goed;
+  if (st === "toegewezen") return [goed, r.toegewezen_op ? `ingevuld in TF door Shai op ${wanneerTekst(r.toegewezen_op)}` : ""].filter(Boolean).join(" · ");
+  if (st === "verwerkt") return [goed, r.verwerkt_op ? `afschrift geboekt op ${wanneerTekst(r.verwerkt_op)}` : ""].filter(Boolean).join(" · ");
+  if (st === "overgeslagen") return `Overgeslagen door ${wieTekst(l ? l.door : r.updated_by)} op ${wanneerTekst(l ? l.at : r.updated_at)}`;
+  if (st === "fout") return [`Op Fout gezet door ${wieTekst(l ? l.door : r.updated_by)} op ${wanneerTekst(l ? l.at : r.updated_at)}`, goed].filter(Boolean).join(" · ");
+  return "";
+}
 // Openklappen onder de regel (17 okt): volgorde van de lijst zoals getekend, en waar je zat toen je een document opende.
 let faVolgorde = [], faPlek = null;
 // Wat je al invulde bij een document dat je met Volgende/Vorige liet staan (tot de pagina ververst). Alleen terugzetten
@@ -4342,7 +4380,7 @@ async function laadFacturen() {
   if (!CLOUD) { toonMelding("melding-facturen", "fout", "Het tabblad Basecone werkt alleen in cloud-modus (met inlog)."); return; }
   laadRobotStatus();
   const { data, error } = await sb.from("basecone_documenten")
-    .select("id, office, bestandsnaam, status, voorstel, goedgekeurd, opmerking, geupload_op, updated_at, nieuwe_crediteur, invul_resultaat")
+    .select("id, office, bestandsnaam, status, voorstel, goedgekeurd, goedgekeurd_door, goedgekeurd_op, opmerking, geupload_op, updated_at, updated_by, verwijderd_door, verwijderd_op, nieuwe_crediteur, invul_resultaat")
     .order("updated_at", { ascending: false }).limit(500);
   if (error) {
     toonMelding("melding-facturen", "fout", /does not exist|relation|could not find the table|schema cache/i.test(error.message)
@@ -4355,6 +4393,7 @@ async function laadFacturen() {
   // Originelen die Shai al bij Aangeleverd heeft gesplitst bestaan niet meer in Basecone (de delen zijn gewone
   // documenten) — niet tonen in Overgeslagen (Shereen 13 okt: "deze heeft geen laten splitsen button").
   faDocs = (data || []).filter(d => !(d.status === "overgeslagen" && /^Door Shai gesplitst/.test(d.opmerking || "")));
+  faKeuzeLog = await laatsteKeuzes("basecone_log", "document_id", faDocs.filter(d => ["fout", "overgeslagen"].includes(d.status)).map(d => d.id), FA_KEUZE_ACTIES);
   // Namen van de grootboekrekeningen (uit de Twinfield-cache van de leesfunctie).
   const faOffices = [...new Set(faDocs.map(d => d.office))];
   if (faOffices.length) {
@@ -4544,7 +4583,7 @@ function vernieuwFaTabel() {
     const let_ = alle.length;
     const tr = document.createElement("tr");
     if (faGekozen && faGekozen.id === d.id) tr.classList.add("gekozen");
-    tr.title = `${d.bestandsnaam || d.id} · ${d.office}`;
+    tr.title = [`${d.bestandsnaam || d.id} · ${d.office}`, faWieWanneer(d)].filter(Boolean).join("\n");
     const kanVink = FA_VINK.includes(d.status);
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="fa-vink-rij"${faVink.has(d.id) ? " checked" : ""}>` : ""}</td><td>${statusLabel(d.status, "shai")}</td>
       <td style="font-size:13px"><b>${escapeHtml(v.crediteur || "")}</b> ${escapeHtml(faCrdNamen[`${d.office}|${v.crediteur}`] || (d.nieuwe_crediteur && (v.crediteur === "NIEUW" || v.crediteur === d.nieuwe_crediteur.code) ? d.nieuwe_crediteur.naam + " (nieuw)" : ""))}</td>
@@ -5084,6 +5123,12 @@ async function openFactuur(id) {
   faOmsTeller();
 
   const opm = [];
+  if (["fout", "overgeslagen"].includes(d.status) && !faKeuzeLog.has(d.id)) {
+    const extra = await laatsteKeuzes("basecone_log", "document_id", [d.id], FA_KEUZE_ACTIES);
+    if (extra.has(d.id)) faKeuzeLog.set(d.id, extra.get(d.id));
+  }
+  const wieWanneer = faWieWanneer(d);
+  if (wieWanneer) opm.push(`<div class="fa-wie">${escapeHtml(wieWanneer)}</div>`);
   const tw = d.invul_resultaat && d.invul_resultaat.twinfield;
   if (d.status === "geboekt" && tw) opm.push(`<div class="melding ok">✓ Geboekt in Twinfield — dagboek <b>${escapeHtml(tw.dagboek || "")}</b>, boekstuk <b>${escapeHtml(String(tw.boekstuk || ""))}</b>${tw.geboekt_op ? " · " + escapeHtml(new Date(tw.geboekt_op).toLocaleString("nl-NL", { timeZone: "America/Aruba" })) : ""}</div>`);
   // Eén melding per onderwerp (Shereen 10 okt: dezelfde datummelding stond er 3×): de reden om voor
@@ -5919,7 +5964,7 @@ async function laadBank() {
   let data = [], error = null;
   for (let van = 0; ; van += 1000) {
     const deel = await sb.from("bank_regels")
-      .select("id, office, bank_code, afschrift, sub_id, regel, datum, verwerkt_op, bedrag, valuta, omschrijving, twinfield_bak, status, voorstel, goedgekeurd, goedgekeurd_door, opmerking, boekstuk, updated_at")
+      .select("id, office, bank_code, afschrift, sub_id, regel, datum, verwerkt_op, bedrag, valuta, omschrijving, twinfield_bak, status, voorstel, goedgekeurd, goedgekeurd_door, goedgekeurd_op, toegewezen_op, opmerking, boekstuk, updated_at, updated_by")
       .order("id", { ascending: true }).range(van, van + 999);
     if (deel.error) { error = deel.error; break; }
     data = data.concat(deel.data || []);
@@ -5932,6 +5977,7 @@ async function laadBank() {
   }
   document.getElementById("melding-bank").innerHTML = "";
   bkRegels = data || [];
+  bkKeuzeLog = await laatsteKeuzes("bank_log", "regel_id", bkRegels.filter(r => ["fout", "overgeslagen"].includes(r.status)).map(r => r.id), BK_KEUZE_ACTIES);
   const offices = [...new Set(bkRegels.map(r => r.office))].sort();
   if (offices.length) {
     const { data: st } = await sb.from("twinfield_stamdata").select("office, data").eq("soort", "BAS").in("office", offices);
@@ -6187,7 +6233,7 @@ function vernieuwBkTabel() {
     const kanVink = BK_VINK.includes(r.status);   // ook zonder voorstel: kan naar Vraagposten (Shereen 12 okt); Goedgekeurd: overslaan (16 okt)
     const bron = bkHerkomst(r);   // herkomst: alleen in de ⓘ en in de kolom Bron (Shereen 11 okt)
     // "Klant/leverancier toewijzen doet Shai nog niet" stond in oudere voorstellen — klopt niet meer (Shereen 14 okt).
-    const uitleg = ((r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "")).replace(/\s*Klant\/leverancier toewijzen doet Shai nog niet — graag zelf in Twinfield\.?/g, "");
+    const uitleg = [bkWieWanneer(r), ((r.status === "fout" || r.opmerking ? (r.opmerking || "") + " " : "") + ((r.voorstel || {}).uitleg || "")).replace(/\s*Klant\/leverancier toewijzen doet Shai nog niet — graag zelf in Twinfield\.?/g, "").trim()].filter(Boolean).join("\n");
     const tr = document.createElement("tr");
     tr.className = "bk-rij" + (bkGekozen === r.id ? " gekozen" : "");
     tr.innerHTML = `<td class="fa-vink">${kanVink ? `<input type="checkbox" class="bk-vink-rij"${bkVink.has(r.id) ? " checked" : ""}>` : ""}</td>

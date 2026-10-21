@@ -1023,6 +1023,7 @@
       <label style="font-weight:normal; display:flex; align-items:center; gap:6px; margin:0"><input type="checkbox" id="vw-ook-gemaild"> Ook al gemailde tonen</label>
       <button class="knop stil" id="btn-vw-ververs" style="padding:6px 12px">↻ Verversen</button>
       <button class="knop" id="btn-vw-mail" disabled>✉ Klant mailen</button>
+      <button class="knop stil" id="btn-vw-download" disabled title="Per document één PDF met alle pagina's, om weer in Basecone te zetten.">⬇ Downloaden</button>
       <button class="knop stil" id="btn-vw-terug" disabled title="Terug naar Te beoordelen in Shai Booking. Al uit Basecone verwijderd? Zet het document dan eerst in Basecone terug; Shai leest het daarna opnieuw.">↩ Terug naar Te beoordelen</button>
       <button class="knop stil gevaar" id="btn-vw-definitief" disabled title="Scan wissen en uit deze lijst halen, zonder de klant te mailen. Het document is al uit Basecone verwijderd; Shai onthoudt het, zodat hij het nooit opnieuw tagt.">Definitief verwijderen (zonder mail)</button>
       <span id="vw-tal" style="font-size:13px"></span>
@@ -8385,6 +8386,7 @@ function vwKnoppen() {
   document.getElementById("btn-vw-mail").disabled = !gekozen.length || offices.size !== 1;
   document.getElementById("btn-vw-definitief").disabled = !gekozen.some(d => d.status === "verwijderd");
   document.getElementById("btn-vw-terug").disabled = !gekozen.length;
+  document.getElementById("btn-vw-download").disabled = !gekozen.some(d => (d.scan_paden || []).length);
   document.getElementById("vw-tal").textContent = !gekozen.length ? "" : offices.size > 1
     ? `${gekozen.length} aangevinkt — kies documenten van één klant om te mailen`
     : `${gekozen.length} aangevinkt (${[...offices][0]})`;
@@ -8405,7 +8407,7 @@ async function vwTerug() {
   if (!gekozen.length) return;
   const weg = gekozen.filter(d => d.status === "verwijderd");
   const vraag = `${gekozen.length} document${gekozen.length === 1 ? "" : "en"} terug naar Te beoordelen?` + (weg.length
-    ? `\n\nLet op: ${weg.length === gekozen.length ? (weg.length === 1 ? "dit document is" : "deze documenten zijn") : weg.length + " daarvan zijn"} al uit Basecone verwijderd. Zet ${weg.length === 1 ? "het" : "ze"} eerst in Basecone terug; daarna leest Shai ${weg.length === 1 ? "het" : "ze"} in zijn volgende ronde opnieuw en ${weg.length === 1 ? "komt het" : "komen ze"} in Te beoordelen.`
+    ? `\n\nLet op: ${weg.length === gekozen.length ? (weg.length === 1 ? "dit document is" : "deze documenten zijn") : weg.length + " daarvan zijn"} al uit Basecone verwijderd. Zet ${weg.length === 1 ? "het" : "ze"} eerst in Basecone terug (⬇ Downloaden en daar opnieuw uploaden); daarna leest Shai ${weg.length === 1 ? "het" : "ze"} in zijn volgende ronde opnieuw en ${weg.length === 1 ? "komt het" : "komen ze"} in Te beoordelen.`
     : "");
   if (!confirm(vraag)) return;
   const wie = gebruiker ? gebruiker.email : null;
@@ -8424,6 +8426,65 @@ async function vwTerug() {
   await laadVerwijderd();
   toonMelding("melding-verwijderd", fout ? "fout" : "ok", `${klaar} document${klaar === 1 ? "" : "en"} terug naar Te beoordelen.` +
     (weg.length ? " Wat al uit Basecone weg was: eerst daar terugzetten, dan leest Shai het opnieuw." : "") + (fout ? " Daarna ging het mis: " + escapeHtml(fout) : ""));
+}
+/* Downloaden om weer in Basecone te zetten (Shereen 21 okt): per document één PDF met alle pagina's (foto's → PDF met
+   jsPDF, pas geladen bij de eerste klik); was de scan al een PDF, dan die zelf. Bestandsnaam = de naam in Basecone. */
+let vwJsPdf = null;
+function vwLaadJsPdf() {
+  if (window.jspdf) return Promise.resolve(window.jspdf.jsPDF);
+  if (!vwJsPdf) vwJsPdf = new Promise((ok, mis) => {
+    const el = document.createElement("script");
+    el.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+    el.onload = () => (window.jspdf ? ok(window.jspdf.jsPDF) : mis(new Error("jsPDF niet geladen")));
+    el.onerror = () => { vwJsPdf = null; mis(new Error("jsPDF kon niet geladen worden")); };
+    document.head.appendChild(el);
+  });
+  return vwJsPdf;
+}
+function vwBewaar(blob, naam) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = naam;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+const vwAlsDataUrl = (blob) => new Promise((ok, mis) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mis; f.readAsDataURL(blob); });
+const vwMaat = (url) => new Promise((ok, mis) => { const i = new Image(); i.onload = () => ok({ b: i.naturalWidth, h: i.naturalHeight }); i.onerror = mis; i.src = url; });
+async function vwDownload() {
+  const gekozen = vwDocs.filter(d => vwVink.has(d.id) && (d.scan_paden || []).length);
+  if (!gekozen.length) return;
+  const knop = document.getElementById("btn-vw-download"); knop.disabled = true; knop.textContent = "Bezig…";
+  let klaar = 0, fout = null;
+  try {
+    for (const d of gekozen) {
+      const naam = String(d.bestandsnaam || d.id).replace(/[\\/:*?"<>|]+/g, "_").trim() || d.id;
+      const blobs = [];
+      for (const pad of d.scan_paden) {
+        const { data, error } = await sb.storage.from("basecone-scans").download(pad);
+        if (error || !data) throw new Error(`${naam}: pagina ${pad.split("/").pop()} niet gevonden`);
+        blobs.push({ pad, blob: data });
+      }
+      if (blobs.some(x => /\.pdf$/i.test(x.pad))) {
+        // Al een PDF (geen foto's): zoals hij is.
+        blobs.forEach((x, i) => vwBewaar(x.blob, blobs.length === 1 ? `${naam}.pdf` : `${naam}_${i + 1}.${x.pad.split(".").pop()}`));
+      } else {
+        const JsPdf = await vwLaadJsPdf();
+        let pdf = null;
+        for (const x of blobs) {
+          const url = await vwAlsDataUrl(x.blob);
+          const { b, h } = await vwMaat(url);
+          const fmt = [b * 0.75, h * 0.75];   // px → pt, pagina zo groot als de foto
+          if (!pdf) pdf = new JsPdf({ unit: "pt", format: fmt, orientation: b > h ? "l" : "p" });
+          else pdf.addPage(fmt, b > h ? "l" : "p");
+          pdf.addImage(url, /\.png$/i.test(x.pad) ? "PNG" : "JPEG", 0, 0, fmt[0], fmt[1]);
+        }
+        vwBewaar(pdf.output("blob"), `${naam}.pdf`);
+      }
+      klaar++;
+      await new Promise(ok => setTimeout(ok, 400));   // de browser telt meerdere downloads achter elkaar
+    }
+  } catch (e) { fout = e.message; }
+  knop.textContent = "⬇ Downloaden"; vwKnoppen();
+  toonMelding("melding-verwijderd", fout ? "fout" : "ok", `${klaar} document${klaar === 1 ? "" : "en"} gedownload${klaar ? " (één PDF per document) — upload ze in Basecone bij de juiste administratie" : ""}.` + (fout ? " Mis: " + escapeHtml(fout) : ""));
 }
 /* Reden (omschrijving) aanpassen in DELETED (Shereen 21 okt) — die komt ook in de mail aan de klant. */
 function vwRedenBewerken(td, d) {
@@ -8591,6 +8652,7 @@ document.getElementById("btn-vw-ververs").addEventListener("click", laadVerwijde
 document.getElementById("btn-vw-mail").addEventListener("click", vwMailOpenen);
 document.getElementById("btn-vw-definitief").addEventListener("click", vwDefinitief);
 document.getElementById("btn-vw-terug").addEventListener("click", vwTerug);
+document.getElementById("btn-vw-download").addEventListener("click", vwDownload);
 document.getElementById("vw-vink-alles").addEventListener("change", (e) => {
   for (const d of vwZichtbaar()) e.target.checked ? vwVink.add(d.id) : vwVink.delete(d.id);
   vernieuwVerwijderd();

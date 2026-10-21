@@ -325,6 +325,7 @@
   .status-tabjes button.vw-tab { background: var(--rood); color: #fff; font-weight: 600; border-radius: 6px 6px 0 0; padding: 6px 10px; margin-left: 4px; }
   .status-tabjes button.vw-tab:hover { color: #fff; filter: brightness(0.92); }
   .status-tabjes button.vw-tab.actief { color: #fff; border-bottom-color: var(--tekst); }
+  #tabel-verwijderd > thead th { position: sticky; top: 0; background: #fff; z-index: 3; }
   #tabel-verwijderd td.vw-reden { cursor: text; } #tabel-verwijderd .vw-pen { color: var(--blauw); font-size: 12px; opacity: .6; }
   .status-tabjes button.actief { color: var(--blauw); font-weight: 600; border-bottom-color: #FB7974; }
   /* Harde regel toevoegen (Knowledgebase, 14 okt) */
@@ -1016,12 +1017,13 @@
   <div class="kaart">
     <div class="status-tabjes" id="vw-tabjes" style="margin-bottom:10px"></div>
     <h2>Basecone — verwijderd door Shai</h2>
-    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Hier staat elk document dat Shai op jouw aanwijzing uit Basecone heeft verwijderd (knop <b>Laten verwijderen door Shai</b> bij een document), met de eerste pagina van de scan, de uploaddatum en de reden. De scan blijft hier bewaard tot je hem definitief verwijdert. Vink documenten van één klant aan en kies <b>✉ Klant mailen</b> om de klant te laten weten welke documenten we hebben weggehaald en waarom. Hoeft de klant het niet te weten (bv. een tijdlijn-pagina of een dubbele upload), kies dan <b>Definitief verwijderen (zonder mail)</b>: de scan wordt gewist en het document verdwijnt uit deze lijst. Klik op een reden om hem aan te passen. De mail gaat naar de contactpersonen die in E-Board de aanleverherinneringen krijgen, vanaf het Endura-mailadres; de eerste pagina van elk document zit als bijlage bij de mail. Klik op een afbeelding om hem groot te zien.</details>
+    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Hier staat elk document dat Shai op jouw aanwijzing uit Basecone heeft verwijderd (knop <b>Laten verwijderen door Shai</b> bij een document), met de eerste pagina van de scan, de uploaddatum en de reden. De scan blijft hier bewaard tot je hem definitief verwijdert. Vink documenten van één klant aan en kies <b>✉ Klant mailen</b> om de klant te laten weten welke documenten we hebben weggehaald en waarom. Hoeft de klant het niet te weten (bv. een tijdlijn-pagina of een dubbele upload), kies dan <b>Definitief verwijderen (zonder mail)</b>: de scan wordt gewist en het document verdwijnt uit deze lijst. Klik op een reden om hem aan te passen. Toch nodig? Kies <b>↩ Terug naar Te beoordelen</b>; staat het document al niet meer in Basecone, zet het daar dan eerst terug. De mail gaat naar de contactpersonen die in E-Board de aanleverherinneringen krijgen, vanaf het Endura-mailadres; de eerste pagina van elk document zit als bijlage bij de mail. Klik op een afbeelding om hem groot te zien.</details>
     <div class="fa-balk">
       <select id="vw-office" style="width:auto"></select>
       <label style="font-weight:normal; display:flex; align-items:center; gap:6px; margin:0"><input type="checkbox" id="vw-ook-gemaild"> Ook al gemailde tonen</label>
       <button class="knop stil" id="btn-vw-ververs" style="padding:6px 12px">↻ Verversen</button>
       <button class="knop" id="btn-vw-mail" disabled>✉ Klant mailen</button>
+      <button class="knop stil" id="btn-vw-terug" disabled title="Terug naar Te beoordelen in Shai Booking. Al uit Basecone verwijderd? Zet het document dan eerst in Basecone terug; Shai leest het daarna opnieuw.">↩ Terug naar Te beoordelen</button>
       <button class="knop stil gevaar" id="btn-vw-definitief" disabled title="Scan wissen en uit deze lijst halen, zonder de klant te mailen. Het document is al uit Basecone verwijderd; Shai onthoudt het, zodat hij het nooit opnieuw tagt.">Definitief verwijderen (zonder mail)</button>
       <span id="vw-tal" style="font-size:13px"></span>
     </div>
@@ -1029,10 +1031,12 @@
     <div class="vw-mail" id="vw-mail" style="display:none"></div>
   </div>
   <div class="kaart">
+    <div class="bk-scroll" id="vw-scroll">
     <table id="tabel-verwijderd">
       <thead><tr><th class="fa-vink"><input type="checkbox" id="vw-vink-alles" title="Alles in deze lijst aanvinken"></th><th>Scan</th><th>Administratie</th><th>Document</th><th>Geüpload</th><th>Reden</th><th>Verwijderd</th><th>Klant gemaild</th></tr></thead>
       <tbody></tbody>
     </table>
+    </div>
   </div>
   <div id="vw-groot"><img alt=""></div>
 </section>
@@ -8373,17 +8377,54 @@ function vernieuwVerwijderd() {
   }
   document.getElementById("vw-vink-alles").checked = lijst.length > 0 && lijst.every(d => vwVink.has(d.id));
   vwKnoppen();
+  requestAnimationFrame(vwHoogte);
 }
 function vwKnoppen() {
   const gekozen = vwDocs.filter(d => vwVink.has(d.id));
   const offices = new Set(gekozen.map(d => d.office));
   document.getElementById("btn-vw-mail").disabled = !gekozen.length || offices.size !== 1;
   document.getElementById("btn-vw-definitief").disabled = !gekozen.some(d => d.status === "verwijderd");
+  document.getElementById("btn-vw-terug").disabled = !gekozen.length;
   document.getElementById("vw-tal").textContent = !gekozen.length ? "" : offices.size > 1
     ? `${gekozen.length} aangevinkt — kies documenten van één klant om te mailen`
     : `${gekozen.length} aangevinkt (${[...offices][0]})`;
 }
 
+/* Bovenste deel vast, de lijst scrolt (Shereen 21 okt) — zoals bkHoogte bij Twinfield Bank. */
+function vwHoogte() {
+  const sc = document.getElementById("vw-scroll");
+  if (!sc || !sc.offsetParent) return;
+  sc.style.height = Math.max(300, innerHeight - sc.getBoundingClientRect().top - 16) + "px";
+}
+addEventListener("resize", vwHoogte);
+/* Terug naar Te beoordelen (Shereen 21 okt). Nog niet weg uit Basecone ("wordt verwijderd"): gewoon terug met het voorstel
+   van Shai. Al door Shai uit Basecone verwijderd: eerst in Basecone terugzetten — dan tagt en leest Shai het opnieuw
+   (status nieuw) en staat het daarna in Te beoordelen. */
+async function vwTerug() {
+  const gekozen = vwDocs.filter(d => vwVink.has(d.id));
+  if (!gekozen.length) return;
+  const weg = gekozen.filter(d => d.status === "verwijderd");
+  const vraag = `${gekozen.length} document${gekozen.length === 1 ? "" : "en"} terug naar Te beoordelen?` + (weg.length
+    ? `\n\nLet op: ${weg.length === gekozen.length ? (weg.length === 1 ? "dit document is" : "deze documenten zijn") : weg.length + " daarvan zijn"} al uit Basecone verwijderd. Zet ${weg.length === 1 ? "het" : "ze"} eerst in Basecone terug; daarna leest Shai ${weg.length === 1 ? "het" : "ze"} in zijn volgende ronde opnieuw en ${weg.length === 1 ? "komt het" : "komen ze"} in Te beoordelen.`
+    : "");
+  if (!confirm(vraag)) return;
+  const wie = gebruiker ? gebruiker.email : null;
+  let fout = null, klaar = 0;
+  for (const d of gekozen) {
+    const { data: rij } = await sb.from("basecone_documenten").select("status, voorstel, basecone").eq("id", d.id).maybeSingle();
+    if (!rij || !["verwijderd", "verwijderen"].includes(rij.status)) continue;
+    const nieuw = rij.status === "verwijderen" && rij.voorstel ? "voorleggen" : "nieuw";
+    const { error } = await sb.from("basecone_documenten").update({ status: nieuw, verwijder_reden: null, verwijderd_op: null, verwijderd_door: null,
+      opmerking: rij.status === "verwijderd" ? "Terug uit DELETED — Shai leest hem opnieuw zodra hij weer in Basecone staat." : null,
+      basecone: { ...(rij.basecone || {}), ...(nieuw === "nieuw" ? { tag_toegestaan: true } : {}) }, updated_by: wie }).eq("id", d.id).eq("status", rij.status);
+    if (error) { fout = error.message; break; }
+    await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "terug naar beoordelen", door: wie, details: { uit: "DELETED", was: rij.status, nu: nieuw } });
+    vwVink.delete(d.id); klaar++;
+  }
+  await laadVerwijderd();
+  toonMelding("melding-verwijderd", fout ? "fout" : "ok", `${klaar} document${klaar === 1 ? "" : "en"} terug naar Te beoordelen.` +
+    (weg.length ? " Wat al uit Basecone weg was: eerst daar terugzetten, dan leest Shai het opnieuw." : "") + (fout ? " Daarna ging het mis: " + escapeHtml(fout) : ""));
+}
 /* Reden (omschrijving) aanpassen in DELETED (Shereen 21 okt) — die komt ook in de mail aan de klant. */
 function vwRedenBewerken(td, d) {
   if (td.querySelector("input")) return;
@@ -8549,6 +8590,7 @@ document.getElementById("vw-ook-gemaild").addEventListener("change", vernieuwVer
 document.getElementById("btn-vw-ververs").addEventListener("click", laadVerwijderd);
 document.getElementById("btn-vw-mail").addEventListener("click", vwMailOpenen);
 document.getElementById("btn-vw-definitief").addEventListener("click", vwDefinitief);
+document.getElementById("btn-vw-terug").addEventListener("click", vwTerug);
 document.getElementById("vw-vink-alles").addEventListener("change", (e) => {
   for (const d of vwZichtbaar()) e.target.checked ? vwVink.add(d.id) : vwVink.delete(d.id);
   vernieuwVerwijderd();

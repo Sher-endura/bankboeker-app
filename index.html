@@ -322,6 +322,7 @@
   .status-tabjes { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--rand); margin: 0 0 10px; }
   .status-tabjes button { background: none; border: none; border-bottom: 3px solid transparent; padding: 6px 6px; font-size: 14px; color: var(--tekst); cursor: pointer; white-space: nowrap; }
   .status-tabjes button:hover { color: var(--blauw); }
+  #tabel-verwijderd td.vw-reden { cursor: text; } #tabel-verwijderd .vw-pen { color: var(--blauw); font-size: 12px; opacity: .6; }
   .status-tabjes button.actief { color: var(--blauw); font-weight: 600; border-bottom-color: #FB7974; }
   /* Harde regel toevoegen (Knowledgebase, 14 okt) */
   .kb-hard { margin: 8px 0 14px; border: 1px solid var(--rand); border-radius: 8px; background: var(--grijs); }
@@ -1010,13 +1011,15 @@
 <!-- ============ TAB: BASECONE → DELETED (Shereen 12 okt) ============ -->
 <section id="tab-verwijderd" style="display:none">
   <div class="kaart">
+    <div class="status-tabjes" id="vw-tabjes" style="margin-bottom:10px"></div>
     <h2>Basecone — verwijderd door Shai</h2>
-    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Hier staat elk document dat Shai op jouw aanwijzing uit Basecone heeft verwijderd (knop <b>Laten verwijderen door Shai</b> bij een document), met de eerste pagina van de scan, de uploaddatum en de reden. De scan blijft hier bewaard. Vink documenten van één klant aan en kies <b>✉ Klant mailen</b> om de klant te laten weten welke documenten we hebben weggehaald en waarom. De mail gaat naar de contactpersonen die in E-Board de aanleverherinneringen krijgen, vanaf het Endura-mailadres; de eerste pagina van elk document zit als bijlage bij de mail. Klik op een afbeelding om hem groot te zien.</details>
+    <details class="fa-uitleg"><summary style="cursor:pointer; font-weight:600">Hoe werkt dit?</summary>Hier staat elk document dat Shai op jouw aanwijzing uit Basecone heeft verwijderd (knop <b>Laten verwijderen door Shai</b> bij een document), met de eerste pagina van de scan, de uploaddatum en de reden. De scan blijft hier bewaard. Vink documenten van één klant aan en kies <b>✉ Klant mailen</b> om de klant te laten weten welke documenten we hebben weggehaald en waarom. Hoeft de klant het niet te weten (bv. een tijdlijn-pagina of een dubbele upload), kies dan <b>Definitief verwijderen (zonder mail)</b>: dan verdwijnt het uit deze lijst. Klik op een reden om hem aan te passen. De mail gaat naar de contactpersonen die in E-Board de aanleverherinneringen krijgen, vanaf het Endura-mailadres; de eerste pagina van elk document zit als bijlage bij de mail. Klik op een afbeelding om hem groot te zien.</details>
     <div class="fa-balk">
       <select id="vw-office" style="width:auto"></select>
       <label style="font-weight:normal; display:flex; align-items:center; gap:6px; margin:0"><input type="checkbox" id="vw-ook-gemaild"> Ook al gemailde tonen</label>
       <button class="knop stil" id="btn-vw-ververs" style="padding:6px 12px">↻ Verversen</button>
       <button class="knop" id="btn-vw-mail" disabled>✉ Klant mailen</button>
+      <button class="knop stil gevaar" id="btn-vw-definitief" disabled title="Uit deze lijst halen zonder de klant te mailen. Het document is al uit Basecone verwijderd; Shai onthoudt het, zodat hij het nooit opnieuw tagt.">Definitief verwijderen (zonder mail)</button>
       <span id="vw-tal" style="font-size:13px"></span>
     </div>
     <div id="melding-verwijderd"></div>
@@ -4405,6 +4408,7 @@ async function laadFacturen() {
     faRekNamen = {}; faCrdNamen = {};
     for (const rij of st || []) for (const x of rij.data || []) (rij.soort === "CRD" ? faCrdNamen : faRekNamen)[`${rij.office}|${x.code}`] = x.naam;
   }
+  await vwTellerLaden();
   vernieuwFaFilters();
   vernieuwFaTabel();
 }
@@ -4527,14 +4531,32 @@ const FA_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen", "n
   ["overgeslagen", "Overgeslagen", ["overgeslagen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd", "ingevuld"]],
   ["geboekt", "Geboekt", ["geboekt"]], ["splitsen", "Wacht op splitsen", ["splitsen"]]];
 const FA_TABJES_DOEN = ["beoordelen", "fout", "overgeslagen"];
+/* DELETED als laatste tabje in dezelfde rij (Shereen 21 okt: "zet de deleted tab na Wacht op splitsen"); het opent de
+   pagina DELETED, die bovenaan dezelfde rij toont. Teller: wat nog in DELETED staat (niet definitief verwijderd). */
+let vwTeller = null;
+async function vwTellerLaden() {
+  const { count } = await sb.from("basecone_documenten").select("id", { count: "exact", head: true })
+    .in("status", ["verwijderd", "verwijderen"]).is("basecone->definitief_verwijderd", null);
+  vwTeller = count ?? null;
+}
+function faTabjesRij(vakId, opDeleted) {
+  const office = document.getElementById("fa-office").value;
+  statusTabjes(vakId, FA_TABJES, opDeleted ? null : faTabje, (st) => faDocs.filter(d => (!office || d.office === office) && d.status === st).length, (t) => {
+    faTabje = t; faStatusSel = new Set(FA_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.basecone.tabje", t);
+    if (opDeleted) kiesTab("facturen");
+    vernieuwFaFilters(); vernieuwFaTabel();
+  }, FA_TABJES_DOEN);
+  const knop = document.createElement("button");
+  knop.type = "button"; knop.dataset.tab = "deleted"; if (opDeleted) knop.className = "actief";
+  knop.textContent = `DELETED${vwTeller === null ? "" : ` (${vwTeller})`}`;
+  knop.addEventListener("click", () => kiesTab("verwijderd"));
+  document.getElementById(vakId).appendChild(knop);
+}
 let faTabje = leesTabje("bankboeker.basecone.tabje", FA_TABJES);
 let faStatusSel = new Set(FA_TABJES.find(t => t[0] === faTabje)[2]);
 function vernieuwFaFilters() {
   const office = document.getElementById("fa-office").value;
-  statusTabjes("fa-tabjes", FA_TABJES, faTabje, (s) => faDocs.filter(d => (!office || d.office === office) && d.status === s).length, (t) => {
-    faTabje = t; faStatusSel = new Set(FA_TABJES.find(x => x[0] === t)[2]); bewaarTabje("bankboeker.basecone.tabje", t);
-    vernieuwFaFilters(); vernieuwFaTabel();
-  }, FA_TABJES_DOEN);
+  faTabjesRij("fa-tabjes", false);
   toonSubstatus("fa-substatus", faTabje === "beoordelen");
   faStatusKnop();
   requestAnimationFrame(faHoogte);
@@ -7188,7 +7210,7 @@ function kiesTab(naam) {
   document.querySelectorAll("nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === (groep || naam)));
   setTimeout(onlineWaarBijwerken, 50);   // collega's zien op welk tabblad je zit
   const sub = document.getElementById("subnav");
-  sub.style.display = groep ? "" : "none";
+  sub.style.display = groep && groep !== "basecone" ? "" : "none";   // Basecone: DELETED staat sinds 21 okt in de tabjesrij
   sub.innerHTML = (groep ? TAB_GROEPEN[groep].map(([t, tekst]) => `<button data-sub="${t}"${t === naam ? ' class="actief"' : ""}>${tekst}</button>`).join("") : "");   // (de oude kop "Actieve klant" hoorde bij de verborgen pagina's)
   sub.querySelectorAll("button").forEach(b => b.addEventListener("click", () => kiesTab(b.dataset.sub)));
   for (const s of ["vraagposten","ronde","inlezen","controleren","exporteren","klanten","regels","herhaal","facturen","verwijderd","bank","kennis"])
@@ -8273,9 +8295,11 @@ document.querySelector("#tabel-vpb tbody").addEventListener("click", (e) => {
 async function laadVerwijderd() {
   const { data, error } = await sb.from("basecone_documenten")
     .select("id, office, bestandsnaam, geupload_op, verwijder_reden, verwijderd_op, verwijderd_door, klant_gemaild_op, klant_gemaild_door, klant_gemaild_aan, scan_paden, status, opmerking")
-    .in("status", ["verwijderd", "verwijderen"]).order("verwijderd_op", { ascending: false, nullsFirst: true });
+    .in("status", ["verwijderd", "verwijderen"]).is("basecone->definitief_verwijderd", null).order("verwijderd_op", { ascending: false, nullsFirst: true });
   if (error) { toonMelding("melding-verwijderd", "fout", escapeHtml(error.message)); return; }
   vwDocs = data || [];
+  vwTeller = vwDocs.length;
+  faTabjesRij("vw-tabjes", true);
   const paden = [...new Set(vwDocs.map(d => (d.scan_paden || [])[0]).filter(Boolean))];
   const urls = {};
   for (let i = 0; i < paden.length; i += 100) {
@@ -8325,7 +8349,8 @@ function vernieuwVerwijderd() {
       const gemaild = d.klant_gemaild_op ? `${escapeHtml(vwDatum(d.klant_gemaild_op))}<br><span style="font-size:12px">${escapeHtml(d.klant_gemaild_aan || "")}</span>` : "";
       tr.innerHTML = `<td class="fa-vink"><input type="checkbox"${vwVink.has(d.id) ? " checked" : ""}></td>
         <td>${scan}</td><td>${escapeHtml(d.office)}</td><td>${escapeHtml(d.bestandsnaam || "")}</td><td>${escapeHtml(vwDatum(d.geupload_op))}</td>
-        <td>${d.verwijder_reden ? escapeHtml(d.verwijder_reden) : `<span style="color:var(--rood); font-size:12px">geen reden — komt leeg in de mail</span>`}</td><td>${weg}</td><td>${gemaild}</td>`;
+        <td class="vw-reden" title="Klik om de reden aan te passen">${d.verwijder_reden ? escapeHtml(d.verwijder_reden) : `<span style="color:var(--rood); font-size:12px">geen reden — komt leeg in de mail</span>`} <span class="vw-pen">✎</span></td><td>${weg}</td><td>${gemaild}</td>`;
+      tr.querySelector(".vw-reden").addEventListener("click", () => vwRedenBewerken(tr.querySelector(".vw-reden"), d));
       const vak = tr.querySelector("input[type=checkbox]");
       vak.addEventListener("change", () => {
         if (vak.checked) { for (const id of [...vwVink]) if (!vanKlant.some(x => x.id === id)) vwVink.delete(id); vwVink.add(d.id); }
@@ -8344,9 +8369,55 @@ function vwKnoppen() {
   const gekozen = vwDocs.filter(d => vwVink.has(d.id));
   const offices = new Set(gekozen.map(d => d.office));
   document.getElementById("btn-vw-mail").disabled = !gekozen.length || offices.size !== 1;
+  document.getElementById("btn-vw-definitief").disabled = !gekozen.some(d => d.status === "verwijderd");
   document.getElementById("vw-tal").textContent = !gekozen.length ? "" : offices.size > 1
     ? `${gekozen.length} aangevinkt — kies documenten van één klant om te mailen`
     : `${gekozen.length} aangevinkt (${[...offices][0]})`;
+}
+
+/* Reden (omschrijving) aanpassen in DELETED (Shereen 21 okt) — die komt ook in de mail aan de klant. */
+function vwRedenBewerken(td, d) {
+  if (td.querySelector("input")) return;
+  td.innerHTML = `<input type="text" maxlength="200" style="width:100%" value="${escapeHtml(d.verwijder_reden || "")}">`;
+  const veld = td.querySelector("input");
+  veld.focus(); veld.select();
+  let klaar = false;
+  const bewaar = async (opslaan) => {
+    if (klaar) return; klaar = true;
+    const nieuw = veld.value.trim();
+    if (opslaan && nieuw !== (d.verwijder_reden || "")) {
+      const wie = gebruiker ? gebruiker.email : null;
+      const { error } = await sb.from("basecone_documenten").update({ verwijder_reden: nieuw || null, updated_by: wie }).eq("id", d.id);
+      if (error) { toonMelding("melding-verwijderd", "fout", "Reden opslaan lukte niet: " + escapeHtml(error.message)); }
+      else {
+        await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "reden aangepast", door: wie, details: { was: d.verwijder_reden || null, nu: nieuw || null } });
+        d.verwijder_reden = nieuw || null;
+      }
+    }
+    vernieuwVerwijderd();
+  };
+  veld.addEventListener("keydown", (e) => { if (e.key === "Enter") bewaar(true); if (e.key === "Escape") bewaar(false); });
+  veld.addEventListener("blur", () => bewaar(true));
+}
+/* Definitief verwijderen zonder mail (Shereen 21 okt). Alleen wat Shai al uit Basecone verwijderde. De rij blijft in de
+   database (basecone.definitief_verwijderd), zodat Shai het document herkent als het ooit terugkomt; de scan blijft in
+   de opslag (medewerkers mogen daar niets wissen), maar is nergens meer te zien. */
+async function vwDefinitief() {
+  const gekozen = vwDocs.filter(d => vwVink.has(d.id) && d.status === "verwijderd");
+  if (!gekozen.length) return;
+  if (!confirm(`${gekozen.length} document${gekozen.length === 1 ? "" : "en"} definitief verwijderen, zonder de klant te mailen?\n\nZe verdwijnen uit DELETED. Dit kun je hier niet terugdraaien.`)) return;
+  const wie = gebruiker ? gebruiker.email : null, op = new Date().toISOString();
+  let fout = null, klaar = 0;
+  for (const d of gekozen) {
+    const { data: rij } = await sb.from("basecone_documenten").select("basecone").eq("id", d.id).maybeSingle();
+    const { error } = await sb.from("basecone_documenten").update({ basecone: { ...((rij && rij.basecone) || {}), definitief_verwijderd: { door: wie, op } }, updated_by: wie })
+      .eq("id", d.id).eq("status", "verwijderd");
+    if (error) { fout = error.message; break; }
+    await sb.from("basecone_log").insert({ document_id: d.id, office: d.office, actie: "definitief verwijderd", door: wie, details: { zonder_mail: true, reden: d.verwijder_reden || null } });
+    vwVink.delete(d.id); klaar++;
+  }
+  await laadVerwijderd();
+  toonMelding("melding-verwijderd", fout ? "fout" : "ok", `${klaar} document${klaar === 1 ? "" : "en"} definitief verwijderd (zonder mail).` + (fout ? " Daarna ging het mis: " + escapeHtml(fout) : ""));
 }
 
 /* Het mailvenster: E-Board-klant (eenmalig koppelen), ontvangers, taal, toelichting, voorbeeld, proef, versturen. */
@@ -8445,6 +8516,7 @@ document.getElementById("vw-office").addEventListener("change", vernieuwVerwijde
 document.getElementById("vw-ook-gemaild").addEventListener("change", vernieuwVerwijderd);
 document.getElementById("btn-vw-ververs").addEventListener("click", laadVerwijderd);
 document.getElementById("btn-vw-mail").addEventListener("click", vwMailOpenen);
+document.getElementById("btn-vw-definitief").addEventListener("click", vwDefinitief);
 document.getElementById("vw-vink-alles").addEventListener("change", (e) => {
   for (const d of vwZichtbaar()) e.target.checked ? vwVink.add(d.id) : vwVink.delete(d.id);
   vernieuwVerwijderd();

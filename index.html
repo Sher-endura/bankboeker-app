@@ -4411,7 +4411,7 @@ async function laadFacturen() {
   requestAnimationFrame(faHoogte);
   // Originelen die Shai al bij Aangeleverd heeft gesplitst bestaan niet meer in Basecone (de delen zijn gewone
   // documenten) — niet tonen in Overgeslagen (Shereen 13 okt: "deze heeft geen laten splitsen button").
-  faDocs = (data || []).filter(d => !(d.status === "overgeslagen" && /^Door Shai gesplitst/.test(d.opmerking || "")));
+  faDocs = (data || []).filter(d => !faWegUitBasecone(d));
   faKeuzeLog = await laatsteKeuzes("basecone_log", "document_id", faDocs.filter(d => ["fout", "overgeslagen"].includes(d.status)).map(d => d.id), FA_KEUZE_ACTIES);
   // Namen van de grootboekrekeningen (uit de Twinfield-cache van de leesfunctie).
   const faOffices = [...new Set(faDocs.map(d => d.office))];
@@ -4543,6 +4543,10 @@ const FA_TABJES = [["beoordelen", "Te beoordelen", ["voorstel", "voorleggen", "n
   ["overgeslagen", "Overgeslagen", ["overgeslagen"]], ["goedgekeurd", "Goedgekeurd", ["goedgekeurd", "ingevuld"]],
   ["geboekt", "Geboekt", ["geboekt"]], ["splitsen", "Wacht op splitsen", ["splitsen"]]];
 const FA_TABJES_DOEN = ["beoordelen", "fout", "overgeslagen"];
+/* Overgeslagen, maar bestaat niet meer in Basecone: het origineel van een splitsing of samenvoeging door Shai, of een
+   document dat later uit Basecone verdween (Shereen 23 okt: "waarom verdwijnen deze niet"). Niets meer te doen. */
+const faWegUitBasecone = (d) => d.status === "overgeslagen"
+  && /^(Door Shai (gesplitst|samengevoegd)|Bestaat niet meer in Basecone)/.test(d.opmerking || "");
 /* DELETED als laatste tabje in dezelfde rij (Shereen 21 okt: "zet de deleted tab na Wacht op splitsen"); het opent de
    pagina DELETED, die bovenaan dezelfde rij toont. Teller: wat nog in DELETED staat (niet definitief verwijderd). */
 let vwTeller = null;
@@ -5202,7 +5206,7 @@ async function openFactuur(id) {
   // Ook vanuit Overgeslagen meteen invullen en goedkeuren (Shereen 13 okt: "hoeft niet per se weer naar beoordelen,
   // t kan right here") — behalve een origineel dat Shai al splitste (bestaat niet meer in Basecone).
   const beoordelen = ["voorstel", "voorleggen", "fout"].includes(d.status)
-    || (d.status === "overgeslagen" && !/^Door Shai gesplitst/.test(d.opmerking || ""));
+    || (d.status === "overgeslagen" && !faWegUitBasecone(d));
   // Door Shai afgeknipte onbruikbare foto (13 okt): niets te boeken, alleen verwijderen.
   const onbruikbaar = (d.basecone || {}).besluit === "onbruikbaar";
   document.getElementById("btn-fa-goedkeuren").style.display = beoordelen && !onbruikbaar ? "" : "none";
@@ -5213,7 +5217,7 @@ async function openFactuur(id) {
   // Splitsen van een al getagd document (Shereen 13 okt): alleen bij meer dan één pagina, nog niet geboekt/ingevuld.
   // Niet bij een origineel dat Shai al bij Aangeleverd splitste (bestaat niet meer in Basecone; geen boeking = nooit getagd).
   document.getElementById("btn-fa-splitsen").style.display = (beoordelen || d.status === "overgeslagen") && (d.scan_paden || []).length > 1
-    && (d.basecone || {}).boeking && !/^Door Shai gesplitst/.test(d.opmerking || "") ? "" : "none";
+    && (d.basecone || {}).boeking && !faWegUitBasecone(d) ? "" : "none";
   // Verwijderen: alles wat nog niet geboekt of ingevuld is (Shai doet het in Basecone, ook bij Aangeleverd).
   document.getElementById("btn-fa-verwijderen").style.display = beoordelen || ["overgeslagen", "splitsen"].includes(d.status) ? "" : "none";
   document.getElementById("fa-verwijder-vak").style.display = "none";
@@ -8609,8 +8613,8 @@ async function vwScansWissen(d) {
   if (!paden.size) return 0;
   const { data: anderen, error: e1 } = await sb.from("basecone_documenten").select("id, status, opmerking, scan_paden").overlaps("scan_paden", [...paden]).neq("id", d.id);
   if (e1) throw new Error(e1.message);
-  // Het origineel van een splitsing telt niet mee: dat bestaat in Basecone niet meer, de delen zijn de documenten.
-  const echt = (anderen || []).filter(x => !(x.status === "overgeslagen" && /^Door Shai gesplitst/.test(x.opmerking || "")));
+  // Het origineel van een splitsing of samenvoeging telt niet mee: dat bestaat in Basecone niet meer.
+  const echt = (anderen || []).filter(x => !faWegUitBasecone(x));
   const inGebruik = new Set(echt.flatMap(x => x.scan_paden || []));
   const weg = [...paden].filter(x => !inGebruik.has(x));
   if (!weg.length) return 0;

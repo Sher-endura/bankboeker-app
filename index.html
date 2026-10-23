@@ -1298,6 +1298,7 @@ async function initAuth() {
   setTimeout(laadAiStand, 1500);
   setInterval(laadAiStand, 10 * 60 * 1000);
   startOnline();
+  startUrenKlok();
   document.getElementById("btn-uitloggen").style.display = "";
   return true;
 }
@@ -7791,7 +7792,7 @@ document.getElementById("btn-fa-overslaan").addEventListener("click", () => faZe
    Een selectie (één klant) kan naar de klant gemaild worden: ontvangers = contactpersonen met het vinkje
    aanleverherinneringen in E-Board (functie shai-klantcontacten in het E-Board-project); versturen via
    basecone-verwijderd-mail (Microsoft 365, vanaf het Endura-adres). De koppeling administratie → E-Board-
-   klant staat in het klantprofiel (eboard_klant) en wordt bij de eerste mail één keer gekozen. */
+   klant staat sinds 23 okt in E-Board (shai_koppelingen, ook voor de werktijd) en wordt bij de eerste mail één keer gekozen. */
 let vwDocs = [], vwVink = new Set(), vwEboardKlanten = null;
 const EBOARD_FUNCTIES = "https://xwswtarlyygiayjrzefh.supabase.co/functions/v1";
 const vwDatum = (iso) => iso ? new Date(iso).toLocaleDateString("nl-NL", { timeZone: "America/Aruba", day: "2-digit", month: "2-digit", year: "numeric" }) : "";
@@ -7824,6 +7825,135 @@ async function vpRoep(body) {
   if (!resp.ok) throw new Error(r.fout || r.message || `HTTP ${resp.status}`);
   return r;
 }
+/* ===== Werktijd naar de uren van E-Board (Shereen 23 okt 2026) =====
+   Per medewerker en per klant de echte werktijd in Bank en Basecone, op de seconde ("Shai doet sommige boekingen
+   binnen een minuut, afronden op een kwartier is niet eerlijk naar de klant"). De klok start als je een regel
+   (Bank) of document (Basecone) van een klant opent en loopt door zolang je op dat tabblad bij die klant blijft.
+   Hij stopt bij een andere klant, een ander tabblad, of na 5 minuten zonder muis of toetsenbord; die stille
+   minuten tellen dan niet mee. Elke 30 seconden gaan de gemeten stukjes (van–tot) naar E-Board (functie shai-uren);
+   lukt dat niet, dan blijven ze in deze browser bewaard en gaan ze bij de volgende keer mee. E-Board telt ze op
+   bij één urenregel per medewerker, klant, dag en boekingsmaand (database-update 160 van E-Board). */
+const UK_STIL_MS = 5 * 60 * 1000, UK_STUUR_MS = 30 * 1000, UK_OPSLAG = "shai.urenklok.wachtrij.v1";
+let ukActief = null, ukStart = null, ukLaatst = Date.now(), ukVerschil = 0, ukBezig = false;   // ukActief = { office, bron }
+const ukUuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)));
+async function ukRoep(body) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) throw new Error("Niet ingelogd.");
+  const resp = await fetch(`${EBOARD_FUNCTIES}/shai-uren`, { method: "POST",
+    headers: { "Authorization": "Bearer " + EBOARD_ANON, "apikey": EBOARD_ANON, "x-shai-token": session.access_token, "Content-Type": "application/json" },
+    body: JSON.stringify(body) });
+  const r = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(r.fout || r.message || `HTTP ${resp.status}`);
+  return r;
+}
+function ukWachtrij() { try { return JSON.parse(localStorage.getItem(UK_OPSLAG)) || []; } catch (e) { return []; } }
+function ukBewaar(lijst) { try { localStorage.setItem(UK_OPSLAG, JSON.stringify(lijst)); } catch (e) { /* vol of geblokkeerd */ } }
+const ukZichtbaar = (id) => { const el = document.getElementById(id); return !!el && el.style.display !== "none"; };
+// Bij welke klant ben je nu bezig? Open regel/document gaat voor; zonder open regel blijft de klok bij de klant
+// waar je mee bezig was, zolang je op hetzelfde tabblad blijft en de lijst niet op een andere klant staat.
+// De periode (Shereen 23 okt): de maand van de BOEKING, niet van het werk. Bank = de datum van de bankregel;
+// Basecone = de factuurdatum (een statement van september dat in oktober binnenkomt hoort bij september).
+// Onbekend (nog geen datum) = leeg; E-Board neemt dan de werkdag.
+const ukMaand = (d) => /^\d{4}-\d{2}-\d{2}/.test(String(d || "")) ? String(d).slice(0, 7) + "-01" : null;
+function ukWaar() {
+  const bron = ukZichtbaar("tab-bank") ? "bank" : ukZichtbaar("tab-facturen") ? "basecone" : null;
+  if (!bron) return null;
+  if (bron === "bank" && bkGekozen) {
+    const r = bkRegels.find(x => x.id === bkGekozen);
+    if (r && r.office) return { office: String(r.office).toUpperCase(), bron, periode: ukMaand(r.datum) };
+  }
+  if (bron === "basecone" && faGekozen && faGekozen.office) {
+    const g = faGekozen.goedgekeurd || {}, v = faGekozen.voorstel || {};
+    return { office: String(faGekozen.office).toUpperCase(), bron, periode: ukMaand(document.getElementById("fa-datum")?.value || g.datum || v.datum) };
+  }
+  if (!ukActief || ukActief.bron !== bron) return null;
+  const filter = String(document.getElementById(bron === "bank" ? "bk-office" : "fa-office")?.value || "").toUpperCase();
+  return !filter || filter === ukActief.office ? ukActief : null;
+}
+// Een gemeten stukje in de wachtrij zetten (tijden van deze computer, in milliseconden).
+function ukStukje(van, tot) {
+  if (!ukActief || !(tot > van)) return;
+  const q = ukWachtrij();
+  q.push({ id: ukUuid(), email: (gebruiker.email || "").toLowerCase(), administratie: ukActief.office, bron: ukActief.bron, periode: ukActief.periode || null, van, tot });
+  ukBewaar(q);
+}
+function ukTik(isActiviteit) {
+  const nu = Date.now();
+  if (isActiviteit && nu - ukLaatst < 250) { ukLaatst = nu; return; }   // muisbewegingen komen tientallen keren per seconde
+  if (isActiviteit) {
+    if (ukStart !== null && nu - ukLaatst > UK_STIL_MS) { ukStukje(ukStart, ukLaatst); ukStart = null; }   // stilte telt niet
+    ukLaatst = nu;
+  } else if (ukStart !== null && nu - ukLaatst > UK_STIL_MS) {
+    ukStukje(ukStart, ukLaatst); ukStart = null;
+  }
+  const waar = ukWaar();
+  const sleutel = (w) => w ? `${w.office}|${w.bron}|${w.periode || ""}` : "";   // andere klant, tabblad of boekingsmaand = nieuw stukje
+  const anders = sleutel(waar) !== sleutel(ukActief);
+  if (anders) {
+    if (ukStart !== null) ukStukje(ukStart, ukLaatst);
+    ukActief = waar;
+    ukStart = waar && nu - ukLaatst <= UK_STIL_MS ? ukLaatst : null;
+  } else if (ukActief && ukStart === null && isActiviteit) {
+    ukStart = nu;
+  }
+}
+// Wat tot nu toe gemeten is afsluiten (tot de laatste muis/toets) en versturen.
+async function ukVersturen(bijSluiten) {
+  if (ukStart !== null && ukLaatst > ukStart) { ukStukje(ukStart, ukLaatst); ukStart = ukLaatst; }
+  const ik = (gebruiker.email || "").toLowerCase();
+  const weg = Date.now() - 6 * 864e5;   // E-Board neemt niets ouder dan 7 dagen aan
+  const q = ukWachtrij().filter(s => s.tot > weg);
+  ukBewaar(q);
+  // Alleen je eigen stukjes; die van een collega op deze computer gaan mee als die weer inlogt.
+  const mee = q.filter(s => s.email === ik).slice(0, 300);
+  if (!mee.length || (ukBezig && !bijSluiten)) return;
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  const iso = (ms) => new Date(ms + ukVerschil).toISOString();   // in de klok van de server
+  const verzoek = { method: "POST", keepalive: !!bijSluiten,
+    headers: { "Authorization": "Bearer " + EBOARD_ANON, "apikey": EBOARD_ANON, "x-shai-token": session.access_token, "Content-Type": "application/json" },
+    body: JSON.stringify({ actie: "tijd", segmenten: mee.map(s => ({ id: s.id, administratie: s.administratie, bron: s.bron, periode: s.periode || null, van: iso(s.van), tot: iso(s.tot) })) }) };
+  if (bijSluiten) { fetch(`${EBOARD_FUNCTIES}/shai-uren`, verzoek).catch(() => {}); return; }   // pagina gaat dicht: niet wachten
+  ukBezig = true;
+  const verstuurd = Date.now();
+  try {
+    const resp = await fetch(`${EBOARD_FUNCTIES}/shai-uren`, verzoek);
+    const r = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(r.fout || `HTTP ${resp.status}`);
+    // Ontvangen (ook "al binnen" of "geweigerd"): uit de wachtrij.
+    const klaar = new Set(mee.map(s => s.id));
+    ukBewaar(ukWachtrij().filter(s => !klaar.has(s.id)));
+    ukKlokGelijk(r.nu, verstuurd);
+  } catch (e) {
+    console.warn("Werktijd naar E-Board: nog niet gelukt, volgende keer opnieuw.", e);
+  } finally { ukBezig = false; }
+}
+// Loopt de klok van deze computer verkeerd, dan schuiven alle tijden mee; de lengte van een stukje verandert niet.
+function ukKlokGelijk(serverNu, verstuurd) {
+  const s = Date.parse(serverNu || "");
+  if (!s) return;
+  const nieuw = s - (verstuurd + Date.now()) / 2;
+  if (Math.abs(nieuw - ukVerschil) > 5000) ukVerschil = Math.round(nieuw);   // kleine schommelingen negeren: geen overlap tussen stukjes
+}
+function startUrenKlok() {
+  if (!CLOUD || !gebruiker || ["shai@endura-aruba.com"].includes((gebruiker.email || "").toLowerCase())) return;   // de robot meet niets
+  for (const ev of ["mousemove", "mousedown", "keydown", "wheel", "touchstart"]) document.addEventListener(ev, () => ukTik(true), { capture: true, passive: true });
+  document.addEventListener("scroll", () => ukTik(true), { capture: true, passive: true });
+  // Na een klik (regel open, andere klant, ander tabblad) direct kijken, niet pas bij de volgende tik:
+  // dan begint de nieuwe klant op de seconde van de klik.
+  document.addEventListener("click", () => setTimeout(() => ukTik(false), 0));
+  setInterval(() => ukTik(false), 1000);
+  window.addEventListener("pagehide", () => { ukTik(false); ukVersturen(true); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") { ukTik(false); ukVersturen(false); } });
+  // Eerst het klokverschil met de server bepalen, dan pas versturen (ook wat er nog van vorige keer ligt).
+  (async () => {
+    try { const verstuurd = Date.now(); ukKlokGelijk((await ukRoep({ actie: "koppelingen" })).nu, verstuurd); }
+    catch (e) { /* dan met de klok van deze computer */ }
+    ukVersturen(false);
+    setInterval(() => ukVersturen(false), UK_STUUR_MS);
+  })();
+}
+
 const vpLabel = (p) => `${MAANDEN[Number(p.slice(5, 7)) - 1]} ${p.slice(0, 4)}`;
 const vpBedrag = (n) => Number(n || 0).toLocaleString("nl-NL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const vpDatum = (d) => String(d || "").replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");   // geen tijdzone: anders schuift de dag
@@ -8656,8 +8786,12 @@ async function vwMailOpenen() {
   const vak = document.getElementById("vw-mail");
   vak.style.display = "";
   vak.innerHTML = "Even kijken in E-Board…";
-  const p = profielen.find(x => x.code === office);
-  if (p && p.eboard_klant && p.eboard_klant.id) await vwKlantGekozen(p.eboard_klant.id);
+  // De koppeling administratie → E-Board-klant staat sinds 23 okt in E-Board (shai_koppelingen), dezelfde die de
+  // werktijd naar de juiste klant brengt.
+  let k = null;
+  try { k = ((await ukRoep({ actie: "koppelingen" })).koppelingen || []).find(x => x.administratie === String(office).toUpperCase()); }
+  catch (e) { /* dan kiezen */ }
+  if (k) await vwKlantGekozen(k.customer_id);
   else await vwKlantKiezen();
 }
 async function vwKlantKiezen() {
@@ -8680,7 +8814,10 @@ async function vwKlantKiezen() {
     const waarde = document.getElementById("vw-klant-zoek").value.trim();
     const k = vwEboardKlanten.find(x => label(x) === waarde);
     if (!k) { toonMelding("melding-verwijderd", "fout", "Kies een klant uit de lijst."); return; }
-    if (p) { p.eboard_klant = { id: k.id, naam: k.naam, debiteur: k.debiteur }; bewaarCloud(); }
+    // Onthouden in E-Board; een bestaande koppeling omzetten mag alleen Shereen of Antoine (dan gaat deze mail
+    // wel naar de gekozen klant, maar blijft de koppeling zoals hij was).
+    try { await ukRoep({ actie: "koppelen", administratie: office, customer_id: k.id }); }
+    catch (e) { toonMelding("melding-verwijderd", "fout", escapeHtml(e.message)); }
     await vwKlantGekozen(k.id);
   });
 }
